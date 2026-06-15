@@ -12,6 +12,10 @@
 
 namespace {
 
+// Upper bound for responses buffered fully in memory (model lists, JSON
+// replies). Prevents a malicious/compromised server from exhausting RAM.
+constexpr size_t kMaxInMemoryResponse = 64ULL * 1024 * 1024;  // 64 MiB
+
 static CURL* CURL_setup_common(const std::string_view url,
                                CurlUtils::CancelChecker& cancel_checker,
                                bool timeout = true) {
@@ -21,7 +25,11 @@ static CURL* CURL_setup_common(const std::string_view url,
         return nullptr;
     }
 
-    curl_easy_setopt(curl, CURLOPT_URL, url.data());
+    // CURLOPT_URL needs a NUL-terminated C string; string_view::data() is not
+    // guaranteed terminated. curl copies the URL at setopt time, so a local
+    // string is sufficient.
+    const std::string url_str(url);
+    curl_easy_setopt(curl, CURLOPT_URL, url_str.c_str());
     // Follow up to 5 redirects
     curl_easy_setopt(curl, CURLOPT_MAXREDIRS, 5L);
     // Enable 302 redirects
@@ -148,13 +156,18 @@ std::optional<std::string> download_memory(
     // Write callback
     curl_easy_setopt(
         curl, CURLOPT_WRITEFUNCTION,
-        +[](void* contents, size_t size, size_t nmemb, void* userp) {
-            std::string s(static_cast<char*>(contents), size * nmemb);
-            *static_cast<std::string*>(userp) += s;
+        +[](void* contents, size_t size, size_t nmemb, void* userp) -> size_t {
+            auto* out = static_cast<std::string*>(userp);
+            const size_t incoming = size * nmemb;
+            if (out->size() + incoming > kMaxInMemoryResponse) {
+                LOG(ERROR) << "Response exceeded in-memory limit of "
+                           << kMaxInMemoryResponse << " bytes, aborting";
+                return 0;  // short count aborts the transfer
+            }
+            out->append(static_cast<char*>(contents), incoming);
             LOG_EVERY_N_SEC(INFO, 5)
-                << fmt::format("Downloaded {} bytes so far",
-                               static_cast<std::string*>(userp)->size());
-            return size * nmemb;
+                << fmt::format("Downloaded {} bytes so far", out->size());
+            return incoming;
         });
     curl_easy_setopt(curl, CURLOPT_WRITEDATA, &result);
 
@@ -206,13 +219,18 @@ std::optional<std::string> send_json_get_reply(const std::string_view url,
     // Write callback
     curl_easy_setopt(
         curl, CURLOPT_WRITEFUNCTION,
-        +[](void* contents, size_t size, size_t nmemb, void* userp) {
-            std::string s(static_cast<char*>(contents), size * nmemb);
-            *static_cast<std::string*>(userp) += s;
+        +[](void* contents, size_t size, size_t nmemb, void* userp) -> size_t {
+            auto* out = static_cast<std::string*>(userp);
+            const size_t incoming = size * nmemb;
+            if (out->size() + incoming > kMaxInMemoryResponse) {
+                LOG(ERROR) << "Reply exceeded in-memory limit of "
+                           << kMaxInMemoryResponse << " bytes, aborting";
+                return 0;  // short count aborts the transfer
+            }
+            out->append(static_cast<char*>(contents), incoming);
             LOG_EVERY_N_SEC(INFO, 5)
-                << fmt::format("Received {} bytes so far",
-                               static_cast<std::string*>(userp)->size());
-            return size * nmemb;
+                << fmt::format("Received {} bytes so far", out->size());
+            return incoming;
         });
     curl_easy_setopt(curl, CURLOPT_WRITEDATA, &result);
 
