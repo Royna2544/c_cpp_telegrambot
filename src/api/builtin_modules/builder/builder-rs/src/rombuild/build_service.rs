@@ -706,6 +706,7 @@ impl rom_build_service_server::RomBuildService for BuildService {
         // Umount /sys/kernel/debug as it causes problem when zipping /d directory later,
         // and it should be safe to umount it since it's only used for debugging and not
         // critical for the build process.
+        #[cfg(unix)]
         if_mounted_try_umount("/sys/kernel/debug");
 
         // 1. Check concurrency (Android builds use 100% CPU, usually 1 at a time is best)
