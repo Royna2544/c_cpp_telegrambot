@@ -6,7 +6,9 @@
 
 #include <StructF.hpp>
 #include <libos/libsighandler.hpp>
+#include <string>
 #include <utility>
+#include <vector>
 
 #include "utils/libfs.hpp"
 
@@ -129,12 +131,13 @@ bool download_file(const std::string_view url,
 
 std::optional<std::string> download_memory(
     const std::string_view url, CurlUtils::CancelChecker cancel_checker,
-    const std::string_view authkey) {
+    const std::vector<std::string>& headers) {
     std::string result;
 
     LOG(INFO) << "Downloading " << url << " to memory";
-    if (!authkey.empty()) {
-        LOG(INFO) << "Using authorization key for download";
+    if (!headers.empty()) {
+        LOG(INFO) << "Using " << headers.size()
+                  << " custom header(s) for download";
     }
 
     // Common CURL setup
@@ -144,13 +147,13 @@ std::optional<std::string> download_memory(
         return std::nullopt;
     }
 
-    // Set authorization header if provided
-    struct curl_slist* headers = nullptr;
-    if (!authkey.empty()) {
-        std::string auth_header =
-            "Authorization: Bearer " + std::string(authkey);
-        headers = curl_slist_append(headers, auth_header.c_str());
-        curl_easy_setopt(curl, CURLOPT_HTTPHEADER, headers);
+    // Set request headers if provided
+    struct curl_slist* hdrlist = nullptr;
+    for (const auto& header : headers) {
+        hdrlist = curl_slist_append(hdrlist, header.c_str());
+    }
+    if (hdrlist != nullptr) {
+        curl_easy_setopt(curl, CURLOPT_HTTPHEADER, hdrlist);
     }
 
     // Write callback
@@ -173,8 +176,8 @@ std::optional<std::string> download_memory(
 
     // Execute it
     bool exec_result = CURL_perform_common(curl);
-    if (headers != nullptr) {
-        curl_slist_free_all(headers);
+    if (hdrlist != nullptr) {
+        curl_slist_free_all(hdrlist);
     }
     LOG_IF(INFO, exec_result) << "Download succeeded";
     if (exec_result) {
@@ -184,9 +187,19 @@ std::optional<std::string> download_memory(
     }
 }
 
-std::optional<std::string> send_json_get_reply(const std::string_view url,
-                                               std::string json,
-                                               const std::string_view authkey) {
+std::optional<std::string> download_memory(
+    const std::string_view url, CurlUtils::CancelChecker cancel_checker,
+    const std::string_view authkey) {
+    std::vector<std::string> headers;
+    if (!authkey.empty()) {
+        headers.emplace_back("Authorization: Bearer " + std::string(authkey));
+    }
+    return download_memory(url, std::move(cancel_checker), headers);
+}
+
+std::optional<std::string> send_json_get_reply(
+    const std::string_view url, std::string json,
+    const std::vector<std::string>& headers) {
     std::string result;
 
     LOG(INFO) << "Sending JSON to " << url;
@@ -203,14 +216,12 @@ std::optional<std::string> send_json_get_reply(const std::string_view url,
     // Set timeout for connection, lower than default
     curl_easy_setopt(curl, CURLOPT_CONNECTTIMEOUT, 15L);
 
-    struct curl_slist* headers = nullptr;
-    headers = curl_slist_append(headers, "Content-Type: application/json");
-    if (!authkey.empty()) {
-        std::string auth_header =
-            "Authorization: Bearer " + std::string(authkey);
-        headers = curl_slist_append(headers, auth_header.c_str());
+    struct curl_slist* hdrlist = nullptr;
+    hdrlist = curl_slist_append(hdrlist, "Content-Type: application/json");
+    for (const auto& header : headers) {
+        hdrlist = curl_slist_append(hdrlist, header.c_str());
     }
-    curl_easy_setopt(curl, CURLOPT_HTTPHEADER, headers);
+    curl_easy_setopt(curl, CURLOPT_HTTPHEADER, hdrlist);
 
     // Set POST data
     curl_easy_setopt(curl, CURLOPT_POSTFIELDS, json.data());
@@ -236,12 +247,22 @@ std::optional<std::string> send_json_get_reply(const std::string_view url,
 
     // Execute it
     bool exec_result = CURL_perform_common(curl);
-    curl_slist_free_all(headers);
+    curl_slist_free_all(hdrlist);
     LOG_IF(INFO, exec_result) << "Request succeeded";
     if (exec_result)
         return result;
     else
         return {};
+}
+
+std::optional<std::string> send_json_get_reply(const std::string_view url,
+                                               std::string json,
+                                               const std::string_view authkey) {
+    std::vector<std::string> headers;
+    if (!authkey.empty()) {
+        headers.emplace_back("Authorization: Bearer " + std::string(authkey));
+    }
+    return send_json_get_reply(url, std::move(json), headers);
 }
 
 }  // namespace CurlUtils
