@@ -185,9 +185,13 @@ void TgBotApiImpl::commandHandler(const std::string& command,
         return;
     }
 
-    if (!_rateLimiter.check()) {
-        LOG(INFO) << fmt::format("Ratelimiting user {}",
-                                 ext->get<MessageAttrs::User>());
+    // Rate-limit per user (fall back to chat id when there is no sender, e.g.
+    // channel posts) so one user cannot exhaust a shared global budget.
+    const auto rlUser = ext->get<MessageAttrs::User>();
+    const std::int64_t rlKey =
+        rlUser ? rlUser->id : ext->get<MessageAttrs::Chat>()->id;
+    if (!_rateLimiter.check(rlKey)) {
+        LOG(INFO) << fmt::format("Ratelimiting user {}", rlUser);
         return;
     }
 

@@ -508,7 +508,7 @@ class TgBotApiImpl : public TgBotApi {
     StringResLoader* _loader;
     Providers* _provider;
     std::vector<CommandListener*> _listeners;
-    IntervalRateLimiter _rateLimiter;
+    KeyedIntervalRateLimiter _rateLimiter;
     RefLock* _refLock;
     TgLongPoll* _longPoll;
     Api::LocalFileMapper _apiServerLocalMapper;

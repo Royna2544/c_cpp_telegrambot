@@ -3,6 +3,7 @@
 
 #include <api/RateLimit.hpp>
 #include <limits>
+#include <utility>
 
 IntervalRateLimiter::IntervalRateLimiter(uint32_t maxPerInterval,
                                          clock::duration interval)
@@ -62,4 +63,37 @@ bool IntervalRateLimiter::check() {
         // before we did. The 'expected' variable is automatically updated with
         // the new value, and the while loop instantly retries.
     }
+}
+
+KeyedIntervalRateLimiter::KeyedIntervalRateLimiter(uint32_t maxPerInterval,
+                                                   clock::duration interval)
+    : maxPerInterval_{maxPerInterval}, interval_{interval} {}
+
+void KeyedIntervalRateLimiter::pruneIfNeeded(clock::time_point now) {
+    if (++checksSincePrune_ < kPruneEvery) {
+        return;
+    }
+    checksSincePrune_ = 0;
+    // A key idle for longer than a few windows has an expired limiter window,
+    // so dropping it is equivalent to keeping a fresh one for a returning user.
+    const auto ttl = interval_ * 4;
+    std::erase_if(limiters_, [now, ttl](const auto& kv) {
+        return now - kv.second.lastAccess > ttl;
+    });
+}
+
+bool KeyedIntervalRateLimiter::check(std::int64_t key) {
+    const auto now = clock::now();
+    const std::lock_guard<std::mutex> lock(mutex_);
+    pruneIfNeeded(now);
+    auto it = limiters_.find(key);
+    if (it == limiters_.end()) {
+        it = limiters_
+                 .emplace(key, Entry{std::make_unique<IntervalRateLimiter>(
+                                         maxPerInterval_, interval_),
+                                     now})
+                 .first;
+    }
+    it->second.lastAccess = now;
+    return it->second.limiter->check();
 }
