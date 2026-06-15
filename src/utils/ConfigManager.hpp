@@ -39,6 +39,9 @@ class UTILS_EXPORT ConfigManager {
         TELEGRAM_API_SERVER_FILEPATH_REMOVE_PREFIX,
         TELEGRAM_API_SERVER_FILEPATH_APPEND_PREFIX,
         KERNELBUILD_SERVER,
+        LLM_URL,
+        LLM_API_TYPE,
+        LLM_AUTHKEY,
         MAX
     };
     static constexpr size_t CONFIG_MAX = static_cast<int>(Configs::MAX);
@@ -201,6 +204,30 @@ class UTILS_EXPORT ConfigManager {
             .alias = Entry::ALIAS_NONE,
             .type = Entry::ArgType::STRING,
             .belongsTo = &sectionNetwork,
+        },
+        {
+            .config = Configs::LLM_URL,
+            .name = "Url",
+            .description = "LLM API base URL (scheme + host, no path)",
+            .alias = Entry::ALIAS_NONE,
+            .type = Entry::ArgType::STRING,
+            .belongsTo = &sectionLLM,
+        },
+        {
+            .config = Configs::LLM_API_TYPE,
+            .name = "ApiType",
+            .description = "LLM API type (OpenAI, LMStudio, Anthropic)",
+            .alias = Entry::ALIAS_NONE,
+            .type = Entry::ArgType::STRING,
+            .belongsTo = &sectionLLM,
+        },
+        {
+            .config = Configs::LLM_AUTHKEY,
+            .name = "AuthKey",
+            .description = "LLM API authentication key (optional)",
+            .alias = Entry::ALIAS_NONE,
+            .type = Entry::ArgType::STRING,
+            .belongsTo = &sectionLLM,
         }};
 
     struct Backend {
