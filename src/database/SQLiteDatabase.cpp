@@ -195,8 +195,12 @@ bool SQLiteDatabase::Helper::bindArguments() {
             [this, &argument](auto&& arg) {
                 using T = std::decay_t<decltype(arg)>;
                 if constexpr (std::is_same_v<T, std::string>) {
+                    // SQLITE_TRANSIENT makes SQLite copy the bytes immediately,
+                    // so binding does not depend on the argument vector
+                    // outliving the step (SQLITE_STATIC would dangle if the
+                    // arguments were mutated/rebound before execution).
                     sqlite3_bind_text(stmt, argument.index, arg.c_str(), -1,
-                                      SQLITE_STATIC);
+                                      SQLITE_TRANSIENT);
                 } else if constexpr (std::is_same_v<T, int64_t>) {
                     sqlite3_bind_int64(stmt, argument.index, arg);
                 } else if constexpr (std::is_same_v<T, int32_t>) {
@@ -256,6 +260,10 @@ bool SQLiteDatabase::Helper::execute() {
         return false;
     }
 
+    // Mark executed before stepping (mirrors execAndGetRow). The previous code
+    // set this after an unconditional switch return, so it was dead code and
+    // getNextStatement() always saw a non-EXECUTED state and bailed.
+    state = State::EXECUTED;
     switch (sqlite3_step(stmt)) {
         case SQLITE_DONE:
         case SQLITE_ROW:
@@ -264,8 +272,6 @@ bool SQLiteDatabase::Helper::execute() {
             LOG(ERROR) << "Error executing: " << sqlite3_errmsg(db);
             return false;
     }
-    state = State::EXECUTED;
-    return true;
 }
 
 std::shared_ptr<SQLiteDatabase::Helper>
