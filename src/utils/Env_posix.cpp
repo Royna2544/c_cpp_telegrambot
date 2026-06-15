@@ -5,7 +5,10 @@
 
 const Env::ValueEntry& Env::ValueEntry::operator=(
     const std::string_view value) const noexcept {
-    setenv(_key.data(), value.data(), 1);
+    // value.data() is not guaranteed NUL-terminated; copy into a std::string
+    // before handing it to the C API.
+    const std::string value_str(value);
+    setenv(_key.c_str(), value_str.c_str(), 1);
     return *this;
 }
 

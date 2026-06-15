@@ -8,18 +8,29 @@
 
 const Env::ValueEntry& Env::ValueEntry::operator=(
     const std::string_view value) const noexcept {
-    SetEnvironmentVariableA(_key.data(), value.data());
+    // value.data() is not guaranteed NUL-terminated; copy first.
+    const std::string value_str(value);
+    SetEnvironmentVariableA(_key.c_str(), value_str.c_str());
     return *this;
 }
 
 void Env::ValueEntry::clear() const noexcept {
-    SetEnvironmentVariableA(_key.data(), nullptr);
+    SetEnvironmentVariableA(_key.c_str(), nullptr);
 }
 
 std::optional<std::string> Env::ValueEntry::get() const noexcept {
-    std::array<char, 1024> buf = {};
-    if (GetEnvironmentVariableA(_key.data(), buf.data(), buf.size() - 1) != 0) {
-        return buf.data();
+    // Query the required size first so values longer than a fixed buffer are
+    // not silently truncated.
+    const DWORD needed = GetEnvironmentVariableA(_key.c_str(), nullptr, 0);
+    if (needed == 0) {
+        return std::nullopt;  // not set
     }
-    return std::nullopt;
+    std::string buf(needed, '\0');
+    const DWORD written =
+        GetEnvironmentVariableA(_key.c_str(), buf.data(), needed);
+    if (written == 0) {
+        return std::nullopt;
+    }
+    buf.resize(written);
+    return buf;
 }
