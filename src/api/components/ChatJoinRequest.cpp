@@ -1,4 +1,6 @@
 #include "tgbot/types/ChatJoinRequest.h"
+#include "tgbot/types/ChatMemberAdministrator.h"
+#include "tgbot/types/ChatMemberOwner.h"
 
 #include <absl/strings/strip.h>
 #include <trivial_helpers/_tgbot.h>
@@ -43,9 +45,14 @@ void TgBotApiImpl::ChatJoinRequestImpl::onCallbackQueryFunction(
         return absl::StartsWith(queryData, fmt::to_string(req.second->date));
     });
     if (reqIt != joinReqs.end()) {
-        if (auto user = _api->getApi().getChatMember(reqIt->first->chat->id,
-                                                     query->from->id);
-            user && user->status != TgBot::ChatMemberAdministrator::STATUS) {
+        // Only chat administrators / the creator may action a join request.
+        // Fail closed: if the membership lookup fails (null), deny rather than
+        // fall through to approving/banning.
+        auto user = _api->getApi().getChatMember(reqIt->first->chat->id,
+                                                 query->from->id);
+        if (!user ||
+            (user->status != TgBot::ChatMemberAdministrator::STATUS &&
+             user->status != TgBot::ChatMemberOwner::STATUS)) {
             _api->answerCallbackQuery(query->id,
                                       "Sorry, you are not allowed to");
             return;
