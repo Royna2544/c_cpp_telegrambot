@@ -1677,16 +1677,29 @@ impl rom_build_service_server::RomBuildService for BuildService {
                 }
                 command_list.push("source build/envsetup.sh".to_string());
 
+                // These values originate from on-disk config and repo-synced
+                // filenames, so shell-quote every interpolated component before
+                // feeding it to bash. Adjacent quoted/unquoted tokens still
+                // concatenate into the expected lunch combo argument.
                 let command = match release {
                     Some(ref rel) => {
-                        format!("lunch {}_{}-{}-{}", vendor_name, device_entry.codename, rel, build_variant)
+                        format!("lunch {}_{}-{}-{}",
+                            Self::shell_single_quote(vendor_name.as_str()),
+                            Self::shell_single_quote(device_entry.codename.as_str()),
+                            Self::shell_single_quote(rel.as_str()),
+                            Self::shell_single_quote(build_variant))
                     }
                     None => {
-                        format!("lunch {}_{}-{}", vendor_name, device_entry.codename, build_variant)
+                        format!("lunch {}_{}-{}",
+                            Self::shell_single_quote(vendor_name.as_str()),
+                            Self::shell_single_quote(device_entry.codename.as_str()),
+                            Self::shell_single_quote(build_variant))
                     }
                 };
                 command_list.push(command);
-                command_list.push(format!("m {} -j{}", rom_entry.target, parallel_jobs));
+                command_list.push(format!("m {} -j{}",
+                    Self::shell_single_quote(rom_entry.target.as_str()),
+                    parallel_jobs));
                 command_list.push("exit 0".to_string());
 
                 for line in command_list {
