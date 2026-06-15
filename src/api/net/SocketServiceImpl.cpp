@@ -380,9 +380,16 @@ Status SocketServiceImpl::Service::requestFileTransfer(
               << request->file_path()
               << (request->is_upload() ? " (upload)" : " (download)");
 
-    // 1. Create UUID for the transfer
-    std::mt19937 rng(std::random_device{}());
-    uuids::uuid uuid = uuids::uuid_random_generator{rng}();
+    // 1. Create UUID for the transfer. Transfers are looked up solely by this
+    // id, so draw it straight from the OS CSPRNG rather than a single-seeded
+    // mt19937 (whose stream a client could otherwise predict from observed
+    // ids and use to hijack another in-flight transfer).
+    std::random_device rd;
+    std::array<std::uint8_t, 16> uuid_bytes{};
+    for (auto& uuid_byte : uuid_bytes) {
+        uuid_byte = static_cast<std::uint8_t>(rd());
+    }
+    uuids::uuid uuid(uuid_bytes.begin(), uuid_bytes.end());
     response->set_uuid(uuids::to_string(uuid));
     // 2. Create file stream and store in activeTransfers_
     TranferEntry entry;
