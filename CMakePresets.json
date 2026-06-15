@@ -54,8 +54,7 @@
         "CMAKE_C_COMPILER": "cl.exe",
         "CMAKE_CXX_COMPILER": "cl.exe",
         "TGBOTCPP_BUILD_TESTS": true,
-        "BUILD_SHARED_LIBS": false,
-        "TGBOTCPP_ENABLE_LOCAL_LLM": false
+        "BUILD_SHARED_LIBS": false
       },
       "condition": {
         "type": "equals",

@@ -8,8 +8,6 @@
       "name": "dlfcn-win32",
       "platform": "windows"
     },
-    "boost-asio",
-    "boost-system",
     "grpc",
     "boost-program-options",
     "curl",

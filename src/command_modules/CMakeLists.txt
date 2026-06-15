@@ -208,19 +208,6 @@ command_module(NAME log SRCS log.cpp)
 
 command_module(NAME q SRCS q.cpp LIBS CurlDownload)
 
-option(TGBOTCPP_ENABLE_LOCAL_LLM "Enable LLM local module, requires CUDA toolkit and NVIDIA GPU" OFF)
-
-if (TGBOTCPP_ENABLE_LOCAL_LLM)
-  set(GGML_CUDA ON)
-  add_subdirectory(llm/llama.cpp)
-  if (MSVC)
-    target_compile_options(llama PUBLIC /Zc:char8_t-)
-  endif()
-  command_module(NAME ask SRCS ask.cpp llm/LLMCore.cpp LIBS llama CurlDownload Utils DEFS ASK_ENABLE_LOCAL_LLM)
-else()
-  command_module(NAME ask SRCS ask.cpp LIBS CurlDownload Utils)
-endif()
-
 if (TGBOTCPP_LUA_MODULES)
   file(GLOB LUA_SCRIPTS "${CMAKE_CURRENT_SOURCE_DIR}/*.lua")
   
