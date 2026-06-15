@@ -15,19 +15,15 @@
 RestartFmt::Type::Type(const absl::string_view string) {
     std::vector<std::string> parts =
         absl::StrSplit(string, ":", absl::SkipEmpty());
-    bool parseFail = false;
     if (parts.size() != 3) {
         LOG(ERROR) << "env has " << parts.size()
                    << " parts, expected 3 parts for RESTART=" << string;
-        parseFail = true;
+        throw std::invalid_argument("Invalid format for RESTART");
     }
     if (!(try_parse(parts[0], &chat_id) && try_parse(parts[1], &message_id) &&
           try_parse(parts[2], &message_thread_id))) {
         LOG(ERROR) << "Failed to parse chat_id, message_id or message_thread_id "
                    << "from env value: " << string;
-        parseFail = true;
-    }
-    if (parseFail) {
         throw std::invalid_argument("Invalid format for RESTART");
     }
 }
