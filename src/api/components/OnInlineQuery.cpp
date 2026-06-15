@@ -39,6 +39,10 @@ void TgBotApiImpl::OnInlineQueryImpl::onInlineQueryFunction(
     if (inlineResults.empty()) {
         static int articleCount = 0;
         for (const auto& queryCallbacks : queryResults) {
+            // Do not advertise privileged commands to non-privileged users.
+            if (!canDoPrivileged && queryCallbacks.first.enforced) {
+                continue;
+            }
             auto article = std::make_shared<TgBot::InlineQueryResultArticle>();
             article->id = fmt::format("article-{}", articleCount++);
             article->title =
