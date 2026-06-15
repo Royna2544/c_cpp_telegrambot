@@ -110,17 +110,25 @@ DECLARE_COMMAND_HANDLER(database) {
 
     UserId userId = message->reply()->get<MessageAttrs::User>()->id;
 
+    // The admin who invoked /database; only they may drive the resulting
+    // keyboard, otherwise any user replying to the prompt could mutate the
+    // black/whitelist (the command is Enforced, but onAnyMessage fires for
+    // everyone).
+    const auto invoker = message->message()->from;
+    const UserId invokerId = invoker ? invoker->id : 0;
+
     auto msg = api->sendReplyMessage(
         message->message(),
         fmt::format(fmt::runtime(res->get(Strings::DB_CHOOSE_USER_ACTION)),
                     message->reply()->get<MessageAttrs::User>()),
         reply);
 
-    api->onAnyMessage([msg, userId, res, provider, addToWhitelist,
+    api->onAnyMessage([msg, userId, invokerId, res, provider, addToWhitelist,
                        removeFromWhitelist, addToBlacklist,
                        removeFromBlacklist](TgBotApi::CPtr api,
                                             const Message::Ptr& m) {
-        if (m->replyToMessage &&
+        if (invokerId != 0 && m->from && m->from->id == invokerId &&
+            m->replyToMessage &&
             (*m->replyToMessage)->messageId == msg->messageId) {
             Strings text{};
             if (m->text == addToWhitelist) {
