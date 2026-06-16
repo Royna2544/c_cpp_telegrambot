@@ -51,7 +51,8 @@ git_execute_proc(
   COMMAND
   log
   -1
-  --pretty=%B
+  # %s = subject (first line) only; %B would include the multi-line body.
+  --pretty=%s
   NAME
   "commit-message"
   VAR
