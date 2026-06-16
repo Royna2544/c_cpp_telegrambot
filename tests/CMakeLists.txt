@@ -67,3 +67,15 @@ tgbot_exe(
   TEST
 )
 target_link_libraries(test_rombuildservice PRIVATE ROMBuildServiceProto GTest::gtest GTest::gmock)
+
+tgbot_exe(
+  NAME llmadapters
+  SRCS
+    TestMain.cpp
+    LLMAdaptersTest.cpp
+  TEST
+)
+target_link_libraries(test_llmadapters PRIVATE GTest::gtest CurlDownload)
+target_include_directories(test_llmadapters PRIVATE
+  ${CMAKE_SOURCE_DIR}/src/command_modules
+  ${CMAKE_SOURCE_DIR}/src/api/builtin_modules/builder)
