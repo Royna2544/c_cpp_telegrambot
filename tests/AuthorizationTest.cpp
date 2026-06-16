@@ -27,6 +27,7 @@ constexpr static UserId FAKE_OWNER_ID = 120412;
 constexpr static UserId FAKE_BLACKLISTED_ID = 123456;
 constexpr static UserId FAKE_WHITELISTED_ID = 1234567890;
 constexpr static UserId FAKE_RANDOM_ID = 1234567891;
+constexpr static UserId FAKE_BACKEND_ERROR_ID = 999999;
 
 std::ostream& operator<<(std::ostream& os, const AuthParam& Authparam) {
     switch (Authparam.userId) {
@@ -41,6 +42,9 @@ std::ostream& operator<<(std::ostream& os, const AuthParam& Authparam) {
             break;
         case FAKE_RANDOM_ID:
             os << "RandomUser";
+            break;
+        case FAKE_BACKEND_ERROR_ID:
+            os << "BackendErrorUser";
             break;
         default:
             os << "User(" << Authparam.userId << ")";
@@ -121,6 +125,15 @@ TEST_P(AuthContextTest, expectedForMessagesInTime) {
             checkUserInList(DatabaseBase::ListType::BLACKLIST, FAKE_RANDOM_ID))
         .WillByDefault(Return(DatabaseBase::ListResult::NOT_IN_LIST));
 
+    // Database backend error: list checks must fail closed (treat as
+    // blacklisted / not whitelisted), so all access levels are denied.
+    ON_CALL(*database, checkUserInList(DatabaseBase::ListType::WHITELIST,
+                                       FAKE_BACKEND_ERROR_ID))
+        .WillByDefault(Return(DatabaseBase::ListResult::BACKEND_ERROR));
+    ON_CALL(*database, checkUserInList(DatabaseBase::ListType::BLACKLIST,
+                                       FAKE_BACKEND_ERROR_ID))
+        .WillByDefault(Return(DatabaseBase::ListResult::BACKEND_ERROR));
+
     // Unloading of database
     ON_CALL(*database, unload).WillByDefault(Return(true));
 
@@ -189,4 +202,14 @@ INSTANTIATE_TEST_SUITE_P(
         // WhiteList access #User
         AuthParam{FAKE_WHITELISTED_ID,
                   AuthContext::AccessLevel::User,
-                  {true, AuthContext::Result::Reason::Ok}}));
+                  {true, AuthContext::Result::Reason::Ok}},
+
+        // Backend error fails closed at #User (blacklist treated as in-list)
+        AuthParam{FAKE_BACKEND_ERROR_ID,
+                  AuthContext::AccessLevel::User,
+                  {false, AuthContext::Result::Reason::ForbiddenUser}},
+
+        // Backend error fails closed at #AdminUser
+        AuthParam{FAKE_BACKEND_ERROR_ID,
+                  AuthContext::AccessLevel::AdminUser,
+                  {false, AuthContext::Result::Reason::ForbiddenUser}}));

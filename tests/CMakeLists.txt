@@ -113,3 +113,17 @@ target_include_directories(test_restartfmt PRIVATE
   ${CMAKE_SOURCE_DIR}/src/include
   ${CMAKE_SOURCE_DIR}/src
   $<TARGET_PROPERTY:TgBot,INTERFACE_INCLUDE_DIRECTORIES>)
+
+tgbot_exe(
+  NAME spamblock
+  SRCS
+    TestMain.cpp
+    SpamBlockTest.cpp
+    ${CMAKE_SOURCE_DIR}/src/global_handlers/SpamBlocker.cpp
+  TEST
+)
+target_link_libraries(test_spamblock PRIVATE GTest::gtest TgBot absl::log fmt::fmt-header-only)
+target_include_directories(test_spamblock PRIVATE
+  ${CMAKE_SOURCE_DIR}/src/include
+  ${CMAKE_SOURCE_DIR}/src
+  $<TARGET_PROPERTY:TgBot,INTERFACE_INCLUDE_DIRECTORIES>)

@@ -133,6 +133,16 @@ TEST_P(DatabaseBaseTest, ChatInfoOperations) {
     auto chatId = db->getChatId(chatName1);
     ASSERT_TRUE(chatId.has_value());
     EXPECT_EQ(chatId.value(), chatId1);
+
+    // Get chat name by ID — must return the name, not the id. Run against both
+    // backends, this also guards against the two diverging (the SQLite query
+    // previously selected the wrong column).
+    auto name1 = db->getChatName(chatId1);
+    ASSERT_TRUE(name1.has_value());
+    EXPECT_EQ(name1.value(), chatName1);
+    auto name2 = db->getChatName(chatId2);
+    ASSERT_TRUE(name2.has_value());
+    EXPECT_EQ(name2.value(), chatName2);
 }
 
 // Test dumping the database to an output stream
