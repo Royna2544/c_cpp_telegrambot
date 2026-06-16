@@ -69,12 +69,6 @@ jobs:
             real_cxx: cl.exe
             flags: ''
 
-    env:
-      # Two layers: a fast per-runner files cache (actions/cache, but evicts at
-      # the 10 GB/7-day limit) plus a persistent NuGet cache on GitHub Packages
-      # so heavy ports (grpc, opencv) are built once and survive eviction.
-      VCPKG_BINARY_SOURCES: "clear;files,${{ github.workspace }}/vcpkg_cache,readwrite;nuget,https://nuget.pkg.github.com/${{ github.repository_owner }}/index.json,readwrite"
-
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -108,11 +102,26 @@ jobs:
             libx11-dev libxft-dev libxext-dev libltdl-dev libxi-dev libxtst-dev \
             x11-xserver-utils gi-docgen nasm mono-complete
 
-      - name: Install mono (macOS, for the NuGet binary cache)
-        if: runner.os == 'macOS'
-        run: brew install mono
+      - name: Select vcpkg binary cache sources
+        shell: bash
+        run: |
+          # Layer 1: a fast per-runner files cache (actions/cache; evicts at the
+          # 10 GB / 7-day limit). Layer 2: a persistent NuGet cache on GitHub
+          # Packages so heavy ports (grpc, opencv) survive eviction.
+          FILES="files,${{ github.workspace }}/vcpkg_cache,readwrite"
+          if [ "$RUNNER_OS" = "macOS" ]; then
+            # macOS runners are arm64, where vcpkg sets VCPKG_FORCE_SYSTEM_BINARIES
+            # and therefore refuses to download the nuget CLI. A nuget source in
+            # VCPKG_BINARY_SOURCES then fails `vcpkg install` outright, so use the
+            # files cache only here.
+            echo "VCPKG_BINARY_SOURCES=clear;$FILES" >> "$GITHUB_ENV"
+          else
+            FEED="nuget,https://nuget.pkg.github.com/${{ github.repository_owner }}/index.json,readwrite"
+            echo "VCPKG_BINARY_SOURCES=clear;$FILES;$FEED" >> "$GITHUB_ENV"
+          fi
 
       - name: Set up vcpkg NuGet binary cache (GitHub Packages)
+        if: runner.os != 'macOS'
         shell: bash
         run: |
           if [ "$RUNNER_OS" = "Windows" ]; then
@@ -123,10 +132,9 @@ jobs:
           FEED="https://nuget.pkg.github.com/${{ github.repository_owner }}/index.json"
 
           # The NuGet binary cache is an optimization; never let setting it up
-          # abort the build. `vcpkg fetch nuget` has been seen to fail on macOS
-          # runners, and because its output was captured into a command
-          # substitution the step exited 1 with no visible log. Run it plainly,
-          # print whatever it produced, and bail out gracefully on any problem.
+          # abort the build. Run `vcpkg fetch nuget` plainly so its output is
+          # visible (capturing it into a command substitution previously hid the
+          # error and exited 1 silently), and bail out gracefully on any problem.
           if ! NUGET_OUT="$("$VCPKG_EXE" fetch nuget 2>&1)"; then
             echo "$NUGET_OUT"
             echo "::warning::vcpkg fetch nuget failed; skipping NuGet binary cache"
