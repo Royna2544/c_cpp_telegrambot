@@ -61,10 +61,11 @@ if(WIN32)
 endif()
 
 # Add bundled dependencies
-add_subdirectory(src/third-party/stduuid)
 add_subdirectory(src/third-party/tgbot-cpp)
 
-# Crypto++ comes from vcpkg (versioned, binary-cached) rather than the bundled
-# cryptopp-cmake submodule, which fetched upstream master at configure time and
-# injected install rules into our package. Target: cryptopp::cryptopp.
+# Crypto++ and stduuid come from vcpkg (versioned, binary-cached) rather than
+# bundled submodules. cryptopp-cmake additionally fetched upstream master at
+# configure time and injected install rules into our package.
+# Targets: cryptopp::cryptopp, stduuid.
 find_package(cryptopp CONFIG REQUIRED)
+find_package(stduuid CONFIG REQUIRED)

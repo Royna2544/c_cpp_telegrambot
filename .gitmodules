@@ -7,6 +7,3 @@
 [submodule "src/third-party/lua"]
 	path = src/api/liblua
 	url = https://github.com/lua/lua
-[submodule "src/third-party/stduuid"]
-	path = src/third-party/stduuid
-	url = https://github.com/mariusbancila/stduuid/

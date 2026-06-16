@@ -16,7 +16,8 @@
     "fmt",
     "nlohmann-json",
     "fruit",
-    "abseil"
+    "abseil",
+    "stduuid"
   ],
   "features": {
     "image": {
