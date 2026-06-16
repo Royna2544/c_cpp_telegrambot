@@ -11,7 +11,13 @@ if(WIN32)
   # NSIS — only enable the installer generator when makensis is available,
   # otherwise `cpack` errors out ("Cannot find NSIS compiler makensis") even
   # though the ZIP/TGZ packages generate fine.
-  find_program(MAKENSIS_EXECUTABLE makensis)
+  # NSIS installs to Program Files and is usually not on PATH, so search the
+  # standard install dirs in addition to PATH.
+  find_program(MAKENSIS_EXECUTABLE makensis
+    PATHS
+      "$ENV{PROGRAMFILES}/NSIS"
+      "C:/Program Files (x86)/NSIS"
+      "C:/Program Files/NSIS")
   if(MAKENSIS_EXECUTABLE)
     list(APPEND CPACK_GENERATOR NSIS)
   else()
