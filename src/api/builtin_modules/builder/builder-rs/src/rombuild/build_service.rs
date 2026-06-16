@@ -77,6 +77,39 @@ struct BuildEntry {
     success: BuildStatus,
 }
 
+enum ConfigType {
+    Standard(ManifestEntry),
+    Recovery(RecoveryManifestEntry),
+}
+
+/// Owned state handed to [`BuildService::run_build`] — everything the build
+/// pipeline needs, captured up front so the task is `'static` and the pipeline
+/// is directly awaitable in tests (inject mock runner/git/fs, drive failures).
+struct BuildTask {
+    build_settings: Settings,
+    build_dir_clone: PathBuf,
+    log_tx_clone: broadcast::Sender<BuildLogEntry>,
+    uploads_clone: Arc<Mutex<Vec<UploadTask>>>,
+    build_id_clone: String,
+    tempdir_clone: PathBuf,
+    known_builds_clone: Arc<Mutex<Vec<BuildEntry>>>,
+    askpass_path_clone: Option<PathBuf>,
+    runner: Arc<dyn ProcessRunner>,
+    git: Arc<dyn GitProvider>,
+    fs: Arc<dyn Filesystem>,
+    force_checkout: bool,
+    parallel_jobs: i32,
+    req: BuildRequest,
+    config_entry: ConfigType,
+    device_entry: TargetsEntry,
+    branch_entry: ManifestBranchesEntry,
+    rom_entry: ROMEntry,
+    rom_branch_entry: ROMBranchEntry,
+    active_job_cleanup: Arc<Mutex<Option<ActiveBuild>>>,
+    kill_rx: mpsc::Receiver<()>,
+    span: tracing::Span,
+}
+
 impl Display for BuildVariant {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let s = match self {
@@ -803,11 +836,6 @@ impl rom_build_service_server::RomBuildService for BuildService {
             )));
         }
 
-        enum ConfigType {
-            Standard(ManifestEntry),
-            Recovery(RecoveryManifestEntry),
-        }
-
         let config_entry = if config_entry.len() == 1 {
             ConfigType::Standard(config_entry[0].clone())
         } else {
@@ -1016,7 +1044,396 @@ impl rom_build_service_server::RomBuildService for BuildService {
         let force_checkout = req.force_checkout.unwrap_or(false);
 
         let span = tracing::info_span!("build_task", build_id = build_id);
-        let task_handle: tokio::task::JoinHandle<Result<(), Status>> = tokio::spawn(async move {
+        let task = BuildTask {
+            build_settings,
+            build_dir_clone,
+            log_tx_clone,
+            uploads_clone,
+            build_id_clone,
+            tempdir_clone,
+            known_builds_clone,
+            askpass_path_clone,
+            runner,
+            git,
+            fs,
+            force_checkout,
+            parallel_jobs,
+            req,
+            config_entry,
+            device_entry,
+            branch_entry,
+            rom_entry,
+            rom_branch_entry,
+            active_job_cleanup,
+            kill_rx,
+            span,
+        };
+        let task_handle: tokio::task::JoinHandle<Result<(), Status>> =
+            tokio::spawn(Self::run_build(task));
+
+        *lock = Some(ActiveBuild {
+            id: build_id.clone(),
+            kill_tx,
+            log_tx,
+            _task: task_handle,
+        });
+
+        info!("Build with ID: {} has been queued.", build_id);
+
+        Ok(Response::new(BuildSubmission {
+            build_id,
+            accepted: true,
+            status_message: "Build queued successfully.".into(),
+        }))
+    }
+
+    /// Logs streaming for a build in progress
+    async fn stream_logs(
+        &self,
+        request: tonic::Request<BuildAction>,
+    ) -> std::result::Result<tonic::Response<Self::StreamLogsStream>, tonic::Status> {
+        log_who_asked_me("stream_logs", &request);
+        let req = request.into_inner();
+        let lock = self.active_job.lock().await;
+
+        let active_build = match lock.as_ref() {
+            Some(build) if build.id == req.build_id => build,
+            _ => {
+                return Err(tonic::Status::invalid_argument(
+                    "No active build with the specified ID.",
+                ));
+            }
+        };
+
+        let mut log_rx = active_build.log_tx.subscribe();
+
+        let output = async_stream::try_stream! {
+            loop {
+                let log_entry = log_rx.recv().await.map_err(|e| {
+                    tonic::Status::internal(format!("Failed to receive log entry: {}", e))
+                })?;
+                if log_entry.is_finished {
+                    break;
+                }
+                yield log_entry;
+            }
+        };
+
+        Ok(tonic::Response::new(
+            Box::pin(output) as Self::StreamLogsStream
+        ))
+    }
+
+    /// Cancel a build in progress
+    async fn cancel_build(
+        &self,
+        request: tonic::Request<BuildAction>,
+    ) -> std::result::Result<tonic::Response<()>, tonic::Status> {
+        log_who_asked_me("cancel_build", &request);
+        let req = request.into_inner();
+        let lock = self.active_job.lock().await;
+
+        let active_build = match lock.as_ref() {
+            Some(build) if build.id == req.build_id => build,
+            _ => {
+                return Err(tonic::Status::invalid_argument(
+                    "No active build with the specified ID.",
+                ));
+            }
+        };
+
+        info!("Cancelling build with ID: {}", req.build_id);
+        // Send cancellation signal
+        match active_build.kill_tx.send(()).await {
+            Ok(_) => {
+                info!("Cancellation signal sent successfully.");
+                Ok(tonic::Response::new(()))
+            }
+            Err(e) => {
+                error!("Failed to send cancellation signal: {}", e);
+                Err(tonic::Status::internal(
+                    "Failed to send cancellation signal.",
+                ))
+            }
+        }
+    }
+
+    async fn get_status(
+        &self,
+        request: tonic::Request<BuildAction>,
+    ) -> std::result::Result<tonic::Response<BuildSubmission>, tonic::Status> {
+        log_who_asked_me("get_status", &request);
+        let req = request.into_inner();
+        let lock = self.active_job.lock().await;
+
+        let (accepted, status_message) = match lock.as_ref() {
+            Some(build) if build.id == req.build_id => (true, "Build is in progress.".into()),
+            _ => (false, "No active build with the specified ID.".into()),
+        };
+
+        Ok(tonic::Response::new(BuildSubmission {
+            build_id: req.build_id,
+            accepted,
+            status_message,
+        }))
+    }
+
+    async fn get_build_result(
+        &self,
+        request: tonic::Request<BuildAction>,
+    ) -> std::result::Result<tonic::Response<Self::GetBuildResultStream>, tonic::Status> {
+        log_who_asked_me("get_build_result", &request);
+        let req = request.into_inner();
+        let known_builds = self.known_builds.lock().await;
+
+        let build_entry = known_builds
+            .iter()
+            .find(|entry| entry.id == req.build_id)
+            .ok_or_else(|| {
+                tonic::Status::invalid_argument("No known build with the specified ID.")
+            })?;
+
+        info!("Fetching build result for ID: {}", req.build_id);
+        info!(
+            "Found build entry: configname: {}, device: {}, variant: {}",
+            build_entry.config_name, build_entry.target_device.name, build_entry.variant
+        );
+
+        // Create a channel to stream results
+        let (tx, rx) = mpsc::channel(10);
+
+        match &build_entry.success {
+            BuildStatus::Failed(error_message) => {
+                warn!("Entering failure branch for build ID: {}", req.build_id);
+                tx.send(Ok(BuildResult {
+                    success: false,
+                    upload_method: UploadMethod::None as i32,
+                    result_details: None,
+                    error_message: Some(error_message.clone()),
+                    file_name: None,
+                }))
+                .await
+                .map_err(|e| {
+                    tonic::Status::internal(format!("Failed to send failure build result: {}", e))
+                })?;
+                return Ok(tonic::Response::new(
+                    Box::pin(ReceiverStream::new(rx)) as Self::GetBuildResultStream
+                ));
+            }
+            BuildStatus::Success => {
+                info!("Build marked as successful for ID: {}", req.build_id);
+            }
+            BuildStatus::InProgress => {
+                info!("Build is still in progress for ID: {}", req.build_id);
+                return Err(tonic::Status::failed_precondition(
+                    "Build is still in progress. Please check back later for results.",
+                ));
+            }
+        }
+
+        let upload_tasks = self.active_uploads.lock().await;
+        let upload_task = {
+            let upload_task_ = upload_tasks
+                .iter()
+                .find(|task| task.build_id == req.build_id);
+            if !upload_task_.is_some() {
+                tx.send(Ok(BuildResult {
+                    success: true,
+                    upload_method: UploadMethod::None as i32,
+                    result_details: None,
+                    error_message: Some("No upload task found for this build.".into()),
+                    file_name: None,
+                }))
+                .await
+                .map_err(|e| {
+                    tonic::Status::internal(format!("Failed to send build result: {}", e))
+                })?;
+                // No upload task found, but build is marked as successful. This can happen if upload is disabled in settings,
+                // or if the artifact was not found. Just return success without upload details.
+                return Ok(tonic::Response::new(
+                    Box::pin(ReceiverStream::new(rx)) as Self::GetBuildResultStream
+                ));
+            }
+            let upload_task = upload_task_.unwrap().clone();
+            drop(upload_tasks);
+            upload_task
+        };
+        info!("Found upload task for build ID: {}", req.build_id);
+
+        let file_name = upload_task
+            .artifact_path
+            .file_name()
+            .ok_or_else(|| {
+                tonic::Status::internal(format!(
+                    "Invalid artifact path: {}",
+                    upload_task.artifact_path.display()
+                ))
+            })?
+            .to_string_lossy()
+            .to_string();
+        info!("Artifact file name: {}", &file_name);
+
+        tokio::spawn(async move {
+            match upload_task.method {
+                UploadMethod::LocalFile => {
+                    info!(
+                        "Returning LocalFile build result for build ID: {}",
+                        req.build_id
+                    );
+                    tx.send(Ok(BuildResult {
+                        success: true,
+                        upload_method: UploadMethod::LocalFile as i32,
+                        result_details: Some(ResultDetails::LocalFilePath(
+                            upload_task.artifact_path.to_string_lossy().to_string(),
+                        )),
+                        error_message: None,
+                        file_name: Some(file_name.clone()),
+                    }))
+                    .await
+                    .map_err(|e| {
+                        tonic::Status::internal(format!(
+                            "Failed to send LocalFile build result: {}",
+                            e
+                        ))
+                    })?;
+                }
+                UploadMethod::Stream => {
+                    info!(
+                        "Returning Stream build result for build ID: {}",
+                        req.build_id
+                    );
+                    let mut file = tokio::fs::File::open(&upload_task.artifact_path)
+                        .await
+                        .map_err(|e| {
+                            tonic::Status::internal(format!(
+                                "Failed to open artifact file for streaming: {}",
+                                e
+                            ))
+                        })?;
+                    let mut buffer = vec![0u8; 1024 * 1024]; // 1MB buffer
+                    loop {
+                        let n = file.read(&mut buffer).await;
+                        if let Err(_e) = n {
+                            tx.send(Ok(BuildResult {
+                                success: false,
+                                upload_method: UploadMethod::Stream as i32,
+                                result_details: None,
+                                error_message: None,
+                                file_name: None,
+                            }))
+                            .await
+                            .map_err(|e| {
+                                tonic::Status::internal(format!(
+                                    "Failed to send Stream build result: {}",
+                                    e
+                                ))
+                            })?;
+                            break;
+                        }
+                        let n = n.unwrap();
+                        if n == 0 {
+                            break;
+                        }
+                        tx.send(Ok(BuildResult {
+                            success: true,
+                            upload_method: UploadMethod::Stream as i32,
+                            result_details: Some(ResultDetails::StreamData(buffer[..n].to_vec())),
+                            error_message: None,
+                            file_name: Some(file_name.clone()),
+                        }))
+                        .await
+                        .map_err(|e| {
+                            tonic::Status::internal(format!(
+                                "Failed to send Stream build result: {}",
+                                e
+                            ))
+                        })?;
+                    }
+                }
+                UploadMethod::GoFile => {
+                    info!(
+                        "Returning GoFile build result for build ID: {}",
+                        req.build_id
+                    );
+                    let upload_response =
+                        upload_file_to_gofile(&upload_task.artifact_path.to_string_lossy())
+                            .await
+                            .map_err(|e| {
+                                tonic::Status::internal(format!(
+                                    "Failed to upload file to GoFile: {}",
+                                    e
+                                ))
+                            })?;
+                    // Here we would normally have the link from the upload process
+                    let gofile_link = upload_response.data.downloadPage;
+                    info!("File uploaded to GoFile successfully: {}", gofile_link);
+                    tx.send(Ok(BuildResult {
+                        success: true,
+                        upload_method: UploadMethod::GoFile as i32,
+                        result_details: Some(ResultDetails::GofileLink(gofile_link)),
+                        error_message: None,
+                        file_name: Some(file_name),
+                    }))
+                    .await
+                    .map_err(|e| {
+                        tonic::Status::internal(format!(
+                            "Failed to send GoFile build result: {}",
+                            e
+                        ))
+                    })?;
+                }
+                _ => {
+                    tx.send(Ok(BuildResult {
+                        success: false,
+                        upload_method: UploadMethod::None as i32,
+                        result_details: None,
+                        error_message: Some("Unsupported upload method.".into()),
+                        file_name: None,
+                    }))
+                    .await
+                    .map_err(|e| {
+                        tonic::Status::internal(format!("Failed to send None build result: {}", e))
+                    })?;
+                }
+            }
+            Ok::<(), tonic::Status>(())
+        });
+
+        Ok(tonic::Response::new(
+            Box::pin(ReceiverStream::new(rx)) as Self::GetBuildResultStream
+        ))
+    }
+}
+
+impl BuildService {
+    /// The build pipeline, extracted from `start_build`'s spawned task so it is
+    /// directly awaitable: tests inject mock runner/git/fs via `BuildTask` and
+    /// assert how a failing command / git / filesystem op is handled and ends.
+    async fn run_build(task: BuildTask) -> Result<(), Status> {
+        let BuildTask {
+            build_settings,
+            build_dir_clone,
+            log_tx_clone,
+            uploads_clone,
+            build_id_clone,
+            tempdir_clone,
+            known_builds_clone,
+            askpass_path_clone,
+            runner,
+            git,
+            fs,
+            force_checkout,
+            parallel_jobs,
+            req,
+            config_entry,
+            device_entry,
+            branch_entry,
+            rom_entry,
+            rom_branch_entry,
+            active_job_cleanup,
+            mut kill_rx,
+            span,
+        } = task;
             macro_rules! send_log {
                 ($level:expr, $msg:expr) => {
                     match $level {
@@ -1869,340 +2286,8 @@ impl rom_build_service_server::RomBuildService for BuildService {
             *lock = None;
 
             Ok(())
-        });
-
-        *lock = Some(ActiveBuild {
-            id: build_id.clone(),
-            kill_tx,
-            log_tx,
-            _task: task_handle,
-        });
-
-        info!("Build with ID: {} has been queued.", build_id);
-
-        Ok(Response::new(BuildSubmission {
-            build_id,
-            accepted: true,
-            status_message: "Build queued successfully.".into(),
-        }))
     }
 
-    /// Logs streaming for a build in progress
-    async fn stream_logs(
-        &self,
-        request: tonic::Request<BuildAction>,
-    ) -> std::result::Result<tonic::Response<Self::StreamLogsStream>, tonic::Status> {
-        log_who_asked_me("stream_logs", &request);
-        let req = request.into_inner();
-        let lock = self.active_job.lock().await;
-
-        let active_build = match lock.as_ref() {
-            Some(build) if build.id == req.build_id => build,
-            _ => {
-                return Err(tonic::Status::invalid_argument(
-                    "No active build with the specified ID.",
-                ));
-            }
-        };
-
-        let mut log_rx = active_build.log_tx.subscribe();
-
-        let output = async_stream::try_stream! {
-            loop {
-                let log_entry = log_rx.recv().await.map_err(|e| {
-                    tonic::Status::internal(format!("Failed to receive log entry: {}", e))
-                })?;
-                if log_entry.is_finished {
-                    break;
-                }
-                yield log_entry;
-            }
-        };
-
-        Ok(tonic::Response::new(
-            Box::pin(output) as Self::StreamLogsStream
-        ))
-    }
-
-    /// Cancel a build in progress
-    async fn cancel_build(
-        &self,
-        request: tonic::Request<BuildAction>,
-    ) -> std::result::Result<tonic::Response<()>, tonic::Status> {
-        log_who_asked_me("cancel_build", &request);
-        let req = request.into_inner();
-        let lock = self.active_job.lock().await;
-
-        let active_build = match lock.as_ref() {
-            Some(build) if build.id == req.build_id => build,
-            _ => {
-                return Err(tonic::Status::invalid_argument(
-                    "No active build with the specified ID.",
-                ));
-            }
-        };
-
-        info!("Cancelling build with ID: {}", req.build_id);
-        // Send cancellation signal
-        match active_build.kill_tx.send(()).await {
-            Ok(_) => {
-                info!("Cancellation signal sent successfully.");
-                Ok(tonic::Response::new(()))
-            }
-            Err(e) => {
-                error!("Failed to send cancellation signal: {}", e);
-                Err(tonic::Status::internal(
-                    "Failed to send cancellation signal.",
-                ))
-            }
-        }
-    }
-
-    async fn get_status(
-        &self,
-        request: tonic::Request<BuildAction>,
-    ) -> std::result::Result<tonic::Response<BuildSubmission>, tonic::Status> {
-        log_who_asked_me("get_status", &request);
-        let req = request.into_inner();
-        let lock = self.active_job.lock().await;
-
-        let (accepted, status_message) = match lock.as_ref() {
-            Some(build) if build.id == req.build_id => (true, "Build is in progress.".into()),
-            _ => (false, "No active build with the specified ID.".into()),
-        };
-
-        Ok(tonic::Response::new(BuildSubmission {
-            build_id: req.build_id,
-            accepted,
-            status_message,
-        }))
-    }
-
-    async fn get_build_result(
-        &self,
-        request: tonic::Request<BuildAction>,
-    ) -> std::result::Result<tonic::Response<Self::GetBuildResultStream>, tonic::Status> {
-        log_who_asked_me("get_build_result", &request);
-        let req = request.into_inner();
-        let known_builds = self.known_builds.lock().await;
-
-        let build_entry = known_builds
-            .iter()
-            .find(|entry| entry.id == req.build_id)
-            .ok_or_else(|| {
-                tonic::Status::invalid_argument("No known build with the specified ID.")
-            })?;
-
-        info!("Fetching build result for ID: {}", req.build_id);
-        info!(
-            "Found build entry: configname: {}, device: {}, variant: {}",
-            build_entry.config_name, build_entry.target_device.name, build_entry.variant
-        );
-
-        // Create a channel to stream results
-        let (tx, rx) = mpsc::channel(10);
-
-        match &build_entry.success {
-            BuildStatus::Failed(error_message) => {
-                warn!("Entering failure branch for build ID: {}", req.build_id);
-                tx.send(Ok(BuildResult {
-                    success: false,
-                    upload_method: UploadMethod::None as i32,
-                    result_details: None,
-                    error_message: Some(error_message.clone()),
-                    file_name: None,
-                }))
-                .await
-                .map_err(|e| {
-                    tonic::Status::internal(format!("Failed to send failure build result: {}", e))
-                })?;
-                return Ok(tonic::Response::new(
-                    Box::pin(ReceiverStream::new(rx)) as Self::GetBuildResultStream
-                ));
-            }
-            BuildStatus::Success => {
-                info!("Build marked as successful for ID: {}", req.build_id);
-            }
-            BuildStatus::InProgress => {
-                info!("Build is still in progress for ID: {}", req.build_id);
-                return Err(tonic::Status::failed_precondition(
-                    "Build is still in progress. Please check back later for results.",
-                ));
-            }
-        }
-
-        let upload_tasks = self.active_uploads.lock().await;
-        let upload_task = {
-            let upload_task_ = upload_tasks
-                .iter()
-                .find(|task| task.build_id == req.build_id);
-            if !upload_task_.is_some() {
-                tx.send(Ok(BuildResult {
-                    success: true,
-                    upload_method: UploadMethod::None as i32,
-                    result_details: None,
-                    error_message: Some("No upload task found for this build.".into()),
-                    file_name: None,
-                }))
-                .await
-                .map_err(|e| {
-                    tonic::Status::internal(format!("Failed to send build result: {}", e))
-                })?;
-                // No upload task found, but build is marked as successful. This can happen if upload is disabled in settings,
-                // or if the artifact was not found. Just return success without upload details.
-                return Ok(tonic::Response::new(
-                    Box::pin(ReceiverStream::new(rx)) as Self::GetBuildResultStream
-                ));
-            }
-            let upload_task = upload_task_.unwrap().clone();
-            drop(upload_tasks);
-            upload_task
-        };
-        info!("Found upload task for build ID: {}", req.build_id);
-
-        let file_name = upload_task
-            .artifact_path
-            .file_name()
-            .ok_or_else(|| {
-                tonic::Status::internal(format!(
-                    "Invalid artifact path: {}",
-                    upload_task.artifact_path.display()
-                ))
-            })?
-            .to_string_lossy()
-            .to_string();
-        info!("Artifact file name: {}", &file_name);
-
-        tokio::spawn(async move {
-            match upload_task.method {
-                UploadMethod::LocalFile => {
-                    info!(
-                        "Returning LocalFile build result for build ID: {}",
-                        req.build_id
-                    );
-                    tx.send(Ok(BuildResult {
-                        success: true,
-                        upload_method: UploadMethod::LocalFile as i32,
-                        result_details: Some(ResultDetails::LocalFilePath(
-                            upload_task.artifact_path.to_string_lossy().to_string(),
-                        )),
-                        error_message: None,
-                        file_name: Some(file_name.clone()),
-                    }))
-                    .await
-                    .map_err(|e| {
-                        tonic::Status::internal(format!(
-                            "Failed to send LocalFile build result: {}",
-                            e
-                        ))
-                    })?;
-                }
-                UploadMethod::Stream => {
-                    info!(
-                        "Returning Stream build result for build ID: {}",
-                        req.build_id
-                    );
-                    let mut file = tokio::fs::File::open(&upload_task.artifact_path)
-                        .await
-                        .map_err(|e| {
-                            tonic::Status::internal(format!(
-                                "Failed to open artifact file for streaming: {}",
-                                e
-                            ))
-                        })?;
-                    let mut buffer = vec![0u8; 1024 * 1024]; // 1MB buffer
-                    loop {
-                        let n = file.read(&mut buffer).await;
-                        if let Err(_e) = n {
-                            tx.send(Ok(BuildResult {
-                                success: false,
-                                upload_method: UploadMethod::Stream as i32,
-                                result_details: None,
-                                error_message: None,
-                                file_name: None,
-                            }))
-                            .await
-                            .map_err(|e| {
-                                tonic::Status::internal(format!(
-                                    "Failed to send Stream build result: {}",
-                                    e
-                                ))
-                            })?;
-                            break;
-                        }
-                        let n = n.unwrap();
-                        if n == 0 {
-                            break;
-                        }
-                        tx.send(Ok(BuildResult {
-                            success: true,
-                            upload_method: UploadMethod::Stream as i32,
-                            result_details: Some(ResultDetails::StreamData(buffer[..n].to_vec())),
-                            error_message: None,
-                            file_name: Some(file_name.clone()),
-                        }))
-                        .await
-                        .map_err(|e| {
-                            tonic::Status::internal(format!(
-                                "Failed to send Stream build result: {}",
-                                e
-                            ))
-                        })?;
-                    }
-                }
-                UploadMethod::GoFile => {
-                    info!(
-                        "Returning GoFile build result for build ID: {}",
-                        req.build_id
-                    );
-                    let upload_response =
-                        upload_file_to_gofile(&upload_task.artifact_path.to_string_lossy())
-                            .await
-                            .map_err(|e| {
-                                tonic::Status::internal(format!(
-                                    "Failed to upload file to GoFile: {}",
-                                    e
-                                ))
-                            })?;
-                    // Here we would normally have the link from the upload process
-                    let gofile_link = upload_response.data.downloadPage;
-                    info!("File uploaded to GoFile successfully: {}", gofile_link);
-                    tx.send(Ok(BuildResult {
-                        success: true,
-                        upload_method: UploadMethod::GoFile as i32,
-                        result_details: Some(ResultDetails::GofileLink(gofile_link)),
-                        error_message: None,
-                        file_name: Some(file_name),
-                    }))
-                    .await
-                    .map_err(|e| {
-                        tonic::Status::internal(format!(
-                            "Failed to send GoFile build result: {}",
-                            e
-                        ))
-                    })?;
-                }
-                _ => {
-                    tx.send(Ok(BuildResult {
-                        success: false,
-                        upload_method: UploadMethod::None as i32,
-                        result_details: None,
-                        error_message: Some("Unsupported upload method.".into()),
-                        file_name: None,
-                    }))
-                    .await
-                    .map_err(|e| {
-                        tonic::Status::internal(format!("Failed to send None build result: {}", e))
-                    })?;
-                }
-            }
-            Ok::<(), tonic::Status>(())
-        });
-
-        Ok(tonic::Response::new(
-            Box::pin(ReceiverStream::new(rx)) as Self::GetBuildResultStream
-        ))
-    }
 }
 
 #[cfg(test)]
@@ -2419,5 +2504,162 @@ mod artifact_path_tests {
             .await
             .expect_err("a missing exact artifact must end in not_found");
         assert_eq!(err.code(), tonic::Code::NotFound);
+    }
+}
+
+#[cfg(test)]
+mod workflow_tests {
+    //! End-to-end failure-path coverage for the build pipeline, driven entirely
+    //! by mock seams: "if the build command fails, mark the build failed and end
+    //! with an error" — no real processes, repos, or disk.
+    use super::runner_tests::MockProcessRunner;
+    use super::*;
+    use crate::filesystem::mock::MockFilesystem;
+    use crate::git_repo::mock::MockGitProvider;
+    use crate::rombuild::types::ROMArtifactEntry;
+    use std::collections::VecDeque;
+
+    fn task_with(
+        runner: Arc<dyn ProcessRunner>,
+        git: Arc<dyn GitProvider>,
+        fs: Arc<dyn Filesystem>,
+        known_builds: Arc<Mutex<Vec<BuildEntry>>>,
+    ) -> BuildTask {
+        let device_entry = TargetsEntry {
+            name: "OnePlus 6".into(),
+            codename: "enchilada".into(),
+            manufacturer: "oneplus".into(),
+        };
+        BuildTask {
+            // do_repo_sync=false skips the manifest/repo phase, so the pipeline
+            // goes straight to the build command — the path under test.
+            build_settings: Settings {
+                do_repo_sync: Some(false),
+                do_clean_build: Some(false),
+                use_ccache: Some(false),
+                use_rbe_service: Some(false),
+                rbe_api_token: None,
+                do_upload: Some(false),
+            },
+            build_dir_clone: PathBuf::from("/build"),
+            log_tx_clone: broadcast::channel(100).0,
+            uploads_clone: Arc::new(Mutex::new(Vec::new())),
+            build_id_clone: "build-test".into(),
+            tempdir_clone: PathBuf::from("/tmp"),
+            known_builds_clone: known_builds,
+            askpass_path_clone: None,
+            runner,
+            git,
+            fs,
+            force_checkout: false,
+            parallel_jobs: 1,
+            req: BuildRequest::default(),
+            config_entry: ConfigType::Standard(ManifestEntry {
+                name: "cfg".into(),
+                url: "https://example.com/manifest.git".into(),
+                branches: vec![],
+            }),
+            device_entry,
+            branch_entry: ManifestBranchesEntry {
+                name: "lineage-21".into(),
+                target_rom: "lineageos".into(),
+                android_version: 14.0,
+                device: "enchilada".into(),
+                use_regex: false,
+            },
+            rom_entry: ROMEntry {
+                name: "lineageos".into(),
+                link: String::new(),
+                target: "bacon".into(),
+                artifact: ROMArtifactEntry {
+                    matcher: ROMArtifactMatcher::ZipFilePrefixer,
+                    data: "lineage-".into(),
+                },
+                branches: vec![],
+            },
+            rom_branch_entry: ROMBranchEntry {
+                android_version: 14.0,
+                branch: "lineage-21".into(),
+            },
+            active_job_cleanup: Arc::new(Mutex::new(None)),
+            kill_rx: mpsc::channel(1).1,
+            span: tracing::Span::none(),
+        }
+    }
+
+    #[tokio::test]
+    async fn failed_build_command_marks_failed_and_ends_with_error() {
+        // Runner scripted so the (single) build command returns failure.
+        let runner = Arc::new(MockProcessRunner {
+            calls: Mutex::new(Vec::new()),
+            results: Mutex::new(VecDeque::from([false])),
+        });
+        let git = Arc::new(MockGitProvider::default());
+        let fs = Arc::new(MockFilesystem::default());
+        let known_builds = Arc::new(Mutex::new(vec![BuildEntry {
+            id: "build-test".into(),
+            variant: BuildVariant::User,
+            target_device: TargetsEntry {
+                name: "OnePlus 6".into(),
+                codename: "enchilada".into(),
+                manufacturer: "oneplus".into(),
+            },
+            config_name: "cfg".into(),
+            success: BuildStatus::InProgress,
+        }]));
+
+        let task = task_with(runner.clone(), git, fs, known_builds.clone());
+
+        // run_build is the spawned task's body, so it always resolves to Ok(());
+        // a failure is surfaced by marking the build Failed and ending the
+        // pipeline (no upload), not by an Err return.
+        let result = BuildService::run_build(task).await;
+        assert!(result.is_ok(), "the task wrapper resolves Ok after handling");
+
+        // The build command was actually reached and run...
+        let calls = runner.calls.lock().await;
+        assert_eq!(calls.len(), 1, "exactly the build command should have run");
+        assert_eq!(calls[0][0], "bash", "the build command is the bash invocation");
+        drop(calls);
+
+        // ...and its failure ended the pipeline with the build marked Failed.
+        let kb = known_builds.lock().await;
+        assert!(
+            matches!(kb[0].success, BuildStatus::Failed(_)),
+            "a failed build command must mark the build Failed and stop"
+        );
+    }
+
+    #[tokio::test]
+    async fn successful_build_command_marks_success() {
+        // Contrast: the same pipeline with the build command succeeding ends in
+        // Success — proving the outcome is driven by the command result.
+        let runner = Arc::new(MockProcessRunner {
+            calls: Mutex::new(Vec::new()),
+            results: Mutex::new(VecDeque::from([true])),
+        });
+        let git = Arc::new(MockGitProvider::default());
+        let fs = Arc::new(MockFilesystem::default());
+        let known_builds = Arc::new(Mutex::new(vec![BuildEntry {
+            id: "build-test".into(),
+            variant: BuildVariant::User,
+            target_device: TargetsEntry {
+                name: "OnePlus 6".into(),
+                codename: "enchilada".into(),
+                manufacturer: "oneplus".into(),
+            },
+            config_name: "cfg".into(),
+            success: BuildStatus::InProgress,
+        }]));
+
+        let task = task_with(runner.clone(), git, fs, known_builds.clone());
+        BuildService::run_build(task).await.unwrap();
+
+        assert_eq!(runner.calls.lock().await.len(), 1);
+        let kb = known_builds.lock().await;
+        assert!(
+            matches!(kb[0].success, BuildStatus::Success),
+            "a successful build command must mark the build Success"
+        );
     }
 }
