@@ -47,6 +47,14 @@ if(WIN32)
     list(GET _vcredist_glob 0 _vcredist_path)
   endif()
 
+  # Normalize to a forward-slash path. $ENV{VCToolsRedistDir} is a backslash
+  # Windows path (e.g. "C:\Program Files\...\vc_redist.x64.exe"); install()
+  # would embed it verbatim into cmake_install.cmake, where CMake re-parses the
+  # string and rejects the backslash escapes ("\P", "\M", ...) — breaking cpack.
+  if(_vcredist_path)
+    file(TO_CMAKE_PATH "${_vcredist_path}" _vcredist_path)
+  endif()
+
   if(_vcredist_path)
     message(STATUS "Found VC redistributable: ${_vcredist_path}")
     install(PROGRAMS "${_vcredist_path}" DESTINATION bin COMPONENT AppMain)
