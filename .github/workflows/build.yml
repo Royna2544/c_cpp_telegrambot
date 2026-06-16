@@ -7,6 +7,15 @@ on:
     branches: [master]
   workflow_dispatch:
 
+# Cancel superseded runs on the same ref (e.g. rapid PR pushes).
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  packages: write   # upload vcpkg binaries to the GitHub Packages NuGet cache
+
 jobs:
   build:
     name: 🚧 ${{ matrix.os }} ${{ matrix.cc }} ${{ matrix.str }}
@@ -61,7 +70,10 @@ jobs:
             flags: ''
 
     env:
-      VCPKG_BINARY_SOURCES: "clear;files,${{ github.workspace }}/vcpkg_cache,readwrite"
+      # Two layers: a fast per-runner files cache (actions/cache, but evicts at
+      # the 10 GB/7-day limit) plus a persistent NuGet cache on GitHub Packages
+      # so heavy ports (grpc, opencv) are built once and survive eviction.
+      VCPKG_BINARY_SOURCES: "clear;files,${{ github.workspace }}/vcpkg_cache,readwrite;nuget,https://nuget.pkg.github.com/${{ github.repository_owner }}/index.json,readwrite"
 
     steps:
       - name: Checkout
@@ -94,7 +106,28 @@ jobs:
           sudo apt update
           sudo apt install -y autoconf autoconf-archive automake libtool libxrandr-dev \
             libx11-dev libxft-dev libxext-dev libltdl-dev libxi-dev libxtst-dev \
-            x11-xserver-utils gi-docgen nasm
+            x11-xserver-utils gi-docgen nasm mono-complete
+
+      - name: Install mono (macOS, for the NuGet binary cache)
+        if: runner.os == 'macOS'
+        run: brew install mono
+
+      - name: Set up vcpkg NuGet binary cache (GitHub Packages)
+        shell: bash
+        run: |
+          if [ "$RUNNER_OS" = "Windows" ]; then
+            VCPKG_EXE="$VCPKG_ROOT/vcpkg.exe"; MONO=""
+          else
+            VCPKG_EXE="$VCPKG_ROOT/vcpkg"; MONO="mono"
+          fi
+          FEED="https://nuget.pkg.github.com/${{ github.repository_owner }}/index.json"
+          NUGET="$("$VCPKG_EXE" fetch nuget | tail -n1)"
+          # Tolerate failures (e.g. fork PRs whose GITHUB_TOKEN cannot write to
+          # GitHub Packages) — the local files cache still works.
+          $MONO "$NUGET" sources add -Source "$FEED" -StorePasswordInClearText \
+            -Name GitHubPackages -UserName "${{ github.repository_owner }}" \
+            -Password "${{ secrets.GITHUB_TOKEN }}" || true
+          $MONO "$NUGET" setapikey "${{ secrets.GITHUB_TOKEN }}" -Source "$FEED" || true
 
       - name: Configure CMake
         shell: bash
