@@ -68,6 +68,21 @@ struct DatabaseCommandTest : public CommandTestBase {
         GenericReply::Ptr reply;
         TgBot::GenericReply::Ptr keyboard;
 
+        // The keyboard buttons are localized through these keys. Give each a
+        // distinct, non-empty label so the simulated tap of keyboard[X][Y] maps
+        // unambiguously to one add/remove branch in the command handler (with
+        // empty labels every comparison matches the first button).
+        EXPECT_CALL(strings, get(Strings::DB_ADD_TO_WHITELIST))
+            .WillRepeatedly(Return(std::string_view{"wl_add"}));
+        EXPECT_CALL(strings, get(Strings::DB_REMOVE_FROM_WHITELIST))
+            .WillRepeatedly(Return(std::string_view{"wl_remove"}));
+        EXPECT_CALL(strings, get(Strings::DB_ADD_TO_BLACKLIST))
+            .WillRepeatedly(Return(std::string_view{"bl_add"}));
+        EXPECT_CALL(strings, get(Strings::DB_REMOVE_FROM_BLACKLIST))
+            .WillRepeatedly(Return(std::string_view{"bl_remove"}));
+        EXPECT_CALL(strings, get(Strings::DB_CHOOSE_USER_ACTION))
+            .WillRepeatedly(Return(std::string_view{"choose"}));
+
         const auto sentMessage = createDefaultMessage();
         const auto recievedMessage = createDefaultMessage();
         willSendReplyMessageTo(matcher, recievedMessage, _);
