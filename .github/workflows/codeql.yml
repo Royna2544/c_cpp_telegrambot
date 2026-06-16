@@ -60,3 +60,75 @@ jobs:
         with:
           category: "/language:${{ matrix.language }}"
           upload: true
+
+  # C/C++ requires a real build, so it is split into its own job that mirrors
+  # build.yml's Linux setup. It is heavy (full vcpkg dependency stack), so it
+  # only runs on master pushes + the weekly schedule, not on every PR.
+  analyze-cpp:
+    name: Analyze (c-cpp)
+    runs-on: ubuntu-latest
+    if: github.event_name != 'pull_request'
+    permissions:
+      security-events: write
+      contents: read
+      actions: read
+      packages: read   # read the shared vcpkg NuGet binary cache
+    env:
+      CC: gcc
+      CXX: g++
+      # Read-only: reuse binaries built by build.yml; never write from here.
+      VCPKG_BINARY_SOURCES: "clear;nuget,https://nuget.pkg.github.com/${{ github.repository_owner }}/index.json,read"
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          submodules: true
+
+      - name: Install Build Dependencies
+        run: |
+          sudo apt update
+          sudo apt install -y autoconf autoconf-archive automake libtool libxrandr-dev \
+            libx11-dev libxft-dev libxext-dev libltdl-dev libxi-dev libxtst-dev \
+            x11-xserver-utils gi-docgen nasm mono-complete
+
+      - name: Setup vcpkg
+        uses: lukka/run-vcpkg@v11
+        with:
+          vcpkgJsonGlob: 'vcpkg.json'
+
+      - name: Set up vcpkg NuGet binary cache (GitHub Packages)
+        shell: bash
+        run: |
+          FEED="https://nuget.pkg.github.com/${{ github.repository_owner }}/index.json"
+          NUGET="$("$VCPKG_ROOT/vcpkg" fetch nuget | tail -n1)"
+          mono "$NUGET" sources add -Source "$FEED" -StorePasswordInClearText \
+            -Name GitHubPackages -UserName "${{ github.repository_owner }}" \
+            -Password "${{ secrets.GITHUB_TOKEN }}" || true
+
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@v3
+        with:
+          languages: c-cpp
+          build-mode: manual
+          config-file: ./.github/codeql/codeql-config.yml
+
+      - name: Build (for CodeQL)
+        shell: bash
+        run: |
+          VCPKG_PATH="$VCPKG_ROOT/scripts/buildsystems/vcpkg.cmake"
+          # Skip the heavy OpenCV/ffmpeg backend and tests; CodeQL analyzes the
+          # project's own sources (src/**), not third-party libraries. This
+          # leaves ImageProcOpenCV.cpp uncovered, an accepted trade-off for cost.
+          cmake -B build -S . \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_TOOLCHAIN_FILE="$VCPKG_PATH" \
+            -DVCPKG_MANIFEST_NO_DEFAULT_FEATURES=ON \
+            -DVCPKG_MANIFEST_FEATURES="image;database;luamodules;backtrace;web" \
+            -DTGBOTCPP_BUILD_TESTS=OFF
+          cmake --build build --config Release
+
+      - name: Perform CodeQL Analysis
+        uses: github/codeql-action/analyze@v3
+        with:
+          category: "/language:c-cpp"
+          upload: true
