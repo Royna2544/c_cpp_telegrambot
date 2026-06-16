@@ -21,11 +21,16 @@
   ],
   "features": {
     "image": {
-      "description": "Libraries for Image Processing",
+      "description": "Basic image processing (PNG/WebP/JPEG)",
       "dependencies": [
         "libpng",
         "libwebp",
-        "libjpeg-turbo",
+        "libjpeg-turbo"
+      ]
+    },
+    "image-opencv": {
+      "description": "OpenCV image/video backend (heavy: pulls opencv4 + ffmpeg)",
+      "dependencies": [
         {
           "name": "opencv4",
           "features": [
@@ -89,6 +94,7 @@
   },
   "default-features": [
     "image",
+    "image-opencv",
     "database",
     "luamodules",
     "testing",

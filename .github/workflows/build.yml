@@ -137,10 +137,20 @@ jobs:
         run: |
           # Use different path syntax for Windows toolchain if needed
           VCPKG_PATH="$VCPKG_ROOT/scripts/buildsystems/vcpkg.cmake"
-          
+
+          # Skip the heavy OpenCV/ffmpeg backend on PRs for fast feedback; build
+          # the full feature set on pushes to master. The image-processing code
+          # already guards OpenCV (if(OpenCV_FOUND) / IMAGEPROC_HAVE_OPENCV).
+          FEATURES="image;database;luamodules;testing;backtrace;web"
+          if [ "${{ github.event_name }}" = "push" ]; then
+            FEATURES="image-opencv;$FEATURES"
+          fi
+
           cmake -B build -S . \
             -DCMAKE_BUILD_TYPE=Release \
             -DCMAKE_TOOLCHAIN_FILE="$VCPKG_PATH" \
+            -DVCPKG_MANIFEST_NO_DEFAULT_FEATURES=ON \
+            -DVCPKG_MANIFEST_FEATURES="$FEATURES" \
             -DTGBOTCPP_BUILD_TESTS=ON \
             ${{ matrix.flags }}
 
@@ -153,4 +163,21 @@ jobs:
         shell: bash
         run: |
           cd build
-          ctest -C Release --output-on-failure --timeout 30
+          ctest -C Release --output-on-failure --timeout 60
+
+      - name: Package (CPack smoke test)
+        shell: bash
+        working-directory: build
+        run: cpack -C Release
+
+      - name: Upload packages
+        if: github.event_name == 'push'
+        uses: actions/upload-artifact@v4
+        with:
+          name: glider-${{ matrix.os }}-${{ matrix.cc }}-${{ strategy.job-index }}
+          path: |
+            build/Glider-*.zip
+            build/Glider-*.tar.gz
+            build/Glider-*.exe
+            build/Glider-*.deb
+          if-no-files-found: ignore
