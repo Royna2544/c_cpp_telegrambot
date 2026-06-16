@@ -27,8 +27,6 @@
 #include "api/TgBotApi.hpp"
 #include "api/Utils.hpp"
 #include "global_handlers/SpamBlock.hpp"
-#include "hex.h"
-#include "sha.h"
 #include "tgbot/TgException.h"
 
 #define CRYPTOPP_ENABLE_NAMESPACE_WEAK 1

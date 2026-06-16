@@ -7,7 +7,7 @@ tgbot_library(
     SRCS SocketServiceImpl.cpp
     ALWAYS_STATIC
 )
-target_link_libraries(SocketService PRIVATE stduuid cryptopp SocketServiceProto)
+target_link_libraries(SocketService PRIVATE stduuid cryptopp::cryptopp SocketServiceProto)
 target_include_directories(SocketService PUBLIC $<TARGET_PROPERTY:TgBot,INTERFACE_INCLUDE_DIRECTORIES>)
 
 tgbot_exe(

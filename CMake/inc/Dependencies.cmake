@@ -63,11 +63,8 @@ endif()
 # Add bundled dependencies
 add_subdirectory(src/third-party/stduuid)
 add_subdirectory(src/third-party/tgbot-cpp)
-set(CRYPTOPP_BUILD_TESTING OFF CACHE BOOL "Disable cryptopp tests" FORCE)
-set(CRYPTOPP_USE_MASTER_BRANCH ON CACHE BOOL "use latest sources" FORCE)
-# Don't generate install rules for the bundled cryptopp: it is linked
-# statically into the binaries, so its .lib and headers must not be part of the
-# package. Leaving CRYPTOPP_INSTALL ON makes `cpack` try to install
-# cryptopp.lib (which isn't part of the default build) and abort.
-set(CRYPTOPP_INSTALL OFF CACHE BOOL "Do not install bundled cryptopp" FORCE)
-add_subdirectory(src/third-party/cryptopp-cmake)
+
+# Crypto++ comes from vcpkg (versioned, binary-cached) rather than the bundled
+# cryptopp-cmake submodule, which fetched upstream master at configure time and
+# injected install rules into our package. Target: cryptopp::cryptopp.
+find_package(cryptopp CONFIG REQUIRED)

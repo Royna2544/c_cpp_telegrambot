@@ -10,6 +10,7 @@
     },
     "grpc",
     "boost-program-options",
+    "cryptopp",
     "curl",
     "libxml2",
     "fmt",
