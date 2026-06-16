@@ -137,6 +137,13 @@ pub(crate) trait ProcessRunner: Send + Sync {
         log_path: Option<PathBuf>,
         stdin_rx: Option<mpsc::Receiver<String>>,
     ) -> Result<bool, Status>;
+
+    /// Whether an external program is on PATH. Defaults to a real `which`
+    /// lookup; a test mock reports availability so the repo phase can run
+    /// without the real `repo` binary installed.
+    fn program_available(&self, program: &str) -> bool {
+        which::which(program).is_ok()
+    }
 }
 
 /// Real runner that spawns processes — the production implementation.
@@ -1482,7 +1489,7 @@ impl BuildService {
                 // First, check if repo command is available
                 if build_settings.do_repo_sync.unwrap_or(false) {
                     send_log!(LogLevel::Debug, "Checking for 'repo' command availability...".to_string());
-                    if which::which("repo").is_err() {
+                    if !runner.program_available("repo") {
                         return Err(tonic::Status::failed_precondition(
                             "The 'repo' command is not available in the system PATH.",
                         ));
@@ -2370,6 +2377,10 @@ mod runner_tests {
             }
             Ok(self.results.lock().await.pop_front().unwrap_or(true))
         }
+
+        fn program_available(&self, _program: &str) -> bool {
+            true // tests don't need the real `repo`/`bash` binaries installed
+        }
     }
 
     #[tokio::test]
@@ -2520,6 +2531,7 @@ mod workflow_tests {
     use std::collections::VecDeque;
 
     fn task_with(
+        repo_sync: bool,
         runner: Arc<dyn ProcessRunner>,
         git: Arc<dyn GitProvider>,
         fs: Arc<dyn Filesystem>,
@@ -2531,10 +2543,8 @@ mod workflow_tests {
             manufacturer: "oneplus".into(),
         };
         BuildTask {
-            // do_repo_sync=false skips the manifest/repo phase, so the pipeline
-            // goes straight to the build command — the path under test.
             build_settings: Settings {
-                do_repo_sync: Some(false),
+                do_repo_sync: Some(repo_sync),
                 do_clean_build: Some(false),
                 use_ccache: Some(false),
                 use_rbe_service: Some(false),
@@ -2608,7 +2618,7 @@ mod workflow_tests {
             success: BuildStatus::InProgress,
         }]));
 
-        let task = task_with(runner.clone(), git, fs, known_builds.clone());
+        let task = task_with(false, runner.clone(), git, fs, known_builds.clone());
 
         // run_build is the spawned task's body, so it always resolves to Ok(());
         // a failure is surfaced by marking the build Failed and ending the
@@ -2652,7 +2662,7 @@ mod workflow_tests {
             success: BuildStatus::InProgress,
         }]));
 
-        let task = task_with(runner.clone(), git, fs, known_builds.clone());
+        let task = task_with(false, runner.clone(), git, fs, known_builds.clone());
         BuildService::run_build(task).await.unwrap();
 
         assert_eq!(runner.calls.lock().await.len(), 1);
@@ -2660,6 +2670,52 @@ mod workflow_tests {
         assert!(
             matches!(kb[0].success, BuildStatus::Success),
             "a successful build command must mark the build Success"
+        );
+    }
+
+    #[tokio::test]
+    async fn failed_manifest_open_in_repo_phase_ends_build() {
+        // Repo phase enabled (program_available mocked true). The manifest repo
+        // dir exists, so the pipeline opens it via git — and that open fails.
+        let runner = Arc::new(MockProcessRunner::default());
+        let git = Arc::new(MockGitProvider {
+            fail_open: true,
+            ..Default::default()
+        });
+        let fs = Arc::new(MockFilesystem::default());
+        // build_dir is "/build" (see task_with); make the manifest repo "exist"
+        // so the open path (not the fresh-clone path) is taken.
+        fs.add_dir("/build/.repo/manifests.git");
+        let known_builds = Arc::new(Mutex::new(vec![BuildEntry {
+            id: "build-test".into(),
+            variant: BuildVariant::User,
+            target_device: TargetsEntry {
+                name: "OnePlus 6".into(),
+                codename: "enchilada".into(),
+                manufacturer: "oneplus".into(),
+            },
+            config_name: "cfg".into(),
+            success: BuildStatus::InProgress,
+        }]));
+
+        let task = task_with(true, runner.clone(), git.clone(), fs, known_builds.clone());
+        BuildService::run_build(task).await.unwrap();
+
+        // The git open was attempted...
+        assert!(
+            !git.opens.lock().unwrap().is_empty(),
+            "the manifest repo open should have been attempted"
+        );
+        // ...it failed, so the pipeline ended before running any build command...
+        assert!(
+            runner.calls.lock().await.is_empty(),
+            "no build command should run after the git failure"
+        );
+        // ...and the build is marked Failed.
+        let kb = known_builds.lock().await;
+        assert!(
+            matches!(kb[0].success, BuildStatus::Failed(_)),
+            "a git failure in the repo phase must mark the build Failed and stop"
         );
     }
 }

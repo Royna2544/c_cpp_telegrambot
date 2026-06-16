@@ -477,6 +477,10 @@ pub(crate) mod mock {
         pub clones: Mutex<Vec<String>>,
         pub remote_url: String,
         pub branch_name: String,
+        /// When set, open/clone_repo return a git error after recording the
+        /// call — to exercise the "git op failed → handle → end" paths.
+        pub fail_open: bool,
+        pub fail_clone: bool,
     }
 
     impl GitProvider for MockGitProvider {
@@ -488,6 +492,9 @@ pub(crate) mod mock {
             _progress_callback: Option<Box<ProgressCallback>>,
         ) -> Result<Box<dyn RepoHandle>, git2::Error> {
             self.opens.lock().unwrap().push(path.display().to_string());
+            if self.fail_open {
+                return Err(git2::Error::from_str("mock git open failure"));
+            }
             Ok(Box::new(MockRepoHandle {
                 remote_url: self.remote_url.clone(),
                 branch_name: self.branch_name.clone(),
@@ -504,6 +511,9 @@ pub(crate) mod mock {
             _progress_callback: &Option<Box<ProgressCallback>>,
         ) -> Result<(), git2::Error> {
             self.clones.lock().unwrap().push(url.to_string());
+            if self.fail_clone {
+                return Err(git2::Error::from_str("mock git clone failure"));
+            }
             Ok(())
         }
     }
