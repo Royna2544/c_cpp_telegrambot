@@ -328,3 +328,183 @@ impl GitRepo {
         Self::update_submodules(&self.repo)
     }
 }
+
+/// A handle to an opened git repository — the instance operations the build
+/// services rely on. Implemented by [`GitRepo`] in production and by a mock in
+/// tests, so the build workflow can be exercised without touching real repos.
+///
+/// Not `Send`: mirrors `GitRepo`, whose libgit2 credential callback is not
+/// `Send`. Handles are used within a single task and not held across awaits,
+/// exactly as the concrete `GitRepo` was before this seam.
+pub trait RepoHandle {
+    fn get_remote_url(&self) -> Result<String, git2::Error>;
+    fn get_branch_name(&self) -> Result<String, git2::Error>;
+    fn fetch_branch(&self, branch: &str) -> Result<(), git2::Error>;
+    fn checkout_branch(&self, branch: &str) -> Result<(), git2::Error>;
+    fn fast_forward(&self) -> Result<(), git2::Error>;
+    fn cmp_head_with_remote_branch(&self, branch: &str) -> Result<bool, git2::Error>;
+    fn update_modules(&self) -> Result<(), git2::Error>;
+}
+
+impl RepoHandle for GitRepo {
+    fn get_remote_url(&self) -> Result<String, git2::Error> {
+        GitRepo::get_remote_url(self)
+    }
+    fn get_branch_name(&self) -> Result<String, git2::Error> {
+        GitRepo::get_branch_name(self)
+    }
+    fn fetch_branch(&self, branch: &str) -> Result<(), git2::Error> {
+        GitRepo::fetch_branch(self, branch)
+    }
+    fn checkout_branch(&self, branch: &str) -> Result<(), git2::Error> {
+        GitRepo::checkout_branch(self, branch)
+    }
+    fn fast_forward(&self) -> Result<(), git2::Error> {
+        GitRepo::fast_forward(self)
+    }
+    fn cmp_head_with_remote_branch(&self, branch: &str) -> Result<bool, git2::Error> {
+        GitRepo::cmp_head_with_remote_branch(self, branch)
+    }
+    fn update_modules(&self) -> Result<(), git2::Error> {
+        GitRepo::update_modules(self)
+    }
+}
+
+/// Seam for git operations: opens/clones repositories and hands back
+/// [`RepoHandle`]s. Production uses [`RealGitProvider`]; tests inject a mock.
+pub trait GitProvider: Send + Sync {
+    fn open(
+        &self,
+        path: &PathBuf,
+        remote_name: &str,
+        github_token: Option<String>,
+        progress_callback: Option<Box<ProgressCallback>>,
+    ) -> Result<Box<dyn RepoHandle>, git2::Error>;
+
+    // Named `clone_repo`, not `clone`, so `Arc<dyn GitProvider>.clone_repo(..)`
+    // doesn't collide with `Arc`'s `Clone::clone`.
+    fn clone_repo(
+        &self,
+        url: &str,
+        branch: &str,
+        clone_depth: Option<i32>,
+        dest_path: &PathBuf,
+        github_token: Option<String>,
+        progress_callback: &Option<Box<ProgressCallback>>,
+    ) -> Result<(), git2::Error>;
+}
+
+/// Real git provider backed by libgit2 (the production implementation).
+pub struct RealGitProvider;
+
+impl GitProvider for RealGitProvider {
+    fn open(
+        &self,
+        path: &PathBuf,
+        remote_name: &str,
+        github_token: Option<String>,
+        progress_callback: Option<Box<ProgressCallback>>,
+    ) -> Result<Box<dyn RepoHandle>, git2::Error> {
+        Ok(Box::new(GitRepo::new(
+            path,
+            remote_name,
+            github_token,
+            progress_callback,
+        )?))
+    }
+
+    fn clone_repo(
+        &self,
+        url: &str,
+        branch: &str,
+        clone_depth: Option<i32>,
+        dest_path: &PathBuf,
+        github_token: Option<String>,
+        progress_callback: &Option<Box<ProgressCallback>>,
+    ) -> Result<(), git2::Error> {
+        GitRepo::clone(
+            url,
+            branch,
+            clone_depth,
+            dest_path,
+            github_token,
+            progress_callback,
+        )
+    }
+}
+
+#[cfg(test)]
+pub(crate) mod mock {
+    //! In-memory git seam for tests: records open/clone calls and returns canned
+    //! handles, performing no real git I/O.
+    use super::{GitProvider, ProgressCallback, RepoHandle};
+    use std::path::PathBuf;
+    use std::sync::Mutex;
+
+    #[derive(Default)]
+    pub(crate) struct MockRepoHandle {
+        pub remote_url: String,
+        pub branch_name: String,
+    }
+
+    impl RepoHandle for MockRepoHandle {
+        fn get_remote_url(&self) -> Result<String, git2::Error> {
+            Ok(self.remote_url.clone())
+        }
+        fn get_branch_name(&self) -> Result<String, git2::Error> {
+            Ok(self.branch_name.clone())
+        }
+        fn fetch_branch(&self, _branch: &str) -> Result<(), git2::Error> {
+            Ok(())
+        }
+        fn checkout_branch(&self, _branch: &str) -> Result<(), git2::Error> {
+            Ok(())
+        }
+        fn fast_forward(&self) -> Result<(), git2::Error> {
+            Ok(())
+        }
+        fn cmp_head_with_remote_branch(&self, _branch: &str) -> Result<bool, git2::Error> {
+            Ok(true)
+        }
+        fn update_modules(&self) -> Result<(), git2::Error> {
+            Ok(())
+        }
+    }
+
+    #[derive(Default)]
+    pub(crate) struct MockGitProvider {
+        pub opens: Mutex<Vec<String>>,
+        pub clones: Mutex<Vec<String>>,
+        pub remote_url: String,
+        pub branch_name: String,
+    }
+
+    impl GitProvider for MockGitProvider {
+        fn open(
+            &self,
+            path: &PathBuf,
+            _remote_name: &str,
+            _github_token: Option<String>,
+            _progress_callback: Option<Box<ProgressCallback>>,
+        ) -> Result<Box<dyn RepoHandle>, git2::Error> {
+            self.opens.lock().unwrap().push(path.display().to_string());
+            Ok(Box::new(MockRepoHandle {
+                remote_url: self.remote_url.clone(),
+                branch_name: self.branch_name.clone(),
+            }))
+        }
+
+        fn clone_repo(
+            &self,
+            url: &str,
+            _branch: &str,
+            _clone_depth: Option<i32>,
+            _dest_path: &PathBuf,
+            _github_token: Option<String>,
+            _progress_callback: &Option<Box<ProgressCallback>>,
+        ) -> Result<(), git2::Error> {
+            self.clones.lock().unwrap().push(url.to_string());
+            Ok(())
+        }
+    }
+}

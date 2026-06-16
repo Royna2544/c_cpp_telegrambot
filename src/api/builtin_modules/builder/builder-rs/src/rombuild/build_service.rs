@@ -4,7 +4,7 @@ mod grpc_pb {
 
 pub use crate::rombuild::build_service::grpc_pb::rom_build_service_server::RomBuildServiceServer;
 use crate::{
-    git_repo::{self, GitRepo},
+    git_repo::{GitProvider, RealGitProvider},
     gofile_api::upload_file_to_gofile,
     rombuild::{
         build_service::grpc_pb::{
@@ -119,6 +119,8 @@ pub struct BuildService {
     pub shutdown_tx: broadcast::Sender<()>, // Channel to signal shutdown
     // Command-execution seam; defaults to RealProcessRunner, swappable in tests.
     runner: Arc<dyn ProcessRunner>,
+    // Git seam; defaults to RealGitProvider, swappable in tests.
+    git: Arc<dyn GitProvider>,
 }
 
 impl BuildService {
@@ -294,6 +296,7 @@ export RBE_LINT_POOL=default"##,
             known_builds: Arc::new(Mutex::new(Vec::new())),
             shutdown_tx,
             runner: Arc::new(RealProcessRunner),
+            git: Arc::new(RealGitProvider),
         }
     }
 
@@ -1009,6 +1012,7 @@ impl rom_build_service_server::RomBuildService for BuildService {
         let known_builds_clone = self.known_builds.clone();
         let askpass_path_clone = askpass_path.clone();
         let runner = self.runner.clone();
+        let git = self.git.clone();
         let force_checkout = req.force_checkout.unwrap_or(false);
 
         let span = tracing::info_span!("build_task", build_id = build_id);
@@ -1073,7 +1077,7 @@ impl rom_build_service_server::RomBuildService for BuildService {
                     let manifest_repo_path = &build_dir_clone.join(".repo").join("manifests.git");
                     if manifest_repo_path.exists() {
                         send_log!(LogLevel::Debug, format!("Opening manifest git repository at {:?}", manifest_repo_path));
-                        let repo = git_repo::GitRepo::new(&manifest_repo_path, "origin", None, None)
+                        let repo = git.open(&manifest_repo_path, "origin", None, None)
                             .map_err(|e| {
                                 tonic::Status::internal(format!(
                                     "Failed to open manifest git repository: {}",
@@ -1166,7 +1170,7 @@ impl rom_build_service_server::RomBuildService for BuildService {
                     let local_manifest_dir = &build_dir_clone.join(".repo").join("local_manifests");
                     match config_entry {
                         ConfigType::Standard(rom) => {
-                            match git_repo::GitRepo::new(
+                            match git.open(
                                 &local_manifest_dir,
                                 "origin",
                                 req.github_token.clone(),
@@ -1188,7 +1192,7 @@ impl rom_build_service_server::RomBuildService for BuildService {
                                             ))
                                         })?;
 
-                                        git_repo::GitRepo::clone(
+                                        git.clone_repo(
                                             &rom.url,
                                             &branch_entry.name,
                                             None,
@@ -1230,7 +1234,7 @@ impl rom_build_service_server::RomBuildService for BuildService {
                                 }
                                 Err(_) => {
                                     send_log!(LogLevel::Info, format!("Cloning local manifest repository from {}...", &rom.url));
-                                    git_repo::GitRepo::clone(
+                                    git.clone_repo(
                                         &rom.url,
                                         &branch_entry.name,
                                         None,
@@ -1324,7 +1328,7 @@ impl rom_build_service_server::RomBuildService for BuildService {
                                                             continue;
                                                         }
 
-                                                        let sub_repo = GitRepo::new(
+                                                        let sub_repo = git.open(
                                                             &PathBuf::from(build_dir_clone.join(&sub_repo_path)),
                                                             "origin",
                                                             req.github_token.clone(),
@@ -2222,6 +2226,7 @@ impl BuildService {
         temp_dir: PathBuf,
         configs: ROMBuildConfig,
         runner: Arc<dyn ProcessRunner>,
+        git: Arc<dyn GitProvider>,
     ) -> Self {
         let (shutdown_tx, _) = broadcast::channel(1);
         BuildService {
@@ -2241,6 +2246,7 @@ impl BuildService {
             known_builds: Arc::new(Mutex::new(Vec::new())),
             shutdown_tx,
             runner,
+            git,
         }
     }
 }
@@ -2310,9 +2316,12 @@ mod runner_tests {
     }
 
     #[tokio::test]
-    async fn build_service_accepts_injected_runner() {
-        // The seam is injectable: a BuildService can be built around the mock.
+    async fn build_service_accepts_injected_seams() {
+        // The seams are injectable: a BuildService can be built around mock
+        // command and git providers (the production type defaults to the real
+        // ones).
         let runner = Arc::new(MockProcessRunner::default());
+        let git = Arc::new(crate::git_repo::mock::MockGitProvider::default());
         let configs = ROMBuildConfig {
             roms: vec![],
             recoveries: vec![],
@@ -2325,7 +2334,9 @@ mod runner_tests {
             PathBuf::from("/tmp/does-not-exist"),
             configs,
             runner.clone(),
+            git.clone(),
         );
         assert_eq!(runner.calls.lock().await.len(), 0);
+        assert_eq!(git.opens.lock().unwrap().len(), 0);
     }
 }

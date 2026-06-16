@@ -4,7 +4,7 @@ mod grpc_pb {
 use super::builder_config::Toolchain;
 use super::builder_config::{BuilderConfig, CompilerType};
 use super::kernel_config::KernelConfig;
-use crate::git_repo::GitRepo;
+use crate::git_repo::{GitProvider, RealGitProvider};
 use builder::ratelimit::RateLimit;
 use chrono::Local;
 use grpc_pb::ArtifactChunk;
@@ -104,6 +104,8 @@ pub struct BuildService {
     pub shutdown_tx: broadcast::Sender<()>, // Channel to signal shutdown
     // Command-execution seam; defaults to RealProcessRunner, swappable in tests.
     runner: Arc<dyn ProcessRunner>,
+    // Git seam; defaults to RealGitProvider, swappable in tests.
+    git: Arc<dyn GitProvider>,
 }
 type WrappedBuildStatus = Arc<Mutex<Vec<PerBuildIdStatus>>>;
 type WrappedContexts = Arc<Mutex<Vec<BuildContext>>>;
@@ -196,6 +198,7 @@ impl BuildService {
             output_directory,
             shutdown_tx,
             runner: Arc::new(RealProcessRunner),
+            git: Arc::new(RealGitProvider),
         }
     }
 
@@ -694,6 +697,7 @@ impl linux_kernel_build_service_server::LinuxKernelBuildService for BuildService
         let per_build_statuses = self.build_statuses.clone();
         let tx_for_final = tx.clone();
         let runner = self.runner.clone();
+        let git = self.git.clone();
 
         let spawnres: tokio::task::JoinHandle<Result<(), Status>> = tokio::spawn(async move {
             report!(
@@ -891,7 +895,7 @@ impl linux_kernel_build_service_server::LinuxKernelBuildService for BuildService
                     let tx_for_inner = tx_for_git.clone();
                     let tx_for_callback = tx_for_git.clone();
                     // Open repo...
-                    let repo = GitRepo::new(
+                    let repo = git.open(
                         &source_dir_clone2,
                         "origin",
                         req.github_token.clone(),
@@ -977,7 +981,7 @@ impl linux_kernel_build_service_server::LinuxKernelBuildService for BuildService
                                             e
                                         )));
                                     }
-                                    match GitRepo::clone(
+                                    match git.clone_repo(
                                         &config_url,
                                         &config_branch,
                                         None,
@@ -1017,7 +1021,7 @@ impl linux_kernel_build_service_server::LinuxKernelBuildService for BuildService
                         }
                         Ok(())
                     } else {
-                        match GitRepo::clone(
+                        match git.clone_repo(
                             &config_url,
                             &config_branch,
                             None,
