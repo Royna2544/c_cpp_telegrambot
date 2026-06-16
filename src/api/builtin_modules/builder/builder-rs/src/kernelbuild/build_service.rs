@@ -4,6 +4,7 @@ mod grpc_pb {
 use super::builder_config::Toolchain;
 use super::builder_config::{BuilderConfig, CompilerType};
 use super::kernel_config::KernelConfig;
+use crate::filesystem::{Filesystem, RealFilesystem};
 use crate::git_repo::{GitProvider, RealGitProvider};
 use builder::ratelimit::RateLimit;
 use chrono::Local;
@@ -106,6 +107,8 @@ pub struct BuildService {
     runner: Arc<dyn ProcessRunner>,
     // Git seam; defaults to RealGitProvider, swappable in tests.
     git: Arc<dyn GitProvider>,
+    // Filesystem seam; defaults to RealFilesystem, swappable in tests.
+    fs: Arc<dyn Filesystem>,
 }
 type WrappedBuildStatus = Arc<Mutex<Vec<PerBuildIdStatus>>>;
 type WrappedContexts = Arc<Mutex<Vec<BuildContext>>>;
@@ -199,6 +202,7 @@ impl BuildService {
             shutdown_tx,
             runner: Arc::new(RealProcessRunner),
             git: Arc::new(RealGitProvider),
+            fs: Arc::new(RealFilesystem),
         }
     }
 
@@ -698,6 +702,7 @@ impl linux_kernel_build_service_server::LinuxKernelBuildService for BuildService
         let tx_for_final = tx.clone();
         let runner = self.runner.clone();
         let git = self.git.clone();
+        let fs = self.fs.clone();
 
         let spawnres: tokio::task::JoinHandle<Result<(), Status>> = tokio::spawn(async move {
             report!(
@@ -890,6 +895,7 @@ impl linux_kernel_build_service_server::LinuxKernelBuildService for BuildService
             let source_dir_clone2 = source_dir.clone();
             let config_branch = config.repo.branch.clone();
             let config_url = config.repo.url.clone();
+            let fs_inner = fs.clone();
             let res: Result<Result<(), Status>, tokio::task::JoinError> =
                 tokio::task::spawn_blocking(move || {
                     let tx_for_inner = tx_for_git.clone();
@@ -967,7 +973,7 @@ impl linux_kernel_build_service_server::LinuxKernelBuildService for BuildService
                                             url, config_url
                                         )
                                     );
-                                    if let Err(e) = std::fs::remove_dir_all(&source_dir_clone2) {
+                                    if let Err(e) = fs_inner.remove_dir_all(&source_dir_clone2) {
                                         report_blk!(
                                             tx_for_inner,
                                             Failed,
@@ -1107,7 +1113,7 @@ impl linux_kernel_build_service_server::LinuxKernelBuildService for BuildService
 
             // Old kernel version requires manual creation of out folder
             let out_path = source_dir.join("out");
-            if out_path.is_dir() {
+            if fs.is_dir(&out_path) {
                 info!(
                     "Output directory {:?} already exists, skipping creation.",
                     out_path
@@ -1117,7 +1123,7 @@ impl linux_kernel_build_service_server::LinuxKernelBuildService for BuildService
                     "Output directory {:?} does not exist, creating...",
                     out_path
                 );
-                std::fs::create_dir(out_path).map_err(|e| {
+                fs.create_dir(&out_path).map_err(|e| {
                     Status::internal(format!("Failed to create 'out' directory: {}", e))
                 })?;
             }
@@ -1280,6 +1286,7 @@ impl linux_kernel_build_service_server::LinuxKernelBuildService for BuildService
         let contexts_clone = self.contexts.clone();
         let toolchain = context.toolchain.clone();
         let runner = self.runner.clone();
+        let fs = self.fs.clone();
 
         let (tx_kill, rx_kill) = mpsc::channel(1);
 
@@ -1342,7 +1349,7 @@ impl linux_kernel_build_service_server::LinuxKernelBuildService for BuildService
             let mut artifact = kernel_image.clone();
 
             // Check if kernel image exists
-            if !artifact.exists() {
+            if !fs.exists(&artifact) {
                 Self::add_artifact_path_to_context(&contexts_clone, req.build_id, &log_file).await;
                 Self::mark_build_finished(&peridstat, req.build_id, false).await;
                 report_build_id!(
@@ -1379,7 +1386,7 @@ impl linux_kernel_build_service_server::LinuxKernelBuildService for BuildService
                     );
                 } else {
                     let anykernel_dir = context.work_dir.join(anykernel.location.as_ref().unwrap());
-                    if !anykernel_dir.exists() {
+                    if !fs.exists(&anykernel_dir) {
                         Self::mark_build_finished(&peridstat, req.build_id, false).await;
                         report_build_id!(
                             tx,
@@ -1393,8 +1400,7 @@ impl linux_kernel_build_service_server::LinuxKernelBuildService for BuildService
                     // Copy kernel image into AnyKernel directory
                     let dest_image_path =
                         anykernel_dir.join(PathBuf::from(&context.config.image_type));
-                    match fs::copy(&kernel_image, &dest_image_path)
-                        .await {
+                    match fs.copy(&kernel_image, &dest_image_path) {
                         Ok(_) => {}
                         Err(e) => {
                             report_build_id!(
@@ -1432,7 +1438,7 @@ impl linux_kernel_build_service_server::LinuxKernelBuildService for BuildService
                     );
 
                     // Delete the copied kernel image from AnyKernel directory
-                    match fs::remove_file(&dest_image_path).await {
+                    match fs.remove_file(&dest_image_path) {
                         Ok(_) => {}
                         Err(e) => {
                             warn!(
@@ -1586,6 +1592,7 @@ impl linux_kernel_build_service_server::LinuxKernelBuildService for BuildService
 
         let req = request.into_inner();
         let (tx, rx) = mpsc::channel(100);
+        let fs = self.fs.clone();
         let spawnres = tokio::spawn(async move {
             // Check if artifact exists
             let artifact_path = match &context.artifact_path {
@@ -1606,8 +1613,8 @@ impl linux_kernel_build_service_server::LinuxKernelBuildService for BuildService
                 req.build_id, artifact_path
             );
             // First send metadata chunk
-            let metadata = match std::fs::metadata(&artifact_path) {
-                Ok(metadata) => metadata,
+            let total_size = match fs.file_len(&artifact_path) {
+                Ok(len) => len,
                 Err(e) => {
                     let _ = tx
                         .send(Err(Status::internal(format!(
@@ -1624,7 +1631,7 @@ impl linux_kernel_build_service_server::LinuxKernelBuildService for BuildService
                     .and_then(|s| s.to_str())
                     .unwrap_or("artifact.bin")
                     .to_string(),
-                total_size: metadata.len(),
+                total_size,
             };
             let meta_chunk = grpc_pb::ArtifactChunk {
                 content: Some(grpc_pb::artifact_chunk::Content::Metadata(artifact_meta)),

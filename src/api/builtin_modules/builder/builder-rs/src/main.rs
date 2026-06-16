@@ -43,6 +43,7 @@ use tracing_subscriber::EnvFilter;
 
 const FILE_DESCRIPTOR_SET: &[u8] = tonic::include_file_descriptor_set!("descriptor");
 
+pub mod filesystem;
 pub mod git_repo;
 pub mod gofile_api;
 mod health;

@@ -4,6 +4,7 @@ mod grpc_pb {
 
 pub use crate::rombuild::build_service::grpc_pb::rom_build_service_server::RomBuildServiceServer;
 use crate::{
+    filesystem::{Filesystem, RealFilesystem},
     git_repo::{GitProvider, RealGitProvider},
     gofile_api::upload_file_to_gofile,
     rombuild::{
@@ -121,6 +122,8 @@ pub struct BuildService {
     runner: Arc<dyn ProcessRunner>,
     // Git seam; defaults to RealGitProvider, swappable in tests.
     git: Arc<dyn GitProvider>,
+    // Filesystem seam; defaults to RealFilesystem, swappable in tests.
+    fs: Arc<dyn Filesystem>,
 }
 
 impl BuildService {
@@ -144,13 +147,17 @@ impl BuildService {
             .all(|component| matches!(component, std::path::Component::Normal(_)))
     }
 
-    async fn setup_rbe_env(build_dir: PathBuf, rbe_api_token: &str) -> Result<(), Status> {
+    async fn setup_rbe_env(
+        fs: &dyn Filesystem,
+        build_dir: PathBuf,
+        rbe_api_token: &str,
+    ) -> Result<(), Status> {
         let rbe_env_path = build_dir.join("rbe_env.sh");
         let rbe_cli_path = build_dir.join("rbe_cli");
 
         const RBE_CLI_URL: &str =
             "https://chrome-infra-packages.appspot.com/dl/infra/rbe/client/linux-amd64/+/stable";
-        if !rbe_cli_path.exists() {
+        if !fs.exists(&rbe_cli_path) {
             // Download rbe_cli binary
             info!("Downloading RBE CLI from {}", RBE_CLI_URL);
             let client = reqwest::Client::new();
@@ -234,18 +241,11 @@ export RBE_LINT_POOL=default"##,
             Self::shell_single_quote(&rbe_cli_path.to_string_lossy()),
             Self::shell_single_quote(&format!("x-buildbuddy-api-key={}", rbe_api_token))
         );
-        std::fs::write(&rbe_env_path, content)
+        fs.write(&rbe_env_path, content.as_bytes())
             .map_err(|e| Status::internal(format!("Failed to write RBE env file: {}", e)))?;
         #[cfg(unix)]
         {
-            use std::os::unix::fs::PermissionsExt;
-            let mut perms = std::fs::metadata(&rbe_env_path)
-                .map_err(|e| {
-                    Status::internal(format!("Failed to get metadata for RBE env file: {}", e))
-                })?
-                .permissions();
-            perms.set_mode(0o600);
-            std::fs::set_permissions(&rbe_env_path, perms).map_err(|e| {
+            fs.set_mode(&rbe_env_path, 0o600).map_err(|e| {
                 Status::internal(format!("Failed to set permissions for RBE env file: {}", e))
             })?;
         }
@@ -297,6 +297,7 @@ export RBE_LINT_POOL=default"##,
             shutdown_tx,
             runner: Arc::new(RealProcessRunner),
             git: Arc::new(RealGitProvider),
+            fs: Arc::new(RealFilesystem),
         }
     }
 
@@ -522,6 +523,7 @@ impl ProcessRunner for RealProcessRunner {
 
 impl BuildService {
     async fn find_artifact(
+        fs: &dyn Filesystem,
         build_dir: &PathBuf,
         codename: &String,
         rom_entry: &ROMEntry,
@@ -536,13 +538,14 @@ impl BuildService {
                 let prefix = &rom_entry.artifact.data;
                 let mut artifact_paths: Vec<PathBuf> = Vec::new();
                 let mut found = false;
-                for entry in std::fs::read_dir(&output_dir).map_err(|e| {
+                for entry in fs.read_dir(&output_dir).map_err(|e| {
                     tonic::Status::internal(format!("Failed to read output directory: {}", e))
                 })? {
-                    let entry = entry.map_err(|e| {
-                        tonic::Status::internal(format!("Failed to read output entry: {}", e))
-                    })?;
-                    let file_name = entry.file_name().to_string_lossy().to_string();
+                    let file_name = entry
+                        .file_name()
+                        .unwrap_or_default()
+                        .to_string_lossy()
+                        .to_string();
                     if file_name.starts_with(prefix) && file_name.ends_with(".zip") {
                         artifact_paths.push(output_dir.join(&file_name));
                         found = true;
@@ -566,7 +569,7 @@ impl BuildService {
                     )));
                 }
                 let artifact_path = output_dir.join(exact_path);
-                if !artifact_path.is_file() {
+                if !fs.is_file(&artifact_path) {
                     Err(tonic::Status::not_found(
                         "Artifact not found with exact name",
                     ))
@@ -704,7 +707,8 @@ impl rom_build_service_server::RomBuildService for BuildService {
             CleanDirectoryType::BuildDirectory => self.build_dir.join("out"),
         };
         info!("Cleaning directory: {:?}", clean_dir);
-        std::fs::remove_dir_all(&clean_dir)
+        self.fs
+            .remove_dir_all(&clean_dir)
             .map_err(|e| tonic::Status::internal(format!("Failed to clean directory: {}", e)))?;
         Ok(tonic::Response::new(()))
     }
@@ -724,7 +728,7 @@ impl rom_build_service_server::RomBuildService for BuildService {
             CleanDirectoryType::BuildDirectory => self.build_dir.join("out"),
         };
         info!("Checking existence of directory: {:?}", check_dir);
-        let exists = check_dir.exists();
+        let exists = self.fs.exists(&check_dir);
         Ok(tonic::Response::new(DirectoryExistsResponse { exists }))
     }
 
@@ -763,12 +767,12 @@ impl rom_build_service_server::RomBuildService for BuildService {
         let (log_tx, _logz_rx) = broadcast::channel::<BuildLogEntry>(100);
 
         // Ensure directory exists before we start the build, so that Ctrl-C handler can safely write logs even if the build fails early.
-        if !self.build_dir.exists() {
+        if !self.fs.exists(&self.build_dir) {
             warn!(
                 "Build directory {:?} does not exist, creating it...",
                 self.build_dir
             );
-            if let Err(e) = tokio::fs::create_dir_all(&self.build_dir).await {
+            if let Err(e) = self.fs.create_dir_all(&self.build_dir) {
                 return Err(Status::internal(format!(
                     "Failed to create build directory: {}",
                     e
@@ -976,7 +980,7 @@ impl rom_build_service_server::RomBuildService for BuildService {
                 "#!/bin/sh\nprintf '%s\\n' {}\n",
                 Self::shell_single_quote(token)
             );
-            let res = tokio::fs::write(&askpass_path, script).await;
+            let res = self.fs.write(&askpass_path, script.as_bytes());
             if let Err(e) = res {
                 return Err(Status::internal(format!(
                     "Failed to write git-askpass file: {}",
@@ -986,12 +990,7 @@ impl rom_build_service_server::RomBuildService for BuildService {
             // Make it executable
             #[cfg(unix)]
             {
-                use std::os::unix::fs::PermissionsExt;
-                let mut perms = std::fs::metadata(&askpass_path)
-                    .inspect_err(|e| info!("Failed to get metadata for git-askpass file: {}", e))?
-                    .permissions();
-                perms.set_mode(0o700);
-                std::fs::set_permissions(&askpass_path, perms).map_err(|e| {
+                self.fs.set_mode(&askpass_path, 0o700).map_err(|e| {
                     tonic::Status::internal(format!(
                         "Failed to set permissions for git-askpass file: {}",
                         e
@@ -1013,6 +1012,7 @@ impl rom_build_service_server::RomBuildService for BuildService {
         let askpass_path_clone = askpass_path.clone();
         let runner = self.runner.clone();
         let git = self.git.clone();
+        let fs = self.fs.clone();
         let force_checkout = req.force_checkout.unwrap_or(false);
 
         let span = tracing::info_span!("build_task", build_id = build_id);
@@ -1075,7 +1075,7 @@ impl rom_build_service_server::RomBuildService for BuildService {
                     // Open .repo/manifest git repository and check URL and branch
                     let mut need_reinit = false;
                     let manifest_repo_path = &build_dir_clone.join(".repo").join("manifests.git");
-                    if manifest_repo_path.exists() {
+                    if fs.exists(&manifest_repo_path) {
                         send_log!(LogLevel::Debug, format!("Opening manifest git repository at {:?}", manifest_repo_path));
                         let repo = git.open(&manifest_repo_path, "origin", None, None)
                             .map_err(|e| {
@@ -1153,9 +1153,9 @@ impl rom_build_service_server::RomBuildService for BuildService {
                             // Update known builds entry to contain failure
                             let known_builds_self = &mut known_builds_clone.lock().await;
                             if let Some(build_entry) = known_builds_self.iter_mut().find(|b| b.id == build_id_clone) {
-                                let content = std::fs::read_to_string(&error_file).unwrap_or_else(|_| "Failed to read error log.".to_string());
+                                let content = fs.read_to_string(&error_file).unwrap_or_else(|_| "Failed to read error log.".to_string());
                                 // Remove error log file after reading
-                                std::fs::remove_file(&error_file).unwrap_or_else(|e| {
+                                fs.remove_file(&error_file).unwrap_or_else(|e| {
                                     error!("Failed to remove error log file {:?}: {}", &error_file, e);
                                 });
                                 build_entry.success = BuildStatus::Failed(content);
@@ -1185,7 +1185,7 @@ impl rom_build_service_server::RomBuildService for BuildService {
                                     })? != rom.url
                                     {
                                         send_log!(LogLevel::Warning, "Local manifest repository URL mismatch, re-cloning...".to_string());
-                                        std::fs::remove_dir_all(&local_manifest_dir).map_err(|e| {
+                                        fs.remove_dir_all(&local_manifest_dir).map_err(|e| {
                                             tonic::Status::internal(format!(
                                                 "Failed to remove existing local manifest directory: {}",
                                                 e
@@ -1252,22 +1252,16 @@ impl rom_build_service_server::RomBuildService for BuildService {
                             }
 
                             // Handle custom attribute: recurse_submodules:bool on the manifest entry
-                            for file in std::fs::read_dir(&local_manifest_dir).map_err(|e| {
+                            for path in fs.read_dir(&local_manifest_dir).map_err(|e| {
                                 tonic::Status::internal(format!(
                                     "Failed to read local manifests directory: {}",
                                     e
                                 ))
                             })?
                             {
-                                let path = file.map_err(|e| {
-                                    tonic::Status::internal(format!(
-                                        "Failed to read local manifest file entry: {}",
-                                        e
-                                    ))
-                                })?.path();
                                 if path.extension().and_then(|s| s.to_str()) == Some("xml") {
                                     // Parse XML to check for recurse_submodules attribute
-                                    let content = std::fs::read_to_string(&path).map_err(|e| {
+                                    let content = fs.read_to_string(&path).map_err(|e| {
                                         tonic::Status::internal(format!(
                                             "Failed to read local manifest file {:?}: {}",
                                             path, e
@@ -1359,8 +1353,8 @@ impl rom_build_service_server::RomBuildService for BuildService {
                             }
                         }
                         ConfigType::Recovery(recov) => {
-                            if !local_manifest_dir.exists() {
-                                std::fs::create_dir_all(&local_manifest_dir).map_err(|e| {
+                            if !fs.exists(&local_manifest_dir) {
+                                fs.create_dir_all(&local_manifest_dir).map_err(|e| {
                                     tonic::Status::internal(format!(
                                         "Failed to create local manifests directory: {}",
                                         e
@@ -1496,9 +1490,9 @@ impl rom_build_service_server::RomBuildService for BuildService {
                         // Update known builds entry to contain failure
                         let known_builds_self = &mut known_builds_clone.lock().await;
                         if let Some(build_entry) = known_builds_self.iter_mut().find(|b| b.id == build_id_clone) {
-                            let content = std::fs::read_to_string(&error_file).unwrap_or_else(|_| "Failed to read error log.".to_string());
+                            let content = fs.read_to_string(&error_file).unwrap_or_else(|_| "Failed to read error log.".to_string());
                             // Remove error log file after reading
-                            std::fs::remove_file(&error_file).unwrap_or_else(|e| {
+                            fs.remove_file(&error_file).unwrap_or_else(|e| {
                                 error!("Failed to remove error log file {:?}: {}", &error_file, e);
                             });
                             build_entry.success = BuildStatus::Failed(content);
@@ -1552,6 +1546,7 @@ impl rom_build_service_server::RomBuildService for BuildService {
                 if use_rbe {
                     send_log!(LogLevel::Info, "Writing RBE environment configuration...".to_string());
                     Self::setup_rbe_env(
+                        fs.as_ref(),
                         build_dir_clone.clone(),
                         build_settings.rbe_api_token.as_deref().unwrap_or(""),
                     ).await.map_err(|e| {
@@ -1564,18 +1559,19 @@ impl rom_build_service_server::RomBuildService for BuildService {
                 let vendor_dir = build_dir_clone.join("vendor");
                 // Check vendor/<vendor>/config/BoardConfigSoong.mk for known vendors
                 let mut vendor_name : String = "unknown".to_string();
-                for dir in std::fs::read_dir(&vendor_dir).map_err(|e| {
+                for dir in fs.read_dir(&vendor_dir).map_err(|e| {
                     tonic::Status::internal(format!("Failed to read vendor directory: {}", e))
                 })? {
-                    let dir = dir.map_err(|e| {
-                        tonic::Status::internal(format!("Failed to read vendor subdirectory: {}", e))
-                    })?;
                     // Check for config/BoardConfigSoong.mk. This requires Android 10+, but most ROMs now target that or higher.
                     // Android 9 is released on August 2018, (that was 8 years ago) so it's reasonable to assume most builds are Android 10+ now.
                     // One exception may be TWRP, but you cannot build old versions of TWRP with this system anyway. (Need docker images with old toolchains)
-                    let config_path = dir.path().join("config").join("BoardConfigSoong.mk");
-                    if config_path.exists() {
-                        vendor_name = dir.file_name().to_string_lossy().to_string();
+                    let config_path = dir.join("config").join("BoardConfigSoong.mk");
+                    if fs.exists(&config_path) {
+                        vendor_name = dir
+                            .file_name()
+                            .unwrap_or_default()
+                            .to_string_lossy()
+                            .to_string();
                         send_log!(LogLevel::Info, format!("Detected vendor: {}", vendor_name));
                         break;
                     }
@@ -1594,7 +1590,7 @@ impl rom_build_service_server::RomBuildService for BuildService {
                 for path in [&build_dir_clone.join("build").join("release"), &build_dir_clone.join("vendor").join(&vendor_name).join("build").join("release")] {
                     // First, check release_config_map.textproto. Refer: https://android.googlesource.com/platform/build/release/+/925b392ae2a5d212904adec6cfebf4d1b8f574d9.
                     let release_config_map_path = path.join("release_config_map.textproto");
-                    if release_config_map_path.exists() {
+                    if fs.exists(&release_config_map_path) {
                         // In this case, aosp_current is automatically mapped to the latest release.
                         send_log!(LogLevel::Info, format!("Detected release from release_config_map.textproto"));
                         release = Some("aosp_current".to_string());
@@ -1603,15 +1599,12 @@ impl rom_build_service_server::RomBuildService for BuildService {
 
                     // Check build/release/build_config, scl for Android 14
                     let _build_config_path = path.join("build_config");
-                    if _build_config_path.is_dir() {
-                        for file in std::fs::read_dir(&path).map_err(|e| {
+                    if fs.is_dir(&_build_config_path) {
+                        for file in fs.read_dir(&path).map_err(|e| {
                             tonic::Status::internal(format!("Failed to read release directory: {}", e))
                         })? {
-                            let file = file.map_err(|e| {
-                                tonic::Status::internal(format!("Failed to read release file entry: {}", e))
-                            })?;
-                            if file.path().extension().and_then(|s| s.to_str()) == Some("scl") {
-                                let file_name = file.file_name().to_string_lossy().to_string();
+                            if file.extension().and_then(|s| s.to_str()) == Some("scl") {
+                                let file_name = file.file_name().unwrap_or_default().to_string_lossy().to_string();
                                 let release_name = file_name.trim_end_matches(".scl");
                                 send_log!(LogLevel::Info, format!("Detected release from build_config scl file: {}", release_name));
                                 release = Some(release_name.to_string());
@@ -1622,16 +1615,13 @@ impl rom_build_service_server::RomBuildService for BuildService {
 
                     // Fallback to build/release/release_configs, textproto, another stuff added on android 15
                     let release_configs_path = path.join("release_configs");
-                    if release_configs_path.is_dir() {
+                    if fs.is_dir(&release_configs_path) {
                         let _latest_release: Option<String> = None;
-                        for file in std::fs::read_dir(&release_configs_path).map_err(|e| {
+                        for file in fs.read_dir(&release_configs_path).map_err(|e| {
                             tonic::Status::internal(format!("Failed to read release_configs directory: {}", e))
                         })? {
-                            let file = file.map_err(|e| {
-                                tonic::Status::internal(format!("Failed to read release_configs file entry: {}", e))
-                            })?;
-                            if file.path().extension().and_then(|s| s.to_str()) == Some("textproto") {
-                                let file_name = file.file_name().to_string_lossy().to_string();
+                            if file.extension().and_then(|s| s.to_str()) == Some("textproto") {
+                                let file_name = file.file_name().unwrap_or_default().to_string_lossy().to_string();
                                 let release_name = file_name.trim_end_matches(".textproto");
                                 if vec!["root", "trunk"].contains(&release_name) {
                                     continue;
@@ -1663,9 +1653,9 @@ impl rom_build_service_server::RomBuildService for BuildService {
                 if build_settings.do_clean_build() {
                     send_log!(LogLevel::Info, "Performing clean build...".to_string());
                     let out_dir = build_dir_clone.join("out");
-                    if out_dir.exists() {
+                    if fs.exists(&out_dir) {
                         send_log!(LogLevel::Info, format!("Removing output directory at {:?}", out_dir));
-                        std::fs::remove_dir_all(&out_dir).map_err(|e| {
+                        fs.remove_dir_all(&out_dir).map_err(|e| {
                             tonic::Status::internal(format!(
                                 "Failed to remove output directory for clean build: {}",
                                 e
@@ -1676,11 +1666,11 @@ impl rom_build_service_server::RomBuildService for BuildService {
 
                 // Delete matching artifact from previous builds to prevent confusion. We will check for the artifact after the build completes, 
                 // if it's not there, we know the build failed. If it's there, we know the build succeeded and we can proceed to upload.
-                match Self::find_artifact(&build_dir_clone, &device_entry.codename, &rom_entry).await {
+                match Self::find_artifact(fs.as_ref(), &build_dir_clone, &device_entry.codename, &rom_entry).await {
                     Ok(artifacts) => {
                         send_log!(LogLevel::Info, format!("Removing existing artifact from previous builds to prevent confusion. (count: {})", artifacts.len()));
                         for artifact in artifacts {
-                            std::fs::remove_file(&artifact).map_err(|e| {
+                            fs.remove_file(&artifact).map_err(|e| {
                                 tonic::Status::internal(format!(
                                     "Failed to remove existing artifact for clean build: {}",
                                     e
@@ -1756,10 +1746,10 @@ impl rom_build_service_server::RomBuildService for BuildService {
                     if let Some(build_entry) = known_builds_self.iter_mut().find(|b| b.id == build_id_clone) {
                         let error_file = (&build_dir_clone).join("out").join("error.log");
                         send_log!(LogLevel::Info, format!("Reading error log from {:?}", error_file));
-                        let content = std::fs::read_to_string(&error_file).unwrap_or_else(|_| "Failed to read error log.".to_string());
+                        let content = fs.read_to_string(&error_file).unwrap_or_else(|_| "Failed to read error log.".to_string());
                         if content.is_empty() {
                             send_log!(LogLevel::Info, format!("Error log is empty, reading from build output log at {:?}", error_file_path));
-                            let content = std::fs::read_to_string(&error_file_path).unwrap_or_else(|_| "Failed to read error log.".to_string());
+                            let content = fs.read_to_string(&error_file_path).unwrap_or_else(|_| "Failed to read error log.".to_string());
                             if content.is_empty() {
                                 send_log!(LogLevel::Warning, "Build output log is also empty, setting generic error message.".to_string());
                                 build_entry.success = BuildStatus::Failed("Build failed, but no error log available.".to_string());
@@ -1775,7 +1765,7 @@ impl rom_build_service_server::RomBuildService for BuildService {
                 send_log!(LogLevel::Info, "Build process completed successfully.".to_string());
 
                 if build_settings.do_upload() {
-                    match Self::find_artifact(&build_dir_clone, &device_entry.codename, &rom_entry).await {
+                    match Self::find_artifact(fs.as_ref(), &build_dir_clone, &device_entry.codename, &rom_entry).await {
                         Ok(artifact) => {
                         send_log!(LogLevel::Info, format!("Found {} artifact(s) for upload.", artifact.len()));
                         for (i, path) in artifact.iter().enumerate() {
@@ -2227,6 +2217,7 @@ impl BuildService {
         configs: ROMBuildConfig,
         runner: Arc<dyn ProcessRunner>,
         git: Arc<dyn GitProvider>,
+        fs: Arc<dyn Filesystem>,
     ) -> Self {
         let (shutdown_tx, _) = broadcast::channel(1);
         BuildService {
@@ -2247,6 +2238,7 @@ impl BuildService {
             shutdown_tx,
             runner,
             git,
+            fs,
         }
     }
 }
@@ -2322,6 +2314,7 @@ mod runner_tests {
         // ones).
         let runner = Arc::new(MockProcessRunner::default());
         let git = Arc::new(crate::git_repo::mock::MockGitProvider::default());
+        let fs = Arc::new(crate::filesystem::mock::MockFilesystem::default());
         let configs = ROMBuildConfig {
             roms: vec![],
             recoveries: vec![],
@@ -2335,8 +2328,10 @@ mod runner_tests {
             configs,
             runner.clone(),
             git.clone(),
+            fs.clone(),
         );
         assert_eq!(runner.calls.lock().await.len(), 0);
         assert_eq!(git.opens.lock().unwrap().len(), 0);
+        assert_eq!(fs.written.lock().unwrap().len(), 0);
     }
 }
