@@ -87,6 +87,27 @@ impl Display for BuildVariant {
     }
 }
 
+/// Seam for executing external build commands.
+///
+/// Production uses [`RealProcessRunner`], which spawns the process and streams
+/// its output (the body that used to be `BuildService::run_command_with_logs`).
+/// Tests inject a mock so the build workflow can be driven without launching
+/// real `repo`/`bash` processes.
+#[async_trait]
+pub(crate) trait ProcessRunner: Send + Sync {
+    async fn run_command_with_logs(
+        &self,
+        command: Command,
+        tx: &broadcast::Sender<BuildLogEntry>,
+        kill_rx: Option<&mut mpsc::Receiver<()>>,
+        log_path: Option<PathBuf>,
+        stdin_rx: Option<mpsc::Receiver<String>>,
+    ) -> Result<bool, Status>;
+}
+
+/// Real runner that spawns processes — the production implementation.
+pub(crate) struct RealProcessRunner;
+
 pub struct BuildService {
     settings: Arc<Mutex<Settings>>,
     build_dir: PathBuf,
@@ -96,6 +117,8 @@ pub struct BuildService {
     active_uploads: Arc<Mutex<Vec<UploadTask>>>,
     known_builds: Arc<Mutex<Vec<BuildEntry>>>,
     pub shutdown_tx: broadcast::Sender<()>, // Channel to signal shutdown
+    // Command-execution seam; defaults to RealProcessRunner, swappable in tests.
+    runner: Arc<dyn ProcessRunner>,
 }
 
 impl BuildService {
@@ -270,10 +293,16 @@ export RBE_LINT_POOL=default"##,
             active_uploads: Arc::new(Mutex::new(Vec::new())),
             known_builds: Arc::new(Mutex::new(Vec::new())),
             shutdown_tx,
+            runner: Arc::new(RealProcessRunner),
         }
     }
 
+}
+
+#[async_trait]
+impl ProcessRunner for RealProcessRunner {
     async fn run_command_with_logs(
+        &self,
         mut command: Command, // The configured tokio::process::Command
         tx: &tokio::sync::broadcast::Sender<BuildLogEntry>, // Where to send logs
         mut kill_rx: Option<&mut mpsc::Receiver<()>>, // Optional Kill Switch
@@ -486,7 +515,9 @@ export RBE_LINT_POOL=default"##,
 
         Ok(success)
     }
+}
 
+impl BuildService {
     async fn find_artifact(
         build_dir: &PathBuf,
         codename: &String,
@@ -977,6 +1008,7 @@ impl rom_build_service_server::RomBuildService for BuildService {
         let tempdir_clone = self.tempdir.clone();
         let known_builds_clone = self.known_builds.clone();
         let askpass_path_clone = askpass_path.clone();
+        let runner = self.runner.clone();
         let force_checkout = req.force_checkout.unwrap_or(false);
 
         let span = tracing::info_span!("build_task", build_id = build_id);
@@ -1106,7 +1138,7 @@ impl rom_build_service_server::RomBuildService for BuildService {
                         let error_file = (&tempdir_clone).join(format!("{}-{}", "repo-init", &build_log_filename_suffix));
                         info!("Repo init output log path: {:?}", &error_file);
 
-                        let res = Self::run_command_with_logs(
+                        let res = runner.run_command_with_logs(
                             repo_init_cmd,
                             &log_tx_clone,
                             Some(&mut kill_rx),
@@ -1280,7 +1312,7 @@ impl rom_build_service_server::RomBuildService for BuildService {
                                                         );
                                                         let error_file = (&tempdir_clone).join(format!("{}-{}-submodule-sync.log", "repo-sync", &build_id_clone));
                                                         info!("Repo sync for submodule output log path: {:?}", &error_file);
-                                                        let repo_sync_status = Self::run_command_with_logs(
+                                                        let repo_sync_status = runner.run_command_with_logs(
                                                             repo_sync_command,
                                                             &log_tx_clone,
                                                             Some(&mut kill_rx),
@@ -1448,7 +1480,7 @@ impl rom_build_service_server::RomBuildService for BuildService {
                     let error_file = (&tempdir_clone).join(format!("{}-{}", "repo-sync", &build_log_filename_suffix));
                     info!("Repo sync output log path: {:?}", &error_file);
 
-                    let repo_sync_status = Self::run_command_with_logs(
+                    let repo_sync_status = runner.run_command_with_logs(
                         repo_sync_command,
                         &log_tx_clone,
                         Some(&mut kill_rx),
@@ -1708,7 +1740,7 @@ impl rom_build_service_server::RomBuildService for BuildService {
                 }
 
                 let error_file_path = (&tempdir_clone).join(format!("{}-{}", "build-output", &build_log_filename_suffix));
-                if !Self::run_command_with_logs(cmd,
+                if !runner.run_command_with_logs(cmd,
                     &log_tx_clone,
                     Some(&mut kill_rx),
                     Some(error_file_path.clone()),
@@ -2176,5 +2208,124 @@ impl rom_build_service_server::RomBuildService for BuildService {
         Ok(tonic::Response::new(
             Box::pin(ReceiverStream::new(rx)) as Self::GetBuildResultStream
         ))
+    }
+}
+
+#[cfg(test)]
+impl BuildService {
+    /// Construct a service around an arbitrary [`ProcessRunner`] for tests,
+    /// skipping `new()`'s global Ctrl-C handler. This is the injection point
+    /// that lets the build workflow be driven with a mock instead of `repo`/
+    /// `bash`.
+    pub(crate) fn for_test(
+        build_dir: PathBuf,
+        temp_dir: PathBuf,
+        configs: ROMBuildConfig,
+        runner: Arc<dyn ProcessRunner>,
+    ) -> Self {
+        let (shutdown_tx, _) = broadcast::channel(1);
+        BuildService {
+            settings: Arc::new(Mutex::new(Settings {
+                do_repo_sync: Some(true),
+                do_clean_build: Some(false),
+                use_ccache: Some(false),
+                use_rbe_service: Some(false),
+                rbe_api_token: None,
+                do_upload: Some(false),
+            })),
+            build_dir,
+            tempdir: temp_dir,
+            configs,
+            active_job: Arc::new(Mutex::new(None)),
+            active_uploads: Arc::new(Mutex::new(Vec::new())),
+            known_builds: Arc::new(Mutex::new(Vec::new())),
+            shutdown_tx,
+            runner,
+        }
+    }
+}
+
+#[cfg(test)]
+mod runner_tests {
+    use super::*;
+    use std::collections::VecDeque;
+
+    /// Records each command's argv and returns scripted results instead of
+    /// spawning a process, so the build workflow can be exercised without real
+    /// `repo`/`bash` invocations.
+    #[derive(Default)]
+    pub(crate) struct MockProcessRunner {
+        pub calls: Mutex<Vec<Vec<String>>>,
+        pub results: Mutex<VecDeque<bool>>,
+    }
+
+    impl MockProcessRunner {
+        fn argv(command: &Command) -> Vec<String> {
+            let std = command.as_std();
+            std::iter::once(std.get_program())
+                .chain(std.get_args())
+                .map(|s| s.to_string_lossy().into_owned())
+                .collect()
+        }
+    }
+
+    #[async_trait]
+    impl ProcessRunner for MockProcessRunner {
+        async fn run_command_with_logs(
+            &self,
+            command: Command,
+            _tx: &broadcast::Sender<BuildLogEntry>,
+            _kill_rx: Option<&mut mpsc::Receiver<()>>,
+            _log_path: Option<PathBuf>,
+            mut stdin_rx: Option<mpsc::Receiver<String>>,
+        ) -> Result<bool, Status> {
+            self.calls.lock().await.push(Self::argv(&command));
+            // Drain queued stdin so the workflow's senders don't block/observe a
+            // closed channel.
+            if let Some(rx) = stdin_rx.as_mut() {
+                while rx.try_recv().is_ok() {}
+            }
+            Ok(self.results.lock().await.pop_front().unwrap_or(true))
+        }
+    }
+
+    #[tokio::test]
+    async fn mock_records_argv_and_returns_scripted_result() {
+        let runner = MockProcessRunner::default();
+        runner.results.lock().await.push_back(false);
+
+        let (tx, _rx) = broadcast::channel(16);
+        let mut cmd = Command::new("repo");
+        cmd.arg("sync").arg("-j8");
+
+        let ok = runner
+            .run_command_with_logs(cmd, &tx, None, None, None)
+            .await
+            .unwrap();
+
+        assert!(!ok, "scripted failure should propagate");
+        let calls = runner.calls.lock().await;
+        assert_eq!(calls.len(), 1);
+        assert_eq!(calls[0], vec!["repo", "sync", "-j8"]);
+    }
+
+    #[tokio::test]
+    async fn build_service_accepts_injected_runner() {
+        // The seam is injectable: a BuildService can be built around the mock.
+        let runner = Arc::new(MockProcessRunner::default());
+        let configs = ROMBuildConfig {
+            roms: vec![],
+            recoveries: vec![],
+            targets: vec![],
+            manifests: vec![],
+            recovery_manifests: vec![],
+        };
+        let _svc = BuildService::for_test(
+            PathBuf::from("/tmp/does-not-exist"),
+            PathBuf::from("/tmp/does-not-exist"),
+            configs,
+            runner.clone(),
+        );
+        assert_eq!(runner.calls.lock().await.len(), 0);
     }
 }

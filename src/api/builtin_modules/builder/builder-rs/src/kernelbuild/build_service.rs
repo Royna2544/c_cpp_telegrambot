@@ -72,6 +72,27 @@ struct PerBuildIdStatus {
     succeeded: bool,
 }
 
+/// Seam for executing external build commands.
+///
+/// Production uses [`RealProcessRunner`], which spawns the process and streams
+/// its output (the body that used to be `BuildService::run_command_with_logs`).
+/// Tests inject a mock so the build workflow can be driven without launching
+/// real `make` processes.
+#[tonic::async_trait]
+pub(crate) trait ProcessRunner: Send + Sync {
+    async fn run_command_with_logs(
+        &self,
+        command: Command,
+        tx: mpsc::Sender<Result<BuildStatus, Status>>,
+        build_id: Option<i32>,
+        kill_rx: Option<mpsc::Receiver<()>>,
+        log_path: Option<PathBuf>,
+    ) -> Result<bool, Status>;
+}
+
+/// Real runner that spawns processes — the production implementation.
+pub(crate) struct RealProcessRunner;
+
 pub struct BuildService {
     kernel_configs: Arc<Mutex<Vec<KernelConfig>>>,
     contexts: Arc<Mutex<Vec<BuildContext>>>,
@@ -81,6 +102,8 @@ pub struct BuildService {
     temp_directory: PathBuf,
     output_directory: PathBuf,
     pub shutdown_tx: broadcast::Sender<()>, // Channel to signal shutdown
+    // Command-execution seam; defaults to RealProcessRunner, swappable in tests.
+    runner: Arc<dyn ProcessRunner>,
 }
 type WrappedBuildStatus = Arc<Mutex<Vec<PerBuildIdStatus>>>;
 type WrappedContexts = Arc<Mutex<Vec<BuildContext>>>;
@@ -172,6 +195,7 @@ impl BuildService {
             temp_directory,
             output_directory,
             shutdown_tx,
+            runner: Arc::new(RealProcessRunner),
         }
     }
 
@@ -282,7 +306,12 @@ impl BuildService {
         Ok(())
     }
 
+}
+
+#[tonic::async_trait]
+impl ProcessRunner for RealProcessRunner {
     async fn run_command_with_logs(
+        &self,
         mut command: Command, // The configured tokio::process::Command
         tx: mpsc::Sender<Result<BuildStatus, Status>>, // Where to send logs
         build_id: Option<i32>, // To tag the logs
@@ -664,6 +693,7 @@ impl linux_kernel_build_service_server::LinuxKernelBuildService for BuildService
         let build_id_handle = self.id.clone();
         let per_build_statuses = self.build_statuses.clone();
         let tx_for_final = tx.clone();
+        let runner = self.runner.clone();
 
         let spawnres: tokio::task::JoinHandle<Result<(), Status>> = tokio::spawn(async move {
             report!(
@@ -1092,7 +1122,7 @@ impl linux_kernel_build_service_server::LinuxKernelBuildService for BuildService
             let log_file = tmp_dir.join(format!("output-prepare-{}.log", &config.name));
             info!("Defconfig log file will be at: {:?}", &log_file);
             let success =
-                BuildService::run_command_with_logs(proc, tx.clone(), None, None, Some(log_file))
+                runner.run_command_with_logs(proc, tx.clone(), None, None, Some(log_file))
                     .await?;
 
             if !success {
@@ -1245,6 +1275,7 @@ impl linux_kernel_build_service_server::LinuxKernelBuildService for BuildService
         let tmp_dir = self.temp_directory.clone();
         let contexts_clone = self.contexts.clone();
         let toolchain = context.toolchain.clone();
+        let runner = self.runner.clone();
 
         let (tx_kill, rx_kill) = mpsc::channel(1);
 
@@ -1280,7 +1311,7 @@ impl linux_kernel_build_service_server::LinuxKernelBuildService for BuildService
             info!("Build log file will be at: {:?}", &log_file);
             debug!("Running make in directory: {:?}", &context.work_dir);
 
-            let success = BuildService::run_command_with_logs(
+            let success = runner.run_command_with_logs(
                 proc,
                 tx.clone(),
                 Some(req.build_id),
@@ -1661,5 +1692,77 @@ impl linux_kernel_build_service_server::LinuxKernelBuildService for BuildService
         Ok(tonic::Response::new(
             Box::pin(stream) as Self::getArtifactStream
         ))
+    }
+}
+
+#[cfg(test)]
+mod runner_tests {
+    use super::*;
+    use std::collections::VecDeque;
+
+    /// Records each command's argv and returns scripted results instead of
+    /// spawning a process, so the build workflow can be exercised without real
+    /// `make` invocations.
+    #[derive(Default)]
+    pub(crate) struct MockProcessRunner {
+        pub calls: Mutex<Vec<Vec<String>>>,
+        pub results: Mutex<VecDeque<bool>>,
+    }
+
+    impl MockProcessRunner {
+        fn argv(command: &Command) -> Vec<String> {
+            let std = command.as_std();
+            std::iter::once(std.get_program())
+                .chain(std.get_args())
+                .map(|s| s.to_string_lossy().into_owned())
+                .collect()
+        }
+    }
+
+    #[tonic::async_trait]
+    impl ProcessRunner for MockProcessRunner {
+        async fn run_command_with_logs(
+            &self,
+            command: Command,
+            _tx: mpsc::Sender<Result<BuildStatus, Status>>,
+            _build_id: Option<i32>,
+            _kill_rx: Option<mpsc::Receiver<()>>,
+            _log_path: Option<PathBuf>,
+        ) -> Result<bool, Status> {
+            self.calls.lock().await.push(Self::argv(&command));
+            Ok(self.results.lock().await.pop_front().unwrap_or(true))
+        }
+    }
+
+    #[tokio::test]
+    async fn mock_records_argv_and_returns_scripted_result() {
+        let runner = MockProcessRunner::default();
+        runner.results.lock().await.push_back(false);
+
+        let (tx, _rx) = mpsc::channel(16);
+        let mut cmd = Command::new("make");
+        cmd.arg("defconfig");
+
+        let ok = runner
+            .run_command_with_logs(cmd, tx, Some(7), None, None)
+            .await
+            .unwrap();
+
+        assert!(!ok, "scripted failure should propagate");
+        let calls = runner.calls.lock().await;
+        assert_eq!(calls.len(), 1);
+        assert_eq!(calls[0], vec!["make", "defconfig"]);
+    }
+
+    #[tokio::test]
+    async fn injected_runner_is_a_trait_object() {
+        // The struct field is Arc<dyn ProcessRunner>; confirm the mock satisfies it.
+        let runner: Arc<dyn ProcessRunner> = Arc::new(MockProcessRunner::default());
+        let (tx, _rx) = mpsc::channel(16);
+        let ok = runner
+            .run_command_with_logs(Command::new("true"), tx, None, None, None)
+            .await
+            .unwrap();
+        assert!(ok, "default scripted result is success");
     }
 }
