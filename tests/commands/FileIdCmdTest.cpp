@@ -19,6 +19,10 @@ TEST_F(FileIdCommandTest, WithRepliedMedia) {
     (*(*defaultProvidedMessage->replyToMessage)->photo)[0]->fileUniqueId =
         TEST_MEDIA_UNIQUEID;
     std::string savedMessage;
+    // fileid formats the reply through this localized template; stub it so the
+    // ids appear in the output (the response is localized via res->get).
+    EXPECT_CALL(strings, get(Strings::FILEID_BASIC))
+        .WillOnce(testing::Return("id: {} unique: {}"));
     EXPECT_CALL(*botApi, sendMessage_impl(TEST_CHAT_ID, _, _, _, _))
         .WillOnce(testing::DoAll(testing::SaveArg<1>(&savedMessage),
                                  testing::Return(createDefaultMessage())));

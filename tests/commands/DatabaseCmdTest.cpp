@@ -72,6 +72,9 @@ struct DatabaseCommandTest : public CommandTestBase {
         const auto recievedMessage = createDefaultMessage();
         willSendReplyMessageTo(matcher, recievedMessage, _);
         recievedMessage->replyToMessage = sentMessage;
+        // The keyboard may only be driven by the admin who invoked /database,
+        // so the reply must come from that same user.
+        recievedMessage->from = defaultProvidedMessage->from;
         EXPECT_CALL(*botApi, sendMessage_impl(TEST_CHAT_ID, _,
                                               createMessageReplyMatcher(), _,
                                               TgBotApi::ParseMode::None))
