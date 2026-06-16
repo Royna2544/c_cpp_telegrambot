@@ -121,7 +121,24 @@ jobs:
             VCPKG_EXE="$VCPKG_ROOT/vcpkg"; MONO="mono"
           fi
           FEED="https://nuget.pkg.github.com/${{ github.repository_owner }}/index.json"
-          NUGET="$("$VCPKG_EXE" fetch nuget | tail -n1)"
+
+          # The NuGet binary cache is an optimization; never let setting it up
+          # abort the build. `vcpkg fetch nuget` has been seen to fail on macOS
+          # runners, and because its output was captured into a command
+          # substitution the step exited 1 with no visible log. Run it plainly,
+          # print whatever it produced, and bail out gracefully on any problem.
+          if ! NUGET_OUT="$("$VCPKG_EXE" fetch nuget 2>&1)"; then
+            echo "$NUGET_OUT"
+            echo "::warning::vcpkg fetch nuget failed; skipping NuGet binary cache"
+            exit 0
+          fi
+          NUGET="$(printf '%s\n' "$NUGET_OUT" | tail -n1)"
+
+          if [ -n "$MONO" ] && ! command -v mono >/dev/null 2>&1; then
+            echo "::warning::mono not found; skipping NuGet binary cache"
+            exit 0
+          fi
+
           # Tolerate failures (e.g. fork PRs whose GITHUB_TOKEN cannot write to
           # GitHub Packages) — the local files cache still works.
           $MONO "$NUGET" sources add -Source "$FEED" -StorePasswordInClearText \
