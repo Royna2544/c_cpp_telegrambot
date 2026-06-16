@@ -9,6 +9,13 @@ on:
 env:
   CARGO_TERM_COLOR: always
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
 jobs:
   build:
 
@@ -16,11 +23,19 @@ jobs:
 
     steps:
     - uses: actions/checkout@v4
+    - name: Cache cargo registry and target dirs
+      uses: Swatinem/rust-cache@v2
+      with:
+        workspaces: |
+          src/api/builtin_modules/builder/builder-rs
+          src/rust/stringcalc
     - name: Install protoc
       run: |
         sudo apt update
         sudo apt-get install -y protobuf-compiler
-    - name: Build
+    - name: Build builder-rs
       run: cd src/api/builtin_modules/builder/builder-rs; cargo build --verbose
-    - name: Run tests
+    - name: Test builder-rs
       run: cd src/api/builtin_modules/builder/builder-rs; cargo test --verbose
+    - name: Build and test stringcalc
+      run: cd src/rust/stringcalc; cargo build --verbose && cargo test --verbose
