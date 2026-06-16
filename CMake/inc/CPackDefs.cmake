@@ -8,8 +8,15 @@ set(CPACK_GENERATOR "ZIP;TGZ")
 set(CPACK_PACKAGE_INSTALL_DIRECTORY "TgBot C++ server ${CPACK_PACKAGE_VERSION}")
 
 if(WIN32)
-  # NSIS
-  list(APPEND CPACK_GENERATOR NSIS)
+  # NSIS — only enable the installer generator when makensis is available,
+  # otherwise `cpack` errors out ("Cannot find NSIS compiler makensis") even
+  # though the ZIP/TGZ packages generate fine.
+  find_program(MAKENSIS_EXECUTABLE makensis)
+  if(MAKENSIS_EXECUTABLE)
+    list(APPEND CPACK_GENERATOR NSIS)
+  else()
+    message(STATUS "makensis not found; skipping the NSIS installer generator")
+  endif()
   set(CPACK_NSIS_ENABLE_UNINSTALL_BEFORE_INSTALL ON)
   set(CPACK_NSIS_MUI_ICON ${CMAKE_SOURCE_DIR}/resources/photo/icon.ico)
   set(CPACK_NSIS_MUI_UNIICON ${CMAKE_SOURCE_DIR}/resources/photo/uninstall.ico)
