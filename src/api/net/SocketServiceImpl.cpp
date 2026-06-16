@@ -22,6 +22,7 @@
 #include <system_error>
 #include <vector>
 
+#include "FileTransferValidation.hpp"
 #include "Socket_service.grpc.pb.h"
 #include "Socket_service.pb.h"
 #include "api/TgBotApi.hpp"
@@ -39,6 +40,7 @@
 using grpc::ServerContext;
 using grpc::Status;
 using namespace tgbot::proto::socket;
+namespace transfer = tgbot::socket::transfer;
 
 class SocketServiceImpl::Service : public SocketService::Service {
    public:
@@ -425,13 +427,13 @@ Status SocketServiceImpl::Service::requestFileTransfer(
         // Reject absurd sizes before pre-allocating: file_size is
         // client-supplied and resize_file would otherwise let a single request
         // exhaust the disk.
-        constexpr std::uintmax_t kMaxTransferSize = 2ULL << 30;  // 2 GiB
-        if (request->file_size() > kMaxTransferSize) {
+        if (!transfer::sizeWithinCap(request->file_size())) {
             response->set_accepted(false);
             response->set_reject_message(
                 "Requested file size exceeds maximum allowed");
             LOG(ERROR) << "Rejecting upload exceeding size limit: "
-                       << request->file_size() << " > " << kMaxTransferSize;
+                       << request->file_size() << " > "
+                       << transfer::kMaxTransferSize;
             return Status::OK;
         }
         entry.totalSize = request->file_size();
@@ -469,10 +471,7 @@ Status SocketServiceImpl::Service::requestFileTransfer(
             return Status::OK;
         }
         entry.totalSize = std::filesystem::file_size(entry.filePath);
-        // Calculate chunk_count
-        constexpr std::uintmax_t chunkSize = 64 * 1024;  // 64 KB
-        entry.chunk_count =
-            static_cast<int>((entry.totalSize + chunkSize - 1) / chunkSize);
+        entry.chunk_count = transfer::chunkCount(entry.totalSize);
         response->set_file_size(entry.totalSize);
         response->set_chunk_count(entry.chunk_count);
     }
@@ -496,12 +495,11 @@ Status SocketServiceImpl::Service::downloadFileLoop(
     ServerContext* context,
     ::grpc::ServerReaderWriter<FileChunkResponse, FileChunkRequest>* stream) {
     FileChunkRequest msg;
-    constexpr std::uintmax_t CHUNK_SIZE = 64 * 1024;  // 64 KB
 
     LogWhoCalledMe(context, "downloadFileLoop");
 
     while (stream->Read(&msg)) {
-        std::vector<char> buffer(CHUNK_SIZE);
+        std::vector<char> buffer(transfer::kChunkSize);
         std::streamsize bytesRead = 0;
         {
             std::lock_guard<std::mutex> lock(activeTransfersMutex_);
@@ -517,8 +515,23 @@ Status SocketServiceImpl::Service::downloadFileLoop(
                 return Status::OK;
             }
 
-            it->second.fileStream.seekg(msg.chunk_idx() * CHUNK_SIZE,
-                                        std::ios::beg);
+            // Reject out-of-range chunk indices instead of computing a bogus
+            // (possibly overflowing) seek offset.
+            if (!transfer::downloadChunkValid(msg.chunk_idx(),
+                                              it->second.chunk_count)) {
+                FileChunkResponse response;
+                response.set_success(false);
+                response.set_retry(false);
+                LOG(ERROR) << "Out-of-range chunk index " << msg.chunk_idx()
+                           << " for download UUID " << msg.uuid();
+                stream->Write(response);
+                return Status::OK;
+            }
+
+            it->second.fileStream.seekg(
+                static_cast<std::streamoff>(transfer::chunkOffset(
+                    msg.chunk_idx())),
+                std::ios::beg);
             if (!it->second.fileStream.good()) {
                 // Seek failed
                 FileChunkResponse response;
@@ -580,10 +593,9 @@ Status SocketServiceImpl::Service::uploadFileLoop(
                 stream->Write(response);
                 return Status::OK;
             }
-            if (msg.chunk_offset() < 0 ||
-                static_cast<std::uintmax_t>(msg.chunk_offset()) +
-                        msg.chunk_data().size() >
-                    it->second.totalSize) {
+            if (!transfer::uploadChunkInRange(msg.chunk_offset(),
+                                              msg.chunk_data().size(),
+                                              it->second.totalSize)) {
                 FileChunkResponse response;
                 response.set_success(false);
                 response.set_retry(false);

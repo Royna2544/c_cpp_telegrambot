@@ -127,3 +127,13 @@ target_include_directories(test_spamblock PRIVATE
   ${CMAKE_SOURCE_DIR}/src/include
   ${CMAKE_SOURCE_DIR}/src
   $<TARGET_PROPERTY:TgBot,INTERFACE_INCLUDE_DIRECTORIES>)
+
+tgbot_exe(
+  NAME filetransfer
+  SRCS
+    TestMain.cpp
+    FileTransferValidationTest.cpp
+  TEST
+)
+target_link_libraries(test_filetransfer PRIVATE GTest::gtest)
+target_include_directories(test_filetransfer PRIVATE ${CMAKE_SOURCE_DIR}/src/api/net)
