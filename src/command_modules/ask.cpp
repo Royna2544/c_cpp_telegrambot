@@ -6,6 +6,7 @@
 
 #include <algorithm>
 #include <api/CommandModule.hpp>
+#include <api/MarkdownV2.hpp>
 #include <api/MessageExt.hpp>
 #include <api/Providers.hpp>
 #include <api/StringResLoader.hpp>
@@ -63,18 +64,6 @@ void setSelectedModel(ChatId chatId, std::string model) {
     auto [mtx, map] = selectedModelStore();
     const std::lock_guard lock(mtx);
     map[chatId] = std::move(model);
-}
-
-// Telegram MarkdownV2 escaping. Backslash must be escaped first; StrReplaceAll
-// is single-pass so it won't re-escape backslashes it inserts.
-std::string escapeMarkdownV2(const std::string& in) {
-    static const std::vector<std::pair<std::string, std::string>> replacements =
-        {{"\\", "\\\\"}, {"_", "\\_"}, {"*", "\\*"}, {"[", "\\["},
-         {"]", "\\]"},   {"(", "\\("}, {")", "\\)"}, {"~", "\\~"},
-         {"`", "\\`"},   {">", "\\>"}, {"#", "\\#"}, {"+", "\\+"},
-         {"-", "\\-"},   {"=", "\\="}, {"|", "\\|"}, {"{", "\\{"},
-         {"}", "\\}"},   {".", "\\."}, {"!", "\\!"}};
-    return absl::StrReplaceAll(in, replacements);
 }
 
 DECLARE_COMMAND_HANDLER(ask) {
@@ -188,7 +177,7 @@ DECLARE_COMMAND_HANDLER(ask) {
     }
     try {
         api->editMessage<TgBotApi::ParseMode::MarkdownV2>(
-            sent, escapeMarkdownV2(*answer));
+            sent, tgbot::markdownv2::escape(*answer));
     } catch (const TgBot::TgException& ex) {
         LOG(WARNING) << "MarkdownV2 edit failed, sending plain: " << ex.what();
         api->editMessage(sent, *answer);

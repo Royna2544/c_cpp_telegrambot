@@ -79,3 +79,37 @@ target_link_libraries(test_llmadapters PRIVATE GTest::gtest CurlDownload)
 target_include_directories(test_llmadapters PRIVATE
   ${CMAKE_SOURCE_DIR}/src/command_modules
   ${CMAKE_SOURCE_DIR}/src/api/builtin_modules/builder)
+
+tgbot_exe(
+  NAME ratelimit
+  SRCS
+    TestMain.cpp
+    RateLimitTest.cpp
+  TEST
+)
+target_link_libraries(test_ratelimit PRIVATE GTest::gtest RateLimitApi)
+target_include_directories(test_ratelimit PRIVATE ${CMAKE_SOURCE_DIR}/src/include)
+
+tgbot_exe(
+  NAME markdownv2
+  SRCS
+    TestMain.cpp
+    MarkdownV2Test.cpp
+  TEST
+)
+target_link_libraries(test_markdownv2 PRIVATE GTest::gtest absl::strings)
+target_include_directories(test_markdownv2 PRIVATE ${CMAKE_SOURCE_DIR}/src/include)
+
+tgbot_exe(
+  NAME restartfmt
+  SRCS
+    TestMain.cpp
+    RestartFmtTest.cpp
+  TEST
+)
+target_link_libraries(test_restartfmt PRIVATE GTest::gtest restartfmt_parser absl::strings Utils)
+target_include_directories(test_restartfmt PRIVATE
+  ${CMAKE_SOURCE_DIR}/src/api/components/restartfmt_parser
+  ${CMAKE_SOURCE_DIR}/src/include
+  ${CMAKE_SOURCE_DIR}/src
+  $<TARGET_PROPERTY:TgBot,INTERFACE_INCLUDE_DIRECTORIES>)
