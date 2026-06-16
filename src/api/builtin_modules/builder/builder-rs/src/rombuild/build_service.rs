@@ -2335,3 +2335,89 @@ mod runner_tests {
         assert_eq!(fs.written.lock().unwrap().len(), 0);
     }
 }
+
+#[cfg(test)]
+mod artifact_path_tests {
+    //! Failure-path coverage for find_artifact, driven entirely by the
+    //! filesystem mock: "if the artifact lookup / dir read fails, return the
+    //! right error and stop".
+    use super::*;
+    use crate::filesystem::mock::MockFilesystem;
+    use crate::rombuild::types::ROMArtifactEntry;
+
+    fn rom_entry(matcher: ROMArtifactMatcher, data: &str) -> ROMEntry {
+        ROMEntry {
+            name: "rom".into(),
+            link: String::new(),
+            target: "bacon".into(),
+            artifact: ROMArtifactEntry {
+                matcher,
+                data: data.into(),
+            },
+            branches: vec![],
+        }
+    }
+
+    fn product_dir() -> (PathBuf, PathBuf, String) {
+        let build_dir = PathBuf::from("/b");
+        let codename = "bacon".to_string();
+        let out = build_dir
+            .join("out")
+            .join("target")
+            .join("product")
+            .join(&codename);
+        (build_dir, out, codename)
+    }
+
+    #[tokio::test]
+    async fn errors_internal_when_output_dir_read_fails() {
+        let (build_dir, out, codename) = product_dir();
+        let fs = MockFilesystem::default();
+        fs.fail_on(out); // read_dir(output_dir) returns an io error
+        let entry = rom_entry(ROMArtifactMatcher::ZipFilePrefixer, "lineage-");
+
+        let err = BuildService::find_artifact(&fs, &build_dir, &codename, &entry)
+            .await
+            .expect_err("a read failure must surface as an error, not an artifact");
+        assert_eq!(err.code(), tonic::Code::Internal);
+    }
+
+    #[tokio::test]
+    async fn not_found_when_no_zip_matches_prefix() {
+        let (build_dir, out, codename) = product_dir();
+        let fs = MockFilesystem::default();
+        fs.add_file(out.join("README.txt"), "x"); // present, but not a matching zip
+        let entry = rom_entry(ROMArtifactMatcher::ZipFilePrefixer, "lineage-");
+
+        let err = BuildService::find_artifact(&fs, &build_dir, &codename, &entry)
+            .await
+            .expect_err("no matching artifact must end in not_found");
+        assert_eq!(err.code(), tonic::Code::NotFound);
+    }
+
+    #[tokio::test]
+    async fn ok_when_prefixed_zip_present() {
+        let (build_dir, out, codename) = product_dir();
+        let fs = MockFilesystem::default();
+        fs.add_file(out.join("lineage-21-bacon.zip"), "z");
+        let entry = rom_entry(ROMArtifactMatcher::ZipFilePrefixer, "lineage-");
+
+        let paths = BuildService::find_artifact(&fs, &build_dir, &codename, &entry)
+            .await
+            .expect("a matching zip must be found");
+        assert_eq!(paths.len(), 1);
+        assert!(paths[0].ends_with("lineage-21-bacon.zip"));
+    }
+
+    #[tokio::test]
+    async fn exact_matcher_not_found_when_file_missing() {
+        let (build_dir, _out, codename) = product_dir();
+        let fs = MockFilesystem::default(); // file absent
+        let entry = rom_entry(ROMArtifactMatcher::ExactMatcher, "boot.img");
+
+        let err = BuildService::find_artifact(&fs, &build_dir, &codename, &entry)
+            .await
+            .expect_err("a missing exact artifact must end in not_found");
+        assert_eq!(err.code(), tonic::Code::NotFound);
+    }
+}

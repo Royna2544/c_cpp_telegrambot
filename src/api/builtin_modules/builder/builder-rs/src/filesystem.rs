@@ -106,6 +106,9 @@ pub(crate) mod mock {
     pub(crate) struct MockFilesystem {
         files: Mutex<HashMap<PathBuf, Vec<u8>>>,
         dirs: Mutex<HashSet<PathBuf>>,
+        /// Paths whose fallible operations should return an io error, to
+        /// exercise the workflow's "filesystem op failed → handle → end" paths.
+        fail: Mutex<HashSet<PathBuf>>,
         pub removed: Mutex<Vec<PathBuf>>,
         pub written: Mutex<Vec<PathBuf>>,
     }
@@ -116,6 +119,19 @@ pub(crate) mod mock {
             let path = path.into();
             self.register_ancestors(&path);
             self.files.lock().unwrap().insert(path, contents.into());
+        }
+
+        /// Make every fallible operation on `path` return an io error.
+        pub fn fail_on(&self, path: impl Into<PathBuf>) {
+            self.fail.lock().unwrap().insert(path.into());
+        }
+
+        fn check_fail(&self, path: &Path) -> io::Result<()> {
+            if self.fail.lock().unwrap().contains(path) {
+                Err(io::Error::new(io::ErrorKind::Other, "mock filesystem failure"))
+            } else {
+                Ok(())
+            }
         }
 
         /// Seed a directory as existing.
@@ -150,6 +166,7 @@ pub(crate) mod mock {
             self.files.lock().unwrap().contains_key(path)
         }
         fn read_dir(&self, path: &Path) -> io::Result<Vec<PathBuf>> {
+            self.check_fail(path)?;
             let mut out = Vec::new();
             for p in self.files.lock().unwrap().keys() {
                 if p.parent() == Some(path) {
@@ -164,12 +181,14 @@ pub(crate) mod mock {
             Ok(out)
         }
         fn read_to_string(&self, path: &Path) -> io::Result<String> {
+            self.check_fail(path)?;
             match self.files.lock().unwrap().get(path) {
                 Some(b) => Ok(String::from_utf8_lossy(b).into_owned()),
                 None => Err(io::Error::new(io::ErrorKind::NotFound, "no such mock file")),
             }
         }
         fn write(&self, path: &Path, contents: &[u8]) -> io::Result<()> {
+            self.check_fail(path)?;
             self.register_ancestors(path);
             self.written.lock().unwrap().push(path.to_path_buf());
             self.files
@@ -193,11 +212,14 @@ pub(crate) mod mock {
             Ok(())
         }
         fn remove_dir_all(&self, path: &Path) -> io::Result<()> {
+            self.check_fail(path)?;
             self.removed.lock().unwrap().push(path.to_path_buf());
             self.dirs.lock().unwrap().remove(path);
             Ok(())
         }
         fn copy(&self, from: &Path, to: &Path) -> io::Result<u64> {
+            self.check_fail(from)?;
+            self.check_fail(to)?;
             let bytes = self
                 .files
                 .lock()
@@ -210,6 +232,7 @@ pub(crate) mod mock {
             Ok(len)
         }
         fn file_len(&self, path: &Path) -> io::Result<u64> {
+            self.check_fail(path)?;
             match self.files.lock().unwrap().get(path) {
                 Some(b) => Ok(b.len() as u64),
                 None => Err(io::Error::new(io::ErrorKind::NotFound, "no such mock file")),
