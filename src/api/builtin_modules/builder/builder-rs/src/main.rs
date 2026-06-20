@@ -36,6 +36,7 @@ use crate::{
     rombuild::build_service::RomBuildServiceServer,
 };
 use clap::Parser;
+use serde::Deserialize;
 use std::path::PathBuf;
 use tonic::transport::Server;
 use tracing::{debug, error, info, warn};
@@ -56,18 +57,31 @@ pub mod util;
 #[derive(Parser, Debug)]
 #[command(version, about, long_about = None)]
 struct KernelBuilderArgs {
-    #[arg(long)]
+    /// Path to the TOML configuration file (see `Config`).
+    #[arg(long, short)]
+    config: PathBuf,
+}
+
+/// On-disk service configuration, parsed from the TOML file given by `--config`.
+///
+/// The temporary working directory is no longer configured here — it is created
+/// per run with the `tempfile` crate and cleaned up on shutdown.
+#[derive(Deserialize, Debug)]
+struct Config {
     bind_addr: String,
-    #[arg(long)]
-    temp_dir: String,
-    #[arg(long)]
-    kernelbuild_json_dir: String,
-    #[arg(long)]
-    kernelbuild_output_dir: String,
-    #[arg(long)]
-    rombuild_json_dir: String,
-    #[arg(long)]
-    rombuild_output_dir: String,
+    kernelbuild_json_dir: PathBuf,
+    kernelbuild_output_dir: PathBuf,
+    rombuild_json_dir: PathBuf,
+    rombuild_output_dir: PathBuf,
+}
+
+impl Config {
+    /// Read and parse the TOML config file.
+    fn load(path: &PathBuf) -> Result<Self, String> {
+        let text = std::fs::read_to_string(path)
+            .map_err(|e| format!("Failed to read config file {:?}: {}", path, e))?;
+        toml::from_str(&text).map_err(|e| format!("Failed to parse config file {:?}: {}", path, e))
+    }
 }
 
 fn make_kernel_builder_service(
@@ -157,20 +171,32 @@ async fn main() {
 
     let args = KernelBuilderArgs::parse();
 
+    let config = match Config::load(&args.config) {
+        Ok(c) => c,
+        Err(e) => {
+            error!("{}", e);
+            error!("Exiting due to invalid configuration.");
+            return;
+        }
+    };
+
     info!("Starting Linux Kernel+Android ROM Builder Service");
-    info!("Bind Address: {}", args.bind_addr);
-    info!("KernelBuild JSON Directory: {}", args.kernelbuild_json_dir);
+    info!("Config file: {:?}", args.config);
+    info!("Bind Address: {}", config.bind_addr);
+    info!("KernelBuild JSON Directory: {:?}", config.kernelbuild_json_dir);
     info!(
-        "KernelBuild Output Directory: {}",
-        args.kernelbuild_output_dir
+        "KernelBuild Output Directory: {:?}",
+        config.kernelbuild_output_dir
     );
-    info!("ROMBuild JSON Directory: {}", args.rombuild_json_dir);
-    info!("ROMBuild Output Directory: {}", args.rombuild_output_dir);
-    info!("Temp Directory: {}", args.temp_dir);
+    info!("ROMBuild JSON Directory: {:?}", config.rombuild_json_dir);
+    info!("ROMBuild Output Directory: {:?}", config.rombuild_output_dir);
 
     // 1. Define the address to listen on
-    let addr = match args.bind_addr.parse().inspect_err(|err| {
-        error!("Failed to parse bind address '{}': {}", args.bind_addr, err);
+    let addr = match config.bind_addr.parse().inspect_err(|err| {
+        error!(
+            "Failed to parse bind address '{}': {}",
+            config.bind_addr, err
+        );
     }) {
         Ok(addr) => addr,
         Err(_) => {
@@ -184,22 +210,23 @@ async fn main() {
         addr
     );
 
-    let temp_dir = PathBuf::from(&args.temp_dir);
-    let output_dir = PathBuf::from(&args.kernelbuild_output_dir);
-    let rombuild_output_dir = PathBuf::from(&args.rombuild_output_dir);
-    let canonical_temp: PathBuf;
-    let canonical_output: PathBuf;
-    let canonical_rombuild_output: PathBuf;
-
-    match util::make_canonical_path(&temp_dir) {
-        Some(t) => {
-            info!("Using canonical temp directory: {:?}", t);
-            canonical_temp = t;
-        }
-        None => {
+    // Create a unique temporary working directory for this run. Holding the
+    // `TempDir` guard keeps it alive for the server's lifetime; it is removed on
+    // a clean shutdown (Drop). The services only need its path.
+    let temp_dir = match tempfile::Builder::new().prefix("builder-").tempdir() {
+        Ok(t) => t,
+        Err(e) => {
+            error!("Failed to create temporary working directory: {}", e);
             return;
         }
-    }
+    };
+    let canonical_temp = temp_dir.path().to_path_buf();
+    info!("Using temporary working directory: {:?}", canonical_temp);
+
+    let output_dir = config.kernelbuild_output_dir.clone();
+    let rombuild_output_dir = config.rombuild_output_dir.clone();
+    let canonical_output: PathBuf;
+    let canonical_rombuild_output: PathBuf;
 
     match util::make_canonical_path_mkdirs(&output_dir) {
         Some(o) => {
@@ -224,14 +251,14 @@ async fn main() {
     // 2. Initialize Kernel Build Service
     let build_service = make_kernel_builder_service(
         &canonical_output,
-        &PathBuf::from(&args.kernelbuild_json_dir),
+        &config.kernelbuild_json_dir,
         &canonical_temp,
     )
     .expect("Failed to initialize Kernel Build Service");
 
     // 2. Initialize Android ROM Build Service
     let android_build_service = make_rom_build_service(
-        &PathBuf::from(&args.rombuild_json_dir),
+        &config.rombuild_json_dir,
         canonical_rombuild_output,
         canonical_temp.clone(),
     )

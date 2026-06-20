@@ -33,15 +33,14 @@ num_cpus = "1.0"
 xml = "1.2.1"
 regex = "1.10.4"
 anyhow = "1.0.101"
+toml = "0.8"
+tempfile = "3.24"
 
 [target.'cfg(unix)'.dependencies]
 nix = { version = "0.27", features = ["signal", "resource", "mount"] }
 
 [target.armv7-unknown-linux-gnueabihf.dependencies]
 openssl = { version = "0.10.80", features = ["vendored"] }
-
-[dev-dependencies]
-tempfile = "3.24"
 
 [build-dependencies]
 tonic-build = "0.14"

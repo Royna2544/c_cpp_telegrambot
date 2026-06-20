@@ -1,0 +1,11 @@
+# builder-rs service configuration. Pass with: builder --config builder.toml
+# The temporary working directory is created automatically per run (tempfile)
+# and cleaned up on shutdown — it is no longer configured here.
+
+bind_addr = "0.0.0.0:50051"
+
+kernelbuild_json_dir   = "/data/builder/kernel/config"
+kernelbuild_output_dir = "/data/builder/kernel/out"
+
+rombuild_json_dir   = "/data/builder/rom/config"
+rombuild_output_dir = "/data/builder/rom/out"
