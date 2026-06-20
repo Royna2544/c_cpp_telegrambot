@@ -159,6 +159,7 @@ impl BuildService {
         );
         let contexts: Arc<Mutex<Vec<BuildContext>>> = Arc::new(Mutex::new(Vec::new()));
         let contexts_clone = contexts.clone();
+        let shutdown_on_signal = shutdown_tx.clone();
 
         tokio::spawn(async move {
             tokio::signal::ctrl_c()
@@ -166,7 +167,7 @@ impl BuildService {
                 .expect("Failed to listen for Ctrl-C");
             info!("Global Ctrl-C received");
 
-            // Check if build is active
+            // Cancel any active build so its subprocess gets SIGINT and cleans up.
             let job = contexts_clone.lock().await;
             if let Some(active) = job.iter().find(|c| c.kill_signal.is_some()) {
                 info!(
@@ -186,8 +187,10 @@ impl BuildService {
                 info!("No active build found, proceeding with shutdown.");
             }
 
-            info!("Exiting server");
-            std::process::exit(0);
+            // Request a graceful shutdown rather than std::process::exit, so main
+            // returns and its TempDir Drop removes the temporary working directory.
+            info!("Requesting graceful shutdown");
+            let _ = shutdown_on_signal.send(());
         });
 
         BuildService {
@@ -339,6 +342,9 @@ impl ProcessRunner for RealProcessRunner {
 
         #[cfg(unix)]
         command.process_group(0);
+        // Kill the child if its task is dropped (e.g. runtime teardown on
+        // shutdown), so a build subprocess is never orphaned.
+        command.kill_on_drop(true);
         // 2. Setup Pipes
         command.stdout(Stdio::piped());
         command.stderr(Stdio::piped());
