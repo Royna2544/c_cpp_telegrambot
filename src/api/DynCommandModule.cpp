@@ -61,6 +61,12 @@ DynCommandModule::DynCommandModule(std::filesystem::path filePath)
     : handle(nullptr, &dlclose), filePath(std::move(filePath)) {}
 
 bool DynCommandModule::load() {
+    if (!mLock.try_lock()) {
+        // Already concurrent.
+        return false;
+    }
+    std::unique_lock<std::mutex> mLK(mLock, std::adopt_lock);
+
     if (handle != nullptr) {
         LOG(WARNING) << "Preventing double loading";
         return false;
@@ -116,6 +122,12 @@ bool DynCommandModule::load() {
 }
 
 bool DynCommandModule::unload() {
+    if (!mLock.try_lock()) {
+        // Already concurrent.
+        return false;
+    }
+    std::unique_lock<std::mutex> mLK(mLock, std::adopt_lock);
+
     if (handle) {
         handle = nullptr;
         return true;
@@ -124,4 +136,7 @@ bool DynCommandModule::unload() {
     return false;
 }
 
-bool DynCommandModule::isLoaded() const { return handle != nullptr; }
+bool DynCommandModule::isLoaded() const {
+    std::unique_lock<std::mutex> mLK(mLock, std::adopt_lock);
+    return handle != nullptr;
+}

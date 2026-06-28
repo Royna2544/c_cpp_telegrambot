@@ -196,6 +196,9 @@ class DynCommandModule : public CommandModule {
     std::unique_ptr<void, int (*)(void*)> handle;
     std::filesystem::path filePath;
 
+    // Lock
+    mutable std::mutex mLock;
+
     /**
      * @brief Constructs a new instance of DynCommandModule.
      *
