@@ -25,16 +25,14 @@
 //! - `system_monitor`: System resource monitoring
 //! - `util`: Common utility functions
 
-use crate::kernelbuild::build_service::linux_kernel_build_service_server::LinuxKernelBuildServiceServer;
 use crate::kernelbuild::builder_config::BuilderConfig;
+use crate::kernelbuild::grpc::linux_kernel_build_service_server::LinuxKernelBuildServiceServer;
 use crate::kernelbuild::kernel_config::KernelConfig;
-use crate::rombuild::build_service::BuildService as ROMBuildService;
+use crate::rombuild::grpc::RomBuildServiceServer;
+use crate::rombuild::service::BuildService as ROMBuildService;
 use crate::rombuild::types::ROMBuildConfig;
 use crate::system_monitor::grpc_monitor::system_monitor_service_server::SystemMonitorServiceServer;
-use crate::{
-    health::HealthCheckServiceServer, kernelbuild::build_service::BuildService,
-    rombuild::build_service::RomBuildServiceServer,
-};
+use crate::{health::HealthCheckServiceServer, kernelbuild::service::BuildService};
 use clap::Parser;
 use serde::Deserialize;
 use std::path::PathBuf;
@@ -44,6 +42,8 @@ use tracing_subscriber::EnvFilter;
 
 const FILE_DESCRIPTOR_SET: &[u8] = tonic::include_file_descriptor_set!("descriptor");
 
+pub mod build_common;
+pub mod command_executor;
 pub mod filesystem;
 pub mod git_repo;
 pub mod gofile_api;
@@ -143,20 +143,18 @@ fn make_rom_build_service(
     rombuild_output_dir: PathBuf,
     temp_dir: PathBuf,
 ) -> Option<ROMBuildService> {
-    let rombuild_config: Option<ROMBuildConfig> =
-        match ROMBuildConfig::new(&PathBuf::from(&rombuild_json_dir)) {
-            Some(rombuild_config) => Some(rombuild_config),
-            None => {
-                warn!("No valid Android ROM build configuration found.");
-                warn!("Exiting due to lack of configurations.");
-                None
-            }
-        };
+    let rombuild_config = match ROMBuildConfig::load(&PathBuf::from(&rombuild_json_dir)) {
+        Ok(rombuild_config) => rombuild_config,
+        Err(error) => {
+            error!("Failed to load Android ROM build configuration: {error}");
+            return None;
+        }
+    };
 
     Some(ROMBuildService::new(
         rombuild_output_dir,
         temp_dir,
-        rombuild_config?,
+        rombuild_config,
     ))
 }
 
@@ -183,13 +181,19 @@ async fn main() {
     info!("Starting Linux Kernel+Android ROM Builder Service");
     info!("Config file: {:?}", args.config);
     info!("Bind Address: {}", config.bind_addr);
-    info!("KernelBuild JSON Directory: {:?}", config.kernelbuild_json_dir);
+    info!(
+        "KernelBuild JSON Directory: {:?}",
+        config.kernelbuild_json_dir
+    );
     info!(
         "KernelBuild Output Directory: {:?}",
         config.kernelbuild_output_dir
     );
     info!("ROMBuild JSON Directory: {:?}", config.rombuild_json_dir);
-    info!("ROMBuild Output Directory: {:?}", config.rombuild_output_dir);
+    info!(
+        "ROMBuild Output Directory: {:?}",
+        config.rombuild_output_dir
+    );
 
     // 1. Define the address to listen on
     let addr = match config.bind_addr.parse().inspect_err(|err| {
@@ -289,19 +293,19 @@ async fn main() {
         .add_service(HealthCheckServiceServer::new(health_service))
         .add_service(SystemMonitorServiceServer::new(system_monitor));
 
-        tokio::select! {
-            ret = server.serve(addr) => {
-                if let Err(e) = ret {
-                    error!("Android Server error: {}", e);
-                } else {
-                    info!("Android Server has shut down gracefully.");
-                }
-            },
-            _ = android_shutdown_rx.recv() => {
-                info!("AND: Shutdown signal received, stopping server");
+    tokio::select! {
+        ret = server.serve(addr) => {
+            if let Err(e) = ret {
+                error!("Android Server error: {}", e);
+            } else {
+                info!("Android Server has shut down gracefully.");
             }
-            _ = kernel_shutdown_rx.recv() => {
-                info!("KRN: Shutdown signal received, stopping server");
-            }
+        },
+        _ = android_shutdown_rx.recv() => {
+            info!("AND: Shutdown signal received, stopping server");
         }
+        _ = kernel_shutdown_rx.recv() => {
+            info!("KRN: Shutdown signal received, stopping server");
+        }
+    }
 }

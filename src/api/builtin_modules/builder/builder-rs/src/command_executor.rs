@@ -4,13 +4,11 @@
 /// allowing the build services to be tested without actually spawning processes.
 use async_trait::async_trait;
 use std::path::PathBuf;
-use std::process::Stdio;
 use std::sync::Arc;
-use tokio::io::{AsyncBufReadExt, BufReader};
 use tokio::process::Command;
 use tokio::sync::Mutex;
 use tokio::sync::mpsc;
-use tracing::{debug, error, info};
+use tracing::debug;
 
 /// Result of executing a command
 #[derive(Debug, Clone)]
@@ -59,6 +57,29 @@ impl RealCommandExecutor {
     }
 }
 
+struct LegacyEventSender {
+    output_tx: mpsc::Sender<String>,
+    stdout_lines: Arc<Mutex<Vec<String>>>,
+    stderr_lines: Arc<Mutex<Vec<String>>>,
+}
+
+#[async_trait]
+impl crate::build_common::BuildEventSender for LegacyEventSender {
+    async fn send(&self, event: crate::build_common::BuildEvent) {
+        match event {
+            crate::build_common::BuildEvent::Stdout { line, .. } => {
+                self.stdout_lines.lock().await.push(line.clone());
+                let _ = self.output_tx.send(format!("stdout: {line}")).await;
+            }
+            crate::build_common::BuildEvent::Stderr { line, .. } => {
+                self.stderr_lines.lock().await.push(line.clone());
+                let _ = self.output_tx.send(format!("stderr: {line}")).await;
+            }
+            _ => {}
+        }
+    }
+}
+
 #[async_trait]
 impl CommandExecutor for RealCommandExecutor {
     async fn execute(
@@ -70,105 +91,41 @@ impl CommandExecutor for RealCommandExecutor {
         output_tx: mpsc::Sender<String>,
         mut kill_rx: Option<mpsc::Receiver<()>>,
     ) -> Result<CommandResult, String> {
+        use crate::build_common::ProcessRunner;
+
         let mut command = Command::new(program);
         command.args(args);
-
-        if let Some(dir) = cwd {
-            command.current_dir(dir);
+        if let Some(cwd) = cwd {
+            command.current_dir(cwd);
         }
-
         for (key, value) in env {
             command.env(key, value);
         }
 
-        #[cfg(unix)]
-        command.process_group(0);
-
-        command.stdout(Stdio::piped());
-        command.stderr(Stdio::piped());
-
-        let mut child = command.spawn().map_err(|e| e.to_string())?;
-
-        let stdout = child.stdout.take().expect("stdout missing");
-        let stderr = child.stderr.take().expect("stderr missing");
-
-        let pid = child.id();
-        info!("Spawned process with PID: {:?}", pid);
-
         let stdout_lines = Arc::new(Mutex::new(Vec::new()));
         let stderr_lines = Arc::new(Mutex::new(Vec::new()));
-
-        // Stream stdout
-        let stdout_lines_clone = stdout_lines.clone();
-        let tx_out = output_tx.clone();
-        let stdout_task = tokio::spawn(async move {
-            let reader = BufReader::new(stdout);
-            let mut lines = reader.lines();
-            while let Ok(Some(line)) = lines.next_line().await {
-                let msg = format!("stdout: {}", line);
-                let _ = tx_out.send(msg).await;
-                stdout_lines_clone.lock().await.push(line);
-            }
+        let events = Arc::new(LegacyEventSender {
+            output_tx,
+            stdout_lines: stdout_lines.clone(),
+            stderr_lines: stderr_lines.clone(),
         });
-
-        // Stream stderr
-        let stderr_lines_clone = stderr_lines.clone();
-        let tx_err = output_tx.clone();
-        let stderr_task = tokio::spawn(async move {
-            let reader = BufReader::new(stderr);
-            let mut lines = reader.lines();
-            while let Ok(Some(line)) = lines.next_line().await {
-                let msg = format!("stderr: {}", line);
-                let _ = tx_err.send(msg).await;
-                stderr_lines_clone.lock().await.push(line);
-            }
-        });
-
-        // Wait for process or kill signal
-        let wait_result = if let Some(ref mut rx) = kill_rx {
-            tokio::select! {
-                status = child.wait() => {
-                    match status {
-                        Ok(s) => Some(s),
-                        Err(e) => {
-                            error!("Failed to wait for process: {}", e);
-                            None
-                        }
-                    }
-                }
-                _ = rx.recv() => {
-                    info!("Kill signal received, terminating process");
-                    #[cfg(unix)]
-                    {
-                        if let Some(pid) = pid {
-                            use nix::sys::signal::{killpg, Signal};
-                            use nix::unistd::Pid;
-                            let _ = killpg(Pid::from_raw(pid as i32), Signal::SIGINT);
-                        }
-                    }
-                    let _ = child.kill().await;
-                    child.wait().await.ok()
-                }
-            }
-        } else {
-            child.wait().await.ok()
-        };
-
-        // Wait for streaming tasks
-        let _ = tokio::join!(stdout_task, stderr_task);
-
-        let success = wait_result.as_ref().map(|s| s.success()).unwrap_or(false);
-        let exit_code = wait_result.and_then(|s| s.code());
+        let outcome = crate::build_common::RealProcessRunner
+            .run(
+                crate::build_common::CommandSpec::new(command),
+                events,
+                kill_rx.as_mut(),
+            )
+            .await
+            .map_err(|error| error.to_string())?;
 
         Ok(CommandResult {
-            success,
-            exit_code,
+            success: outcome.success,
+            exit_code: outcome.exit_code,
             stdout_lines: stdout_lines.lock().await.clone(),
             stderr_lines: stderr_lines.lock().await.clone(),
         })
     }
 }
-
 /// Mock command executor for testing
 ///
 /// This executor doesn't actually spawn processes, but returns pre-configured
