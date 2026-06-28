@@ -137,6 +137,6 @@ bool DynCommandModule::unload() {
 }
 
 bool DynCommandModule::isLoaded() const {
-    std::unique_lock<std::mutex> mLK(mLock, std::adopt_lock);
+    std::unique_lock<std::mutex> mLK(mLock);
     return handle != nullptr;
 }
