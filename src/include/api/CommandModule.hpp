@@ -294,7 +294,7 @@ class BuiltinCommandModule : public CommandModule {
     using Ptr = std::unique_ptr<BuiltinCommandModule>;
 
    private:
-    bool loaded{};
+    std::atomic_bool loaded{};
 
    public:
     explicit BuiltinCommandModule(const DynModule* dyn);

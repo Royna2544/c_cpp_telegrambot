@@ -1,5 +1,7 @@
 #include <absl/log/log.h>
 
+#include <atomic>
+
 #include "api/CommandModule.hpp"
 
 BuiltinCommandModule::BuiltinCommandModule(const DynModule* dyn) {
@@ -8,16 +10,16 @@ BuiltinCommandModule::BuiltinCommandModule(const DynModule* dyn) {
 }
 
 bool BuiltinCommandModule::load() {
-    loaded = true;
-    return true;
+    bool expected = false;
+    return loaded.compare_exchange_strong(expected, true);
 }
 
 bool BuiltinCommandModule::unload() {
-    loaded = false;
-    return true;
+    bool expected = true;
+    return loaded.compare_exchange_strong(expected, false);
 }
 
 // Trival accessors.
 [[nodiscard]] bool BuiltinCommandModule::isLoaded() const {
-    return loaded;
+    return loaded.load(std::memory_order_relaxed);
 }
