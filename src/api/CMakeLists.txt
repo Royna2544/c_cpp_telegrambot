@@ -55,15 +55,17 @@ tgbot_library(
   NAME builtin_module_RomBuild
   SRCS
     builtin_modules/builder/android/romBuild.cpp
+    builtin_modules/builder/android/RomBuildOrchestrator.cpp
   ALWAYS_STATIC
 )
-target_link_libraries(builtin_module_RomBuild PRIVATE AndroidBuilder-configparse Utils TgBot AuthApi ROMBuildServiceProto SystemMonitorServiceProto HealthCheckServiceProto)
+target_link_libraries(builtin_module_RomBuild PRIVATE AndroidBuilder-configparse Utils TgBot AuthApi BuilderCommon ROMBuildServiceProto SystemMonitorServiceProto HealthCheckServiceProto)
 
 
 tgbot_library(
   NAME builtin_module_KernelBuild
   SRCS
     builtin_modules/builder/kernel/kernelbuild.cpp
+    builtin_modules/builder/kernel/KernelBuildOrchestrator.cpp
     builtin_modules/builder/kernel/ConfigParsers2.cpp
   ALWAYS_STATIC
 )
@@ -72,6 +74,7 @@ target_link_libraries(builtin_module_KernelBuild PRIVATE
   nlohmann_json::nlohmann_json
   Utils
   progress
+  BuilderCommon
   LinuxKernelBuildServiceProto
   SystemMonitorServiceProto
   HealthCheckServiceProto

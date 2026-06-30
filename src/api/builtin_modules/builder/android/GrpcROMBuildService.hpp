@@ -9,11 +9,15 @@
 #include <memory>
 #include <string>
 
+#include "GrpcStream.hpp"
 #include "IROMBuildService.hpp"
 #include "ROMBuild_service.grpc.pb.h"
 #include "ROMBuild_service.pb.h"
 
 namespace tgbot::builder::android {
+
+/// Shared gRPC stream wrapper (formerly a per-class inner struct).
+using ::tgbot::builder::GrpcRepeatableSource;
 
 /**
  * @brief gRPC-based implementation of the ROM build service interface.
@@ -24,35 +28,6 @@ namespace tgbot::builder::android {
  */
 class GrpcROMBuildService : public IROMBuildService {
    public:
-    template <typename T>
-    struct GrpcRepeatableSource : public RepeatableSource<T> {
-        explicit GrpcRepeatableSource(
-            std::unique_ptr<grpc::ClientReader<T>> stream,
-            std::unique_ptr<grpc::ClientContext> context)
-            : stream_(std::move(stream)), context_(std::move(context)) {}
-        ~GrpcRepeatableSource() override = default;
-
-        bool readOnce(T* output) override { return stream_->Read(output); }
-
-        bool readAll(std::function<void(const T&)> callback) override {
-            T entry;
-            bool anyRead = false;
-            while (stream_->Read(&entry)) {
-                callback(entry);
-                anyRead = true;
-            }
-            return anyRead;
-        }
-
-        [[nodiscard]] grpc::Status finish() override {
-            return stream_->Finish();
-        }
-
-       private:
-        std::unique_ptr<grpc::ClientReader<T>> stream_;
-        std::unique_ptr<grpc::ClientContext> context_;
-    };
-
     /**
      * @brief Construct a new gRPC ROM Build Service.
      *

@@ -1,6 +1,11 @@
 #include <gmock/gmock.h>
 #include <gtest/gtest.h>
 
+#include <functional>
+#include <memory>
+#include <utility>
+#include <vector>
+
 #include "mocks/LinuxKernelBuildService.hpp"
 
 using namespace tgbot::builder::linuxkernel;
@@ -8,6 +13,38 @@ using testing::_;
 using testing::DoAll;
 using testing::Invoke;
 using testing::Return;
+
+namespace {
+
+/// In-memory RepeatableSource used to fake streaming RPC responses.
+template <typename T>
+struct TestRepeatableSource : public RepeatableSource<T> {
+    std::vector<T> entries;
+    std::size_t index = 0;
+
+    explicit TestRepeatableSource(std::vector<T> e) : entries(std::move(e)) {}
+
+    bool readOnce(T* output) override {
+        if (index >= entries.size()) {
+            return false;
+        }
+        *output = entries[index++];
+        return true;
+    }
+
+    bool readAll(std::function<void(const T&)> callback) override {
+        bool anyRead = false;
+        while (index < entries.size()) {
+            callback(entries[index++]);
+            anyRead = true;
+        }
+        return anyRead;
+    }
+
+    grpc::Status finish() override { return grpc::Status::OK; }
+};
+
+}  // namespace
 
 /**
  * @brief Test fixture for the Linux Kernel Build Service interface.
@@ -51,7 +88,7 @@ TEST_F(LinuxKernelBuildServiceTest, UpdateConfigSuccess) {
 }
 
 /**
- * @brief Test that prepareBuild method streams status updates.
+ * @brief Test that prepareBuild returns a stream of status updates.
  */
 TEST_F(LinuxKernelBuildServiceTest, PrepareBuildWithStatusUpdates) {
     BuildPrepareRequest request;
@@ -71,21 +108,20 @@ TEST_F(LinuxKernelBuildServiceTest, PrepareBuildWithStatusUpdates) {
     status2.set_build_id(42);
     statusUpdates.push_back(status2);
 
-    EXPECT_CALL(*mockService, prepareBuild(_, _))
-        .WillOnce(Invoke([&](const BuildPrepareRequest& req,
-                             std::function<void(const BuildStatus&)> callback) {
-            for (const auto& status : statusUpdates) {
-                callback(status);
-            }
-            return true;
+    EXPECT_CALL(*mockService, prepareBuild(_))
+        .WillOnce(Invoke([&](const BuildPrepareRequest& req) {
+            return std::make_unique<TestRepeatableSource<BuildStatus>>(
+                statusUpdates);
         }));
 
-    std::vector<BuildStatus> receivedStatuses;
-    bool result = mockService->prepareBuild(
-        request,
-        [&](const BuildStatus& status) { receivedStatuses.push_back(status); });
+    auto stream = mockService->prepareBuild(request);
+    ASSERT_NE(stream, nullptr);
 
-    EXPECT_TRUE(result);
+    std::vector<BuildStatus> receivedStatuses;
+    stream->readAll(
+        [&](const BuildStatus& status) { receivedStatuses.push_back(status); });
+    EXPECT_TRUE(stream->finish().ok());
+
     ASSERT_EQ(receivedStatuses.size(), 2);
     EXPECT_EQ(receivedStatuses[0].status(),
               ProgressStatus::IN_PROGRESS_DOWNLOAD);
@@ -94,7 +130,7 @@ TEST_F(LinuxKernelBuildServiceTest, PrepareBuildWithStatusUpdates) {
 }
 
 /**
- * @brief Test that doBuild method can be mocked.
+ * @brief Test that doBuild returns a stream.
  */
 TEST_F(LinuxKernelBuildServiceTest, DoBuildSuccess) {
     BuildRequest request;
@@ -104,20 +140,21 @@ TEST_F(LinuxKernelBuildServiceTest, DoBuildSuccess) {
     finalStatus.set_status(ProgressStatus::SUCCESS);
     finalStatus.set_output("Build completed successfully");
 
-    EXPECT_CALL(*mockService, doBuild(_, _))
-        .WillOnce(Invoke([&](const BuildRequest& req,
-                             std::function<void(const BuildStatus&)> callback) {
-            callback(finalStatus);
-            return true;
+    EXPECT_CALL(*mockService, doBuild(_))
+        .WillOnce(Invoke([&](const BuildRequest& req) {
+            return std::make_unique<TestRepeatableSource<BuildStatus>>(
+                std::vector<BuildStatus>{finalStatus});
         }));
 
+    auto stream = mockService->doBuild(request);
+    ASSERT_NE(stream, nullptr);
+
     int callbackCount = 0;
-    bool result = mockService->doBuild(request, [&](const BuildStatus& status) {
+    stream->readAll([&](const BuildStatus& status) {
         callbackCount++;
         EXPECT_EQ(status.status(), ProgressStatus::SUCCESS);
     });
-
-    EXPECT_TRUE(result);
+    EXPECT_TRUE(stream->finish().ok());
     EXPECT_EQ(callbackCount, 1);
 }
 
@@ -147,13 +184,12 @@ TEST_F(LinuxKernelBuildServiceTest, CancelBuildSuccess) {
 }
 
 /**
- * @brief Test that getArtifact method streams artifact chunks.
+ * @brief Test that getArtifact streams metadata followed by data chunks.
  */
 TEST_F(LinuxKernelBuildServiceTest, GetArtifactSuccess) {
     BuildRequest request;
     request.set_build_id(42);
 
-    // Create chunks with proper ownership
     ArtifactChunk metadataChunk;
     metadataChunk.mutable_metadata()->set_filename("kernel.zip");
     metadataChunk.mutable_metadata()->set_total_size(1024);
@@ -161,46 +197,43 @@ TEST_F(LinuxKernelBuildServiceTest, GetArtifactSuccess) {
     ArtifactChunk dataChunk;
     dataChunk.set_data("test data content");
 
-    EXPECT_CALL(*mockService, getArtifact(_, _))
-        .WillOnce(
-            Invoke([&](const BuildRequest& req,
-                       std::function<void(const ArtifactChunk&)> callback) {
-                callback(metadataChunk);
-                callback(dataChunk);
-                return true;
-            }));
+    std::vector<ArtifactChunk> chunks{metadataChunk, dataChunk};
+    EXPECT_CALL(*mockService, getArtifact(_))
+        .WillOnce(Invoke([&](const BuildRequest& req) {
+            return std::make_unique<TestRepeatableSource<ArtifactChunk>>(chunks);
+        }));
 
-    std::string receivedFilename;
+    auto stream = mockService->getArtifact(request);
+    ASSERT_NE(stream, nullptr);
+
+    // First message carries metadata.
+    ArtifactChunk first;
+    ASSERT_TRUE(stream->readOnce(&first));
+    ASSERT_TRUE(first.has_metadata());
+    EXPECT_EQ(first.metadata().filename(), "kernel.zip");
+
     std::string receivedData;
-    bool result =
-        mockService->getArtifact(request, [&](const ArtifactChunk& chunk) {
-            if (chunk.has_metadata()) {
-                receivedFilename = chunk.metadata().filename();
-            }
-            if (chunk.has_data()) {
-                receivedData += chunk.data();
-            }
-        });
-
-    EXPECT_TRUE(result);
-    EXPECT_EQ(receivedFilename, "kernel.zip");
+    stream->readAll([&](const ArtifactChunk& chunk) {
+        if (chunk.has_data()) {
+            receivedData += chunk.data();
+        }
+    });
+    EXPECT_TRUE(stream->finish().ok());
     EXPECT_EQ(receivedData, "test data content");
 }
 
 /**
- * @brief Test failure scenarios.
+ * @brief Test failure scenario: a null stream is returned.
  */
 TEST_F(LinuxKernelBuildServiceTest, PrepareBuildFailure) {
     BuildPrepareRequest request;
     request.set_name("invalid_kernel");
 
-    EXPECT_CALL(*mockService, prepareBuild(_, _)).WillOnce(Return(false));
+    EXPECT_CALL(*mockService, prepareBuild(_))
+        .WillOnce(Invoke([](const BuildPrepareRequest&) {
+            return std::unique_ptr<RepeatableSource<BuildStatus>>(nullptr);
+        }));
 
-    bool result =
-        mockService->prepareBuild(request, [](const BuildStatus& status) {
-            // Should not be called on failure
-            FAIL() << "Callback should not be invoked on failure";
-        });
-
-    EXPECT_FALSE(result);
+    auto stream = mockService->prepareBuild(request);
+    EXPECT_EQ(stream, nullptr);
 }

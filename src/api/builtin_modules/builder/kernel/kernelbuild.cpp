@@ -23,15 +23,18 @@
 #include <unordered_map>
 #include <utility>
 
+#include "BuildObserver.hpp"
 #include "ConfigManager.hpp"
 #include "ConfigParsers2.hpp"
 #include "GrpcLinuxKernelBuildService.hpp"
 #include "HealthCheck_service.grpc.pb.h"
 #include "ILinuxKernelBuildService.hpp"
+#include "KernelBuildOrchestrator.hpp"
 #include "LinuxKernelBuild_service.grpc.pb.h"
 #include "LinuxKernelBuild_service.pb.h"
 #include "SystemMonitor_service.grpc.pb.h"
 #include "SystemMonitor_service.pb.h"
+#include "SystemStatsProvider.hpp"
 #include "api/AuthContext.hpp"
 #include "api/RateLimit.hpp"
 #include "api/TgBotApi.hpp"
@@ -40,6 +43,96 @@
 
 using tgbot::builder::linuxkernel::LinuxKernelBuildService;
 using tgbot::builder::system_monitor::SystemMonitorService;
+
+namespace {
+
+// Edit the message backing a callback query, if it is still accessible.
+template <TgBotApi::ParseMode mode = TgBotApi::ParseMode::None>
+void editCallbackMessage(
+    const TgBotApi::Ptr& api, const TgBot::CallbackQuery::Ptr& query,
+    const std::string& text,
+    const TgBot::InlineKeyboardMarkup::Ptr& replyMarkup = nullptr) {
+    if (query->message) {
+        if (auto msg = std::get_if<TgBot::Message::Ptr>(&(*query->message))) {
+            api->editMessage<mode>(*msg, text, replyMarkup);
+            return;
+        }
+    }
+    LOG(ERROR) << "Query message inaccessible, cannot edit message";
+}
+
+/**
+ * @brief Telegram presenter for kernel build progress.
+ *
+ * Implements the transport-agnostic IBuildObserver: it throttles message edits,
+ * pulls a system snapshot only when it actually renders, and never leaks into
+ * the orchestration logic.
+ */
+class TgKernelObserver : public tgbot::builder::IBuildObserver {
+   public:
+    TgKernelObserver(TgBotApi::Ptr api, TgBot::CallbackQuery::Ptr query,
+                     const tgbot::builder::SystemStatsProvider* stats,
+                     std::chrono::system_clock::time_point startTime,
+                     std::string kernelName, std::string device,
+                     TgBot::InlineKeyboardMarkup::Ptr keyboard)
+        : api_(std::move(api)),
+          query_(std::move(query)),
+          stats_(stats),
+          start_(startTime),
+          kernelName_(std::move(kernelName)),
+          device_(std::move(device)),
+          keyboard_(std::move(keyboard)),
+          limiter_(1, std::chrono::seconds(5)) {}
+
+    void onProgress(const tgbot::builder::ProgressEvent& event) override {
+        if (!limiter_.check()) {
+            return;
+        }
+        tgbot::builder::SystemSnapshot snap;
+        if (stats_ != nullptr) {
+            snap = stats_->snapshot();
+        }
+        auto msg = fmt::format(
+            R"(
+<blockquote>Start Time: {} (GMT)
+Time Spent: {:%M minutes %S seconds}
+Kernel Name: {}</blockquote>
+<blockquote>📱 <b>Device</b>: {}
+💻 <b>CPU</b>: {:.2f}%
+💾 <b>Memory</b>: {}MB / {}MB</blockquote>
+<blockquote>{}</blockquote>)",
+            start_, std::chrono::system_clock::now() - start_, kernelName_,
+            device_, snap.cpuUsagePercent, snap.memUsedMb, snap.memTotalMb,
+            event.message);
+        try {
+            editCallbackMessage<TgBotApi::ParseMode::HTML>(api_, query_, msg,
+                                                           keyboard_);
+        } catch (const TgBot::TgException& e) {
+            LOG(ERROR) << "Failed to edit message: " << e.what();
+        }
+    }
+
+    void onFailed(std::string_view message) override {
+        LOG(ERROR) << message;
+        editCallbackMessage(api_, query_, std::string(message));
+    }
+
+    void onCompleted(std::string_view message) override {
+        editCallbackMessage(api_, query_, std::string(message));
+    }
+
+   private:
+    TgBotApi::Ptr api_;
+    TgBot::CallbackQuery::Ptr query_;
+    const tgbot::builder::SystemStatsProvider* stats_;
+    std::chrono::system_clock::time_point start_;
+    std::string kernelName_;
+    std::string device_;
+    TgBot::InlineKeyboardMarkup::Ptr keyboard_;
+    IntervalRateLimiter limiter_;
+};
+
+}  // namespace
 
 class KernelBuildHandler {
    public:
@@ -77,10 +170,11 @@ class KernelBuildHandler {
     mutable std::mutex intermidiates_mutex_;
     std::optional<std::string> gitToken;
 
-    // Build service interface (allows dependency injection for testing)
-    std::shared_ptr<tgbot::builder::linuxkernel::ILinuxKernelBuildService>
-        buildService;
-    std::unique_ptr<SystemMonitorService::Stub> systemMonitorStub;
+    // Telegram-free build orchestration (allows dependency injection for
+    // testing) plus the presentation-side helpers.
+    std::unique_ptr<tgbot::builder::linuxkernel::KernelBuildOrchestrator>
+        orchestrator_;
+    std::unique_ptr<tgbot::builder::SystemStatsProvider> stats_;
     std::unique_ptr<tgbot::builder::healthcheck::HealthCheckService::Stub>
         healthStub;
 
@@ -110,8 +204,11 @@ class KernelBuildHandler {
         : _api(api),
           _auth(auth),
           gitToken(cfgmgr->get(ConfigManager::Configs::GITHUB_TOKEN)),
-          buildService(std::move(buildServiceImpl)),
-          systemMonitorStub(std::move(systemMonitorStubImpl)),
+          orchestrator_(std::make_unique<
+                        tgbot::builder::linuxkernel::KernelBuildOrchestrator>(
+              std::move(buildServiceImpl))),
+          stats_(std::make_unique<tgbot::builder::SystemStatsProvider>(
+              std::move(systemMonitorStubImpl))),
           healthStub(std::move(healthStubImpl)) {
         loadConfigs(line);
     }
@@ -127,9 +224,13 @@ class KernelBuildHandler {
         auto channel = grpc::CreateChannel(
             *cfgmgr->get(ConfigManager::Configs::KERNELBUILD_SERVER),
             grpc::InsecureChannelCredentials());
-        buildService = std::make_shared<
-            tgbot::builder::linuxkernel::GrpcLinuxKernelBuildService>(channel);
-        systemMonitorStub = SystemMonitorService::NewStub(channel);
+        orchestrator_ = std::make_unique<
+            tgbot::builder::linuxkernel::KernelBuildOrchestrator>(
+            std::make_shared<
+                tgbot::builder::linuxkernel::GrpcLinuxKernelBuildService>(
+                channel));
+        stats_ = std::make_unique<tgbot::builder::SystemStatsProvider>(
+            SystemMonitorService::NewStub(channel));
         healthStub =
             tgbot::builder::healthcheck::HealthCheckService::NewStub(channel);
 
@@ -199,17 +300,8 @@ class KernelBuildHandler {
                 bool updated = config.reParse();
                 if (updated) {
                     // Notify build service about config update
-                    ::tgbot::builder::linuxkernel::ConfigResponse response;
-                    auto request = ::tgbot::builder::linuxkernel::Config();
-                    request.set_name(config.name);
-                    request.set_json_content(config.toJsonString());
-                    bool success =
-                        buildService->updateConfig(request, &response);
-                    if (!success || !response.success()) {
-                        LOG(ERROR) << "Failed to notify build service about "
-                                      "config update: "
-                                   << response.message();
-                    } else {
+                    if (orchestrator_->updateConfig(config.name,
+                                                     config.toJsonString())) {
                         LOG(INFO) << "Reloaded config: " << config.name;
                     }
                 }
@@ -333,16 +425,9 @@ class KernelBuildHandler {
     }
 
     void handle_continue(const TgBot::CallbackQuery::Ptr& query);
-    bool handle_prepare(const TgBot::CallbackQuery::Ptr& query, int* build_id);
-    bool handle_build_process(const TgBot::CallbackQuery::Ptr& query,
-                              int build_id);
 
     void handle_cancel(const TgBot::CallbackQuery::Ptr& query) {
-        tgbot::builder::linuxkernel::BuildRequest req;
-        tgbot::builder::linuxkernel::BuildStatus resp;
-        req.set_build_id(intermidiates.build_id.load());
-        bool success = buildService->cancelBuild(req, &resp);
-        if (!success) {
+        if (!orchestrator_->cancel(intermidiates.build_id.load())) {
             LOG(ERROR) << "Error when cancelling build";
             _api->answerCallbackQuery(query->id, "Error when cancelling build");
             return;
@@ -350,9 +435,6 @@ class KernelBuildHandler {
         editQueryMessage(query, "Build cancelled!");
         _api->answerCallbackQuery(query->id, "Build cancelled!");
     }
-
-    bool handle_artifact_download(const TgBot::CallbackQuery::Ptr& query,
-                                  int build_id, std::filesystem::path* outPath);
 
     void handleCallbackQuery(const TgBot::CallbackQuery::Ptr& query) {
         std::string_view data = query->data;
@@ -385,18 +467,20 @@ class KernelBuildHandler {
     }
 };
 
-bool KernelBuildHandler::handle_prepare(const TgBot::CallbackQuery::Ptr& query,
-                                        int* build_id) {
-    constexpr auto interval = std::chrono::seconds(5);
-    IntervalRateLimiter rateLimiter(1, interval);
+void KernelBuildHandler::handle_continue(
+    const TgBot::CallbackQuery::Ptr& query) {
     using namespace ::tgbot::builder::linuxkernel;
 
-    // Prepare the build process
-    // Prepare gRPC request
+    // Start the build process
+    editQueryMessage(query, "Starting build...");
+    intermidiates.start_time = std::chrono::system_clock::now();
+
+    // Prepare (make defconfig).
     BuildPrepareRequest request;
     request.set_name(intermidiates.current->name);
     request.set_device_name(intermidiates.device);
-    for (const auto& [fragment, enabled] : intermidiates.fragment_preference) {
+    for (const auto& [fragment, enabled] :
+         intermidiates.fragment_preference) {
         if (enabled) {
             *request.add_config_fragments() = fragment;
         }
@@ -406,209 +490,41 @@ bool KernelBuildHandler::handle_prepare(const TgBot::CallbackQuery::Ptr& query,
         request.set_github_token(*gitToken);
     }
 
-    // Make defconfig
     LOG(INFO) << "Preparing build for kernel: " << intermidiates.current->name;
-
-    BuildStatus last_response;
-    intermidiates.start_time = std::chrono::system_clock::now();
-
-    bool success =
-        buildService->prepareBuild(request, [&](const BuildStatus& response) {
-            last_response = response;
-            *build_id = response.build_id();
-            if (!rateLimiter.check()) {
-                return;  // Skip update if within rate limit
-            }
-            grpc::ClientContext monitorContext;
-            tgbot::builder::system_monitor::SystemStats info;
-            auto info_status =
-                systemMonitorStub->GetStats(&monitorContext, {}, &info);
-            auto fmted_msg = fmt::format(
-                R"(
-<blockquote>Start Time: {} (GMT)
-Time Spent: {:%M minutes %S seconds}
-Kernel Name: {}</blockquote>
-<blockquote>📱 <b>Device</b>: {}
-💻 <b>CPU</b>: {:.2f}%
-💾 <b>Memory</b>: {}MB / {}MB</blockquote>
-<blockquote>{}</blockquote>)",
-                intermidiates.start_time,
-                std::chrono::system_clock::now() - intermidiates.start_time,
-                intermidiates.current->name, intermidiates.device,
-                info.cpu_usage_percent(), info.memory_used_mb(),
-                info.memory_total_mb(), response.output());
-            if (query->message) {
-                if (auto msg = std::get_if<TgBot::Message::Ptr>(&(*query->message))) {
-                    _api->editMessage<TgBotApi::ParseMode::HTML>(*msg, fmted_msg);
-                }
-            } else {
-                LOG(ERROR) << "Query message is null, cannot edit message to "
-                              "show prepare status";
-            }
-        });
-    if (!success) {
-        editQueryMessage(query, "Prepare failed.");
-        LOG(ERROR) << "Prepare failed.";
-        return false;
-    } else {
-        editQueryMessage(query, "Prepare process completed.");
+    TgKernelObserver prepareObserver(_api, query, stats_.get(),
+                                     intermidiates.start_time,
+                                     intermidiates.current->name,
+                                     intermidiates.device, nullptr);
+    auto buildId = orchestrator_->prepare(request, prepareObserver);
+    if (!buildId) {
+        return;  // Observer already reported the failure.
     }
-    if (last_response.status() != ProgressStatus::SUCCESS) {
-        editQueryMessage(query, "Prepare incomplete!!, last message: " +
-                                    last_response.output());
-        LOG(ERROR) << "Prepare incomplete!!, last message: "
-                   << last_response.output();
-        return false;
-    }
-    return true;
-}
+    LOG(INFO) << "Prepared build with ID: " << *buildId;
+    intermidiates.build_id.store(*buildId);
+    editQueryMessage(query, "Prepare process completed.");
 
-bool KernelBuildHandler::handle_build_process(
-    const TgBot::CallbackQuery::Ptr& query, int build_id) {
-    constexpr auto interval = std::chrono::seconds(5);
-    IntervalRateLimiter rateLimiter(1, interval);
-    using namespace ::tgbot::builder::linuxkernel;
-
-    BuildRequest buildRequest;
-    buildRequest.set_build_id(build_id);
-
-    BuildStatus last_response;
-    bool success =
-        buildService->doBuild(buildRequest, [&](const BuildStatus& response) {
-            last_response = response;
-            if (!rateLimiter.check()) {
-                return;  // Skip update if within rate limit
-            }
-
-            grpc::ClientContext monitorContext;
-            tgbot::builder::system_monitor::SystemStats info;
-            auto info_status = systemMonitorStub->GetStats(
-                &monitorContext, ::google::protobuf::Empty{}, &info);
-            auto fmted_msg = fmt::format(
-                R"(
-<blockquote>Start Time: {} (GMT)
-Time Spent: {:%M minutes %S seconds}
-Kernel Name: {}</blockquote>
-<blockquote>📱 <b>Device</b>: {}
-💻 <b>CPU</b>: {:.2f}%
-💾 <b>Memory</b>: {}MB / {}MB</blockquote>
-<blockquote>{}</blockquote>)",
-                intermidiates.start_time,
-                std::chrono::system_clock::now() - intermidiates.start_time,
-                intermidiates.current->name, intermidiates.device,
-                info.cpu_usage_percent(), info.memory_used_mb(),
-                info.memory_total_mb(), response.output());
-            editQueryMessage<TgBotApi::ParseMode::HTML>(query, fmted_msg,
-                                                        makeCancelKeyboard());
-        });
-    if (!success) {
-        editQueryMessage(query, "Build failed.");
-        LOG(ERROR) << "Build failed.";
-    } else {
-        editQueryMessage(query, "Build process completed.");
-    }
-    if (last_response.status() != ProgressStatus::SUCCESS) {
-        editQueryMessage(query, "Build incomplete!!, last message: " +
-                                    last_response.output());
-        LOG(ERROR) << "Build incomplete!!, last message: "
-                   << last_response.output();
-        return false;
-    }
-    return true;
-}
-
-bool KernelBuildHandler::handle_artifact_download(
-    const TgBot::CallbackQuery::Ptr& query, int build_id,
-    std::filesystem::path* outPath) {
-    using namespace ::tgbot::builder::linuxkernel;
-
-    BuildRequest artifactRequest;
-    artifactRequest.set_build_id(build_id);
-    ArtifactMetadata artifactMetadata;
-    std::ofstream outputFile;
-    std::filesystem::path localArtifactPath;
-    bool fileOpenError = false;
-    bool invalidFilename = false;
-
-    bool success = buildService->getArtifact(
-        artifactRequest, [&](const ArtifactChunk& chunk) {
-            if (fileOpenError) {
-                return;  // Skip processing if file open failed
-            }
-            if (!outputFile.is_open()) {
-                artifactMetadata = chunk.metadata();
-                LOG(INFO) << "Receiving artifact: "
-                          << artifactMetadata.filename()
-                          << ", size: " << artifactMetadata.total_size();
-                const auto safeFilename =
-                    std::filesystem::path(artifactMetadata.filename())
-                        .filename();
-                if (safeFilename.empty() || safeFilename == "." ||
-                    safeFilename == "..") {
-                    LOG(ERROR) << "Invalid artifact filename from build "
-                                  "service: "
-                               << artifactMetadata.filename();
-                    invalidFilename = true;
-                    return;
-                }
-                localArtifactPath = std::filesystem::temp_directory_path() /
-                                    fmt::format("kernelbuild_{}_{}", build_id,
-                                                safeFilename.string());
-                outputFile.open(localArtifactPath, std::ios::binary);
-                if (!outputFile.is_open()) {
-                    LOG(ERROR) << "Failed to open output file: "
-                               << localArtifactPath.string();
-                    fileOpenError = true;
-                    return;
-                }
-            }
-            outputFile.write(chunk.data().data(), chunk.data().size());
-        });
-    outputFile.close();
-
-    if (invalidFilename) {
-        editQueryMessage(query, "Build service returned an invalid artifact name.");
-        return false;
-    }
-
-    if (fileOpenError) {
-        editQueryMessage(query, "Failed to open output file for writing.");
-        return false;
-    }
-
-    if (!success) {
-        editQueryMessage(query, "Failed to retrieve artifact.");
-        LOG(ERROR) << "Failed to retrieve artifact.";
-        return false;
-    } else {
-        editQueryMessage(query, "Artifact retrieved successfully.");
-    }
-
-    LOG(INFO) << "Artifact " << artifactMetadata.filename()
-              << " received successfully.";
-    *outPath = localArtifactPath;
-    return true;
-}
-
-void KernelBuildHandler::handle_continue(
-    const TgBot::CallbackQuery::Ptr& query) {
-    // Start the build process
-    editQueryMessage(query, "Starting build...");
-    int build_id = 0;
-    if (!handle_prepare(query, &build_id)) {
+    // Run the actual build.
+    TgKernelObserver buildObserver(_api, query, stats_.get(),
+                                   intermidiates.start_time,
+                                   intermidiates.current->name,
+                                   intermidiates.device, makeCancelKeyboard());
+    if (!orchestrator_->runBuild(*buildId, buildObserver)) {
         return;
     }
-    LOG(INFO) << "Prepared build with ID: " << build_id;
-    intermidiates.build_id.store(build_id);
-    // Start actual build
-    if (!handle_build_process(query, build_id)) {
-        return;
-    }
-    // Download artifact
+    editQueryMessage(query, "Build process completed.");
+
+    // Download artifact.
     std::filesystem::path artifactPath;
-    if (!handle_artifact_download(query, build_id, &artifactPath)) {
+    TgKernelObserver artifactObserver(_api, query, stats_.get(),
+                                      intermidiates.start_time,
+                                      intermidiates.current->name,
+                                      intermidiates.device, nullptr);
+    if (!orchestrator_->downloadArtifact(*buildId, artifactObserver,
+                                         &artifactPath)) {
         return;
     }
+    editQueryMessage(query, "Artifact retrieved successfully.");
+
     TgBot::Message::Ptr msg = nullptr;
     if (query->message) {
         if (auto p = std::get_if<TgBot::Message::Ptr>(&(*query->message))) {
@@ -653,8 +569,8 @@ DECLARE_COMMAND_HANDLER(kernelbuild) {
                 [api, provider](const TgBot::CallbackQuery::Ptr& ptr) {
                     std::string_view data = ptr->data;
 
-                    if (!provider->auth->isAuthorized(ptr->from,
-                                                AuthContext::AccessLevel::AdminUser)) {
+                    if (!provider->auth->isAuthorized(
+                            ptr->from, AuthContext::AccessLevel::AdminUser)) {
                         api->answerCallbackQuery(
                             ptr->id,
                             "Sorry son, you are not allowed to touch this "

@@ -2,6 +2,8 @@
 
 #include <gmock/gmock.h>
 
+#include <memory>
+
 #include "../../src/api/builtin_modules/builder/kernel/ILinuxKernelBuildService.hpp"
 
 namespace tgbot::builder::linuxkernel {
@@ -17,24 +19,18 @@ class MockLinuxKernelBuildService : public ILinuxKernelBuildService {
     MOCK_METHOD(bool, updateConfig,
                 (const Config& request, ConfigResponse* response), (override));
 
-    MOCK_METHOD(bool, prepareBuild,
-                (const BuildPrepareRequest& request,
-                 std::function<void(const BuildStatus&)> callback),
-                (override));
+    MOCK_METHOD(std::unique_ptr<RepeatableSource<BuildStatus>>, prepareBuild,
+                (const BuildPrepareRequest& request), (override));
 
-    MOCK_METHOD(bool, doBuild,
-                (const BuildRequest& request,
-                 std::function<void(const BuildStatus&)> callback),
-                (override));
+    MOCK_METHOD(std::unique_ptr<RepeatableSource<BuildStatus>>, doBuild,
+                (const BuildRequest& request), (override));
 
     MOCK_METHOD(bool, cancelBuild,
                 (const BuildRequest& request, BuildStatus* response),
                 (override));
 
-    MOCK_METHOD(bool, getArtifact,
-                (const BuildRequest& request,
-                 std::function<void(const ArtifactChunk&)> callback),
-                (override));
+    MOCK_METHOD(std::unique_ptr<RepeatableSource<ArtifactChunk>>, getArtifact,
+                (const BuildRequest& request), (override));
 };
 
 }  // namespace tgbot::builder::linuxkernel

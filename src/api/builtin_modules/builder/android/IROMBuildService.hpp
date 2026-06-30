@@ -6,9 +6,16 @@
 #include <memory>
 #include <string>
 
+#include "GrpcStream.hpp"
 #include "ROMBuild_service.pb.h"
 
 namespace tgbot::builder::android {
+
+/// Caller-owned stream handle (shared infrastructure). Kept as a member-style
+/// alias so existing references like `RepeatableSource<BuildLogEntry>` and the
+/// mocks/tests continue to resolve.
+template <typename T>
+using RepeatableSource = ::tgbot::builder::RepeatableSource<T>;
 
 /**
  * @brief Abstract interface for Android ROM build service operations.
@@ -21,20 +28,9 @@ class IROMBuildService {
    public:
     virtual ~IROMBuildService() = default;
 
+    /// @copydoc tgbot::builder::RepeatableSource
     template <typename T>
-    struct RepeatableSource {
-        RepeatableSource() = default;
-        virtual ~RepeatableSource() = default;
-        virtual bool readOnce(T* output) = 0;
-        virtual bool readAll(std::function<void(const T&)> callback) = 0;
-        virtual grpc::Status finish() = 0;
-
-        // Disable copy and move semantics
-        RepeatableSource(const RepeatableSource&) = delete;
-        RepeatableSource& operator=(const RepeatableSource&) = delete;
-        RepeatableSource(RepeatableSource&&) = delete;
-        RepeatableSource& operator=(RepeatableSource&&) = delete;
-    };
+    using RepeatableSource = ::tgbot::builder::RepeatableSource<T>;
 
     /**
      * @brief Get current build settings.

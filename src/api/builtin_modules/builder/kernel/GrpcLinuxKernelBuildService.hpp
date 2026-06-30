@@ -1,11 +1,14 @@
 #pragma once
 
+#include <absl/log/log.h>
 #include <grpcpp/client_context.h>
 #include <grpcpp/create_channel.h>
 
 #include <memory>
 #include <string>
+#include <utility>
 
+#include "GrpcStream.hpp"
 #include "ILinuxKernelBuildService.hpp"
 #include "LinuxKernelBuild_service.grpc.pb.h"
 
@@ -14,25 +17,16 @@ namespace tgbot::builder::linuxkernel {
 /**
  * @brief gRPC-based implementation of the Linux kernel build service interface.
  *
- * This class wraps the generated gRPC stub and implements the
- * ILinuxKernelBuildService interface, providing the actual communication
- * with the remote build service.
+ * Wraps the generated gRPC stub. Streaming RPCs return a
+ * @ref GrpcRepeatableSource that owns its ClientContext, so the stream may be
+ * read by the caller after this method returns.
  */
 class GrpcLinuxKernelBuildService : public ILinuxKernelBuildService {
    public:
-    /**
-     * @brief Construct a new gRPC Linux Kernel Build Service.
-     *
-     * @param channel The gRPC channel to use for communication.
-     */
-    explicit GrpcLinuxKernelBuildService(std::shared_ptr<grpc::Channel> channel)
+    explicit GrpcLinuxKernelBuildService(
+        const std::shared_ptr<grpc::Channel>& channel)
         : stub_(LinuxKernelBuildService::NewStub(channel)) {}
 
-    /**
-     * @brief Construct a new gRPC Linux Kernel Build Service.
-     *
-     * @param server_address The address of the gRPC server.
-     */
     explicit GrpcLinuxKernelBuildService(const std::string& server_address)
         : GrpcLinuxKernelBuildService(grpc::CreateChannel(
               server_address, grpc::InsecureChannelCredentials())) {}
@@ -43,53 +37,58 @@ class GrpcLinuxKernelBuildService : public ILinuxKernelBuildService {
                       ConfigResponse* response) override {
         grpc::ClientContext context;
         auto status = stub_->updateConfig(&context, request, response);
+        LOG_IF(ERROR, !status.ok())
+            << "updateConfig RPC failed: " << status.error_message();
         return status.ok();
     }
 
-    bool prepareBuild(
-        const BuildPrepareRequest& request,
-        std::function<void(const BuildStatus&)> callback) override {
-        grpc::ClientContext context;
-        auto stream = stub_->prepareBuild(&context, request);
-        BuildStatus status;
-        while (stream->Read(&status)) {
-            callback(status);
+    std::unique_ptr<RepeatableSource<BuildStatus>> prepareBuild(
+        const BuildPrepareRequest& request) override {
+        auto context = std::make_unique<grpc::ClientContext>();
+        auto stream = stub_->prepareBuild(context.get(), request);
+        if (!stream) {
+            LOG(ERROR) << "prepareBuild RPC failed to start.";
+            return nullptr;
         }
-        return stream->Finish().ok();
+        return std::make_unique<GrpcRepeatableSource<BuildStatus>>(
+            std::move(stream), std::move(context));
     }
 
-    bool doBuild(const BuildRequest& request,
-                 std::function<void(const BuildStatus&)> callback) override {
-        grpc::ClientContext context;
-        auto stream = stub_->doBuild(&context, request);
-        BuildStatus status;
-        while (stream->Read(&status)) {
-            callback(status);
+    std::unique_ptr<RepeatableSource<BuildStatus>> doBuild(
+        const BuildRequest& request) override {
+        auto context = std::make_unique<grpc::ClientContext>();
+        auto stream = stub_->doBuild(context.get(), request);
+        if (!stream) {
+            LOG(ERROR) << "doBuild RPC failed to start.";
+            return nullptr;
         }
-        return stream->Finish().ok();
+        return std::make_unique<GrpcRepeatableSource<BuildStatus>>(
+            std::move(stream), std::move(context));
     }
 
     bool cancelBuild(const BuildRequest& request,
                      BuildStatus* response) override {
         grpc::ClientContext context;
         auto status = stub_->cancelBuild(&context, request, response);
+        LOG_IF(ERROR, !status.ok())
+            << "cancelBuild RPC failed: " << status.error_message();
         return status.ok();
     }
 
-    bool getArtifact(
-        const BuildRequest& request,
-        std::function<void(const ArtifactChunk&)> callback) override {
-        grpc::ClientContext context;
-        auto stream = stub_->getArtifact(&context, request);
-        ArtifactChunk chunk;
-        while (stream->Read(&chunk)) {
-            callback(chunk);
+    std::unique_ptr<RepeatableSource<ArtifactChunk>> getArtifact(
+        const BuildRequest& request) override {
+        auto context = std::make_unique<grpc::ClientContext>();
+        auto stream = stub_->getArtifact(context.get(), request);
+        if (!stream) {
+            LOG(ERROR) << "getArtifact RPC failed to start.";
+            return nullptr;
         }
-        return stream->Finish().ok();
+        return std::make_unique<GrpcRepeatableSource<ArtifactChunk>>(
+            std::move(stream), std::move(context));
     }
 
    private:
     std::unique_ptr<LinuxKernelBuildService::Stub> stub_;
-};
+};  // class GrpcLinuxKernelBuildService
 
 }  // namespace tgbot::builder::linuxkernel
