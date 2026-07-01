@@ -208,7 +208,7 @@ command_module(NAME log SRCS log.cpp)
 
 command_module(NAME q SRCS q.cpp LIBS CurlDownload)
 
-command_module(NAME ask SRCS ask.cpp LIBS CurlDownload Utils)
+command_module(NAME ask SRCS ask.cpp LIBS CurlDownload Utils AuthApi)
 
 if (TGBOTCPP_LUA_MODULES)
   file(GLOB LUA_SCRIPTS "${CMAKE_CURRENT_SOURCE_DIR}/*.lua")

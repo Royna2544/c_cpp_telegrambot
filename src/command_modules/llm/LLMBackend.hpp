@@ -1,7 +1,10 @@
 #pragma once
 
+#include <nlohmann/json.hpp>
+
 #include <cctype>
 #include <cstdint>
+#include <functional>
 #include <memory>
 #include <optional>
 #include <string>
@@ -47,6 +50,21 @@ inline std::optional<LLMApiType> parseApiType(std::string_view value) {
     return std::nullopt;
 }
 
+// A tool (function) the model may call. `inputSchema` is a JSON Schema
+// object describing the tool's parameters (Anthropic `input_schema` /
+// OpenAI `function.parameters`).
+struct Tool {
+    std::string name;
+    std::string description;
+    nlohmann::json inputSchema;
+};
+
+// Executes a tool call and returns its result text. Sets `isError` to true if
+// execution failed (bad input, downstream API failure, etc.) so the backend
+// can report it back to the model as a failed tool call rather than success.
+using ToolExecutor = std::function<std::string(
+    const std::string& toolName, const nlohmann::json& input, bool& isError)>;
+
 struct LLMBackend {
     virtual ~LLMBackend() = default;
 
@@ -60,6 +78,21 @@ struct LLMBackend {
                                             const std::string& systemPrompt,
                                             const std::string& userInput,
                                             std::int64_t chatId) = 0;
+
+    // Same as above, but offers `tools` to the model and dispatches any tool
+    // calls through `exec`, looping until the model returns a final answer.
+    // Backends that don't support tool calling can ignore `tools`/`exec` and
+    // fall back to the single-turn chat() above (the default here does so).
+    virtual std::optional<std::string> chat(const std::string& model,
+                                            const std::string& systemPrompt,
+                                            const std::string& userInput,
+                                            std::int64_t chatId,
+                                            const std::vector<Tool>& tools,
+                                            ToolExecutor exec) {
+        (void)tools;
+        (void)exec;
+        return chat(model, systemPrompt, userInput, chatId);
+    }
 };
 
 // Defined in ask.cpp (the only translation unit that pulls in every backend).

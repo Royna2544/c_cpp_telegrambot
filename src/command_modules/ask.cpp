@@ -5,6 +5,7 @@
 #include <tgbot/TgException.h>
 
 #include <algorithm>
+#include <api/AuthContext.hpp>
 #include <api/CommandModule.hpp>
 #include <api/MarkdownV2.hpp>
 #include <api/MessageExt.hpp>
@@ -64,6 +65,38 @@ void setSelectedModel(ChatId chatId, std::string model) {
     auto [mtx, map] = selectedModelStore();
     const std::lock_guard lock(mtx);
     map[chatId] = std::move(model);
+}
+
+// Admin-only tool: lets the model DM an arbitrary Telegram user on its own
+// initiative. Only ever offered to the LLM when the invoking user passes the
+// AdminUser auth check in the handler below.
+const llm::Tool kSendMessageTool{
+    "send_message",
+    "Send a direct message to a Telegram user by their numeric user ID. "
+    "Only use this when explicitly asked to message a user.",
+    nlohmann::json{
+        {"type", "object"},
+        {"properties",
+         {{"user_id", {{"type", "integer"}}}, {"text", {{"type", "string"}}}}},
+        {"required", {"user_id", "text"}}}};
+
+llm::ToolExecutor makeSendMessageExecutor(TgBotApi::Ptr api) {
+    return [api](const std::string& /*name*/, const nlohmann::json& input,
+                bool& isError) -> std::string {
+        isError = false;
+        try {
+            const auto userId = input.at("user_id").get<std::int64_t>();
+            const auto text = input.at("text").get<std::string>();
+            api->sendMessage(userId, text);
+            return fmt::format("Message sent successfully to user {}.", userId);
+        } catch (const TgBot::TgException& ex) {
+            isError = true;
+            return fmt::format("Failed to send message: {}", ex.what());
+        } catch (const std::exception& ex) {
+            isError = true;
+            return fmt::format("Invalid tool input: {}", ex.what());
+        }
+    };
 }
 
 DECLARE_COMMAND_HANDLER(ask) {
@@ -170,7 +203,12 @@ DECLARE_COMMAND_HANDLER(ask) {
 
     auto sent = api->sendReplyMessage(message->message(),
                                       res->get(Strings::LLM_PROCESSING_QUERY));
-    const auto answer = backend->chat(model, SYSTEM_PROMPT, query, chatId);
+    const bool isAdmin = provider->auth->isAuthorized(
+        message->message(), AuthContext::AccessLevel::AdminUser);
+    const auto answer =
+        isAdmin ? backend->chat(model, SYSTEM_PROMPT, query, chatId,
+                                {kSendMessageTool}, makeSendMessageExecutor(api))
+                : backend->chat(model, SYSTEM_PROMPT, query, chatId);
     if (!answer) {
         api->editMessage(sent, res->get(Strings::LLM_RESPONSE_FAILED));
         return;
