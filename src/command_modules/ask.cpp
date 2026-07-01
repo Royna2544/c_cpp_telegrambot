@@ -12,6 +12,7 @@
 #include <api/Providers.hpp>
 #include <api/StringResLoader.hpp>
 #include <api/TgBotApi.hpp>
+#include <database/DatabaseBase.hpp>
 #include <memory>
 #include <mutex>
 #include <string>
@@ -21,6 +22,7 @@
 #include <vector>
 
 #include "AskConfirmTool.hpp"
+#include "ModelPickerTool.hpp"
 #include "llm/AnthropicApi.hpp"
 #include "llm/LLMBackend.hpp"
 #include "llm/LMStudioBackend.hpp"
@@ -48,25 +50,8 @@ std::unique_ptr<LLMBackend> makeBackend(LLMApiType type, std::string url,
 
 namespace {
 
-// Per-chat selected model (in-memory; resets on restart). Both accessors share
-// one store so a selection made by setSelectedModel is visible to readers.
-std::pair<std::mutex&, std::unordered_map<ChatId, std::string>&>
-selectedModelStore() {
-    static std::mutex mtx;
-    static std::unordered_map<ChatId, std::string> map;
-    return {mtx, map};
-}
-std::string selectedModel(ChatId chatId) {
-    auto [mtx, map] = selectedModelStore();
-    const std::lock_guard lock(mtx);
-    auto it = map.find(chatId);
-    return it == map.end() ? std::string{} : it->second;
-}
-void setSelectedModel(ChatId chatId, std::string model) {
-    auto [mtx, map] = selectedModelStore();
-    const std::lock_guard lock(mtx);
-    map[chatId] = std::move(model);
-}
+using llm::model_picker::selectedModel;
+using llm::model_picker::setSelectedModel;
 
 // Admin-only tool: lets the model DM an arbitrary Telegram user on its own
 // initiative. Only ever offered to the LLM when the invoking user passes the
@@ -100,19 +85,88 @@ llm::ToolExecutor makeSendMessageExecutor(TgBotApi::Ptr api) {
     };
 }
 
+// Admin-only tools backed by DatabaseBase's chatmap (name<->id registry).
+// Only entries an admin has manually registered (e.g. via /setChatAlias) are
+// resolvable here - there is no passive auto-population from message
+// traffic, so a "not found" result doesn't mean the id/name is invalid.
+const llm::Tool kGetChatIdTool{
+    "get_chat_id",
+    "Look up the numeric Telegram chat/user ID for a previously registered "
+    "name. Only works for names an admin has registered; returns a "
+    "not-found message if the name is unknown.",
+    nlohmann::json{{"type", "object"},
+                  {"properties", {{"name", {{"type", "string"}}}}},
+                  {"required", {"name"}}}};
+
+llm::ToolExecutor makeGetChatIdExecutor(const Providers* provider) {
+    return [provider](const std::string& /*name*/, const nlohmann::json& input,
+                      bool& isError) -> std::string {
+        isError = false;
+        try {
+            const auto name = input.at("name").get<std::string>();
+            const auto id = provider->database->getChatId(name);
+            if (!id) {
+                return fmt::format("No chat/user id found for name \"{}\".",
+                                  name);
+            }
+            return fmt::format("{}", *id);
+        } catch (const std::exception& ex) {
+            isError = true;
+            return fmt::format("Invalid tool input: {}", ex.what());
+        }
+    };
+}
+
+const llm::Tool kGetChatNameTool{
+    "get_chat_name",
+    "Look up the registered name for a numeric Telegram chat/user ID. Only "
+    "works for IDs an admin has registered; returns a not-found message if "
+    "the ID is unknown.",
+    nlohmann::json{{"type", "object"},
+                  {"properties", {{"chat_id", {{"type", "integer"}}}}},
+                  {"required", {"chat_id"}}}};
+
+llm::ToolExecutor makeGetChatNameExecutor(const Providers* provider) {
+    return [provider](const std::string& /*name*/, const nlohmann::json& input,
+                      bool& isError) -> std::string {
+        isError = false;
+        try {
+            const auto chatId = input.at("chat_id").get<ChatId>();
+            const auto name = provider->database->getChatName(chatId);
+            if (!name) {
+                return fmt::format("No name registered for chat/user id {}.",
+                                  chatId);
+            }
+            return *name;
+        } catch (const std::exception& ex) {
+            isError = true;
+            return fmt::format("Invalid tool input: {}", ex.what());
+        }
+    };
+}
+
 // Dispatches by tool name to whichever admin tool was actually called; each
 // underlying executor already ignores the `name` parameter it's handed.
-llm::ToolExecutor makeCombinedExecutor(TgBotApi::Ptr api, ChatId chatId) {
+llm::ToolExecutor makeCombinedExecutor(TgBotApi::Ptr api, ChatId chatId,
+                                       const Providers* provider) {
     auto sendMsg = makeSendMessageExecutor(api);
     auto askConfirm = llm::ask_confirm::makeAskConfirmExecutor(api, chatId);
-    return [sendMsg, askConfirm](const std::string& name,
-                                 const nlohmann::json& input,
-                                 bool& isError) -> std::string {
+    auto getChatId = makeGetChatIdExecutor(provider);
+    auto getChatName = makeGetChatNameExecutor(provider);
+    return [sendMsg, askConfirm, getChatId, getChatName](
+               const std::string& name, const nlohmann::json& input,
+               bool& isError) -> std::string {
         if (name == "send_message") {
             return sendMsg(name, input, isError);
         }
         if (name == "ask") {
             return askConfirm(name, input, isError);
+        }
+        if (name == "get_chat_id") {
+            return getChatId(name, input, isError);
+        }
+        if (name == "get_chat_name") {
+            return getChatName(name, input, isError);
         }
         isError = true;
         return fmt::format("Unknown tool: {}", name);
@@ -169,17 +223,23 @@ DECLARE_COMMAND_HANDLER(ask) {
         }
         std::string list;
         int index = 1;
+        std::vector<std::string> modelIds;
+        modelIds.reserve(models.size());
         for (const auto& model : models) {
             list += fmt::format("{}. {}", index++, model.id);
             if (model.display != model.id && !model.display.empty()) {
                 list += fmt::format(" ({})", model.display);
             }
             list += '\n';
+            modelIds.push_back(model.id);
         }
+        auto keyboard =
+            llm::model_picker::startPicker(api, chatId, std::move(modelIds));
         api->sendReplyMessage(
             message->message(),
             fmt::format(fmt::runtime(res->get(Strings::LLM_MODELS_AVAILABLE)),
-                        list));
+                        list),
+            keyboard);
         return;
     }
 
@@ -227,8 +287,9 @@ DECLARE_COMMAND_HANDLER(ask) {
         message->message(), AuthContext::AccessLevel::AdminUser);
     const auto answer =
         isAdmin ? backend->chat(model, SYSTEM_PROMPT, query, chatId,
-                                {kSendMessageTool, llm::ask_confirm::kAskConfirmTool},
-                                makeCombinedExecutor(api, chatId))
+                                {kSendMessageTool, llm::ask_confirm::kAskConfirmTool,
+                                 kGetChatIdTool, kGetChatNameTool},
+                                makeCombinedExecutor(api, chatId, provider))
                 : backend->chat(model, SYSTEM_PROMPT, query, chatId);
     if (!answer) {
         api->sendReplyMessage(message->message(),
