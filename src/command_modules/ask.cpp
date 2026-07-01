@@ -20,6 +20,7 @@
 #include <utility>
 #include <vector>
 
+#include "AskConfirmTool.hpp"
 #include "llm/AnthropicApi.hpp"
 #include "llm/LLMBackend.hpp"
 #include "llm/LMStudioBackend.hpp"
@@ -96,6 +97,25 @@ llm::ToolExecutor makeSendMessageExecutor(TgBotApi::Ptr api) {
             isError = true;
             return fmt::format("Invalid tool input: {}", ex.what());
         }
+    };
+}
+
+// Dispatches by tool name to whichever admin tool was actually called; each
+// underlying executor already ignores the `name` parameter it's handed.
+llm::ToolExecutor makeCombinedExecutor(TgBotApi::Ptr api, ChatId chatId) {
+    auto sendMsg = makeSendMessageExecutor(api);
+    auto askConfirm = llm::ask_confirm::makeAskConfirmExecutor(api, chatId);
+    return [sendMsg, askConfirm](const std::string& name,
+                                 const nlohmann::json& input,
+                                 bool& isError) -> std::string {
+        if (name == "send_message") {
+            return sendMsg(name, input, isError);
+        }
+        if (name == "ask") {
+            return askConfirm(name, input, isError);
+        }
+        isError = true;
+        return fmt::format("Unknown tool: {}", name);
     };
 }
 
@@ -201,24 +221,26 @@ DECLARE_COMMAND_HANDLER(ask) {
         model = models.front().id;
     }
 
-    auto sent = api->sendReplyMessage(message->message(),
-                                      res->get(Strings::LLM_PROCESSING_QUERY));
+    api->sendReplyMessage(message->message(),
+                          res->get(Strings::LLM_PROCESSING_QUERY));
     const bool isAdmin = provider->auth->isAuthorized(
         message->message(), AuthContext::AccessLevel::AdminUser);
     const auto answer =
         isAdmin ? backend->chat(model, SYSTEM_PROMPT, query, chatId,
-                                {kSendMessageTool}, makeSendMessageExecutor(api))
+                                {kSendMessageTool, llm::ask_confirm::kAskConfirmTool},
+                                makeCombinedExecutor(api, chatId))
                 : backend->chat(model, SYSTEM_PROMPT, query, chatId);
     if (!answer) {
-        api->editMessage(sent, res->get(Strings::LLM_RESPONSE_FAILED));
+        api->sendReplyMessage(message->message(),
+                              res->get(Strings::LLM_RESPONSE_FAILED));
         return;
     }
     try {
-        api->editMessage<TgBotApi::ParseMode::MarkdownV2>(
-            sent, tgbot::markdownv2::escape(*answer));
+        api->sendReplyMessage<TgBotApi::ParseMode::MarkdownV2>(
+            message->message(), tgbot::markdownv2::escape(*answer));
     } catch (const TgBot::TgException& ex) {
-        LOG(WARNING) << "MarkdownV2 edit failed, sending plain: " << ex.what();
-        api->editMessage(sent, *answer);
+        LOG(WARNING) << "MarkdownV2 send failed, sending plain: " << ex.what();
+        api->sendReplyMessage(message->message(), *answer);
     }
 }
 
