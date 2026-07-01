@@ -167,7 +167,10 @@ class KernelBuildHandler {
     std::vector<KernelConfig> configs;
 
     Intermidates intermidiates;
-    mutable std::mutex intermidiates_mutex_;
+    // Recursive: the selection handlers intentionally re-enter while holding
+    // this lock (e.g. handle_build -> handle_select -> handle_select_INTERNAL),
+    // which would self-deadlock a plain std::mutex (EDEADLK).
+    mutable std::recursive_mutex intermidiates_mutex_;
     std::optional<std::string> gitToken;
 
     // Telegram-free build orchestration (allows dependency injection for
@@ -288,7 +291,7 @@ class KernelBuildHandler {
     constexpr static std::string_view kBuildPrefix = "build_";
     constexpr static std::string_view kSelectPrefix = "select_";
     void start(const Message::Ptr& message) {
-        std::lock_guard<std::mutex> lock(intermidiates_mutex_);
+        std::lock_guard<std::recursive_mutex> lock(intermidiates_mutex_);
         intermidiates = {};
         if (configs.empty()) {
             _api->sendMessage(message->chat, "No kernel configurations found.");
@@ -320,7 +323,7 @@ class KernelBuildHandler {
     }
 
     void handle_build(const TgBot::CallbackQuery::Ptr& query) {
-        std::lock_guard<std::mutex> lock(intermidiates_mutex_);
+        std::lock_guard<std::recursive_mutex> lock(intermidiates_mutex_);
         std::string_view data = query->data;
         if (!absl::ConsumePrefix(&data, kBuildPrefix)) {
             return;
@@ -357,7 +360,7 @@ class KernelBuildHandler {
 
     constexpr static std::string_view kEnablePrefix = "enable_";
     void handle_select(const TgBot::CallbackQuery::Ptr& query) {
-        std::lock_guard<std::mutex> lock(intermidiates_mutex_);
+        std::lock_guard<std::recursive_mutex> lock(intermidiates_mutex_);
         std::string_view data = query->data;
         if (!absl::ConsumePrefix(&data, kSelectPrefix)) {
             return;
@@ -384,7 +387,7 @@ class KernelBuildHandler {
     constexpr static std::string_view kContinuePrefix = "continue";
 
     void handle_select_INTERNAL(const TgBot::CallbackQuery::Ptr& query) {
-        std::lock_guard<std::mutex> lock(intermidiates_mutex_);
+        std::lock_guard<std::recursive_mutex> lock(intermidiates_mutex_);
         KeyboardBuilder builder;
         for (const auto& fragment : intermidiates.current->fragments) {
             bool enabled =
@@ -409,7 +412,7 @@ class KernelBuildHandler {
     }
 
     void handle_enable(const TgBot::CallbackQuery::Ptr& query) {
-        std::lock_guard<std::mutex> lock(intermidiates_mutex_);
+        std::lock_guard<std::recursive_mutex> lock(intermidiates_mutex_);
         std::string_view data = query->data;
         if (!absl::ConsumePrefix(&data, kEnablePrefix)) {
             return;
