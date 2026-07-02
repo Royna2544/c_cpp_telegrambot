@@ -86,14 +86,18 @@ llm::ToolExecutor makeSendMessageExecutor(TgBotApi::Ptr api) {
 }
 
 // Admin-only tools backed by DatabaseBase's chatmap (name<->id registry).
-// Only entries an admin has manually registered (e.g. via /setChatAlias) are
-// resolvable here - there is no passive auto-population from message
-// traffic, so a "not found" result doesn't mean the id/name is invalid.
+// Only entries an admin has manually registered (via save_chat_info below,
+// /setChatAlias, or the DatabaseCtrl CLI) are resolvable here - there is no
+// passive auto-population from message traffic, so a "not found" result
+// doesn't mean the id/name is invalid, just unregistered. Descriptions
+// cross-reference each other so the model picks get vs. save based on
+// whether the admin is asking to look something up or to remember it.
 const llm::Tool kGetChatIdTool{
     "get_chat_id",
-    "Look up the numeric Telegram chat/user ID for a previously registered "
-    "name. Only works for names an admin has registered; returns a "
-    "not-found message if the name is unknown.",
+    "Retrieve the numeric Telegram chat/user ID for a name that was "
+    "previously saved with save_chat_info. Use this when asked to find, "
+    "look up, retrieve, or check an ID - never to create or change a "
+    "registration. Returns a not-found message if the name is unknown.",
     nlohmann::json{{"type", "object"},
                   {"properties", {{"name", {{"type", "string"}}}}},
                   {"required", {"name"}}}};
@@ -119,9 +123,10 @@ llm::ToolExecutor makeGetChatIdExecutor(const Providers* provider) {
 
 const llm::Tool kGetChatNameTool{
     "get_chat_name",
-    "Look up the registered name for a numeric Telegram chat/user ID. Only "
-    "works for IDs an admin has registered; returns a not-found message if "
-    "the ID is unknown.",
+    "Retrieve the name previously saved (via save_chat_info) for a numeric "
+    "Telegram chat/user ID. Use this when asked to find, look up, retrieve, "
+    "or check a name - never to create or change a registration. Returns a "
+    "not-found message if the ID is unregistered.",
     nlohmann::json{{"type", "object"},
                   {"properties", {{"chat_id", {{"type", "integer"}}}}},
                   {"required", {"chat_id"}}}};
@@ -145,6 +150,50 @@ llm::ToolExecutor makeGetChatNameExecutor(const Providers* provider) {
     };
 }
 
+const llm::Tool kSaveChatInfoTool{
+    "save_chat_info",
+    "Register a new mapping between a numeric Telegram chat/user ID and a "
+    "name, so it can be found later with get_chat_id/get_chat_name. Use "
+    "this whenever explicitly asked to save, register, remember, add, or "
+    "create an association between an ID and a name - never for lookups. "
+    "Fails if that ID is already registered (check with get_chat_name "
+    "first if unsure).",
+    nlohmann::json{
+        {"type", "object"},
+        {"properties",
+         {{"chat_id", {{"type", "integer"}}}, {"name", {{"type", "string"}}}}},
+        {"required", {"chat_id", "name"}}}};
+
+llm::ToolExecutor makeSaveChatInfoExecutor(const Providers* provider) {
+    return [provider](const std::string& /*name*/, const nlohmann::json& input,
+                      bool& isError) -> std::string {
+        isError = false;
+        try {
+            const auto chatId = input.at("chat_id").get<ChatId>();
+            const auto chatName = input.at("name").get<std::string>();
+            switch (provider->database->addChatInfo(chatId, chatName)) {
+                case DatabaseBase::AddResult::OK:
+                    return fmt::format("Saved: {} -> \"{}\".", chatId,
+                                      chatName);
+                case DatabaseBase::AddResult::ALREADY_EXISTS:
+                    isError = true;
+                    return fmt::format(
+                        "Chat/user id {} is already registered (use "
+                        "get_chat_name to see the existing name).",
+                        chatId);
+                case DatabaseBase::AddResult::BACKEND_ERROR:
+                    isError = true;
+                    return "Failed to save due to a database error.";
+            }
+            isError = true;
+            return "Unknown save result.";
+        } catch (const std::exception& ex) {
+            isError = true;
+            return fmt::format("Invalid tool input: {}", ex.what());
+        }
+    };
+}
+
 // Dispatches by tool name to whichever admin tool was actually called; each
 // underlying executor already ignores the `name` parameter it's handed.
 llm::ToolExecutor makeCombinedExecutor(TgBotApi::Ptr api, ChatId chatId,
@@ -153,7 +202,8 @@ llm::ToolExecutor makeCombinedExecutor(TgBotApi::Ptr api, ChatId chatId,
     auto askConfirm = llm::ask_confirm::makeAskConfirmExecutor(api, chatId);
     auto getChatId = makeGetChatIdExecutor(provider);
     auto getChatName = makeGetChatNameExecutor(provider);
-    return [sendMsg, askConfirm, getChatId, getChatName](
+    auto saveChatInfo = makeSaveChatInfoExecutor(provider);
+    return [sendMsg, askConfirm, getChatId, getChatName, saveChatInfo](
                const std::string& name, const nlohmann::json& input,
                bool& isError) -> std::string {
         if (name == "send_message") {
@@ -167,6 +217,9 @@ llm::ToolExecutor makeCombinedExecutor(TgBotApi::Ptr api, ChatId chatId,
         }
         if (name == "get_chat_name") {
             return getChatName(name, input, isError);
+        }
+        if (name == "save_chat_info") {
+            return saveChatInfo(name, input, isError);
         }
         isError = true;
         return fmt::format("Unknown tool: {}", name);
@@ -288,7 +341,8 @@ DECLARE_COMMAND_HANDLER(ask) {
     const auto answer =
         isAdmin ? backend->chat(model, SYSTEM_PROMPT, query, chatId,
                                 {kSendMessageTool, llm::ask_confirm::kAskConfirmTool,
-                                 kGetChatIdTool, kGetChatNameTool},
+                                 kGetChatIdTool, kGetChatNameTool,
+                                 kSaveChatInfoTool},
                                 makeCombinedExecutor(api, chatId, provider))
                 : backend->chat(model, SYSTEM_PROMPT, query, chatId);
     if (!answer) {
