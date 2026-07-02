@@ -5,8 +5,10 @@
 #include <algorithm>
 #include <array>
 #include <cstdint>
+#include <filesystem>
 #include <memory>
 #include <optional>
+#include <shared_mutex>
 #include <string>
 #include <vector>
 
@@ -55,6 +57,29 @@ class UTILS_EXPORT ConfigManager {
      * configuration, or std::nullopt if the configuration is not found.
      */
     std::optional<std::string> get(Configs config) const;
+
+    /**
+     * reload - Re-reads the file-backed config source from disk and, on
+     * successful parse, atomically replaces the cached values. Command-line
+     * and environment backends are not re-read (nothing to reload: cmdline
+     * args can't change at runtime, and the env backend already queries
+     * live). On parse failure, the previously-cached values are left
+     * untouched and this returns false.
+     *
+     * Note: only config values re-read on every use (e.g. LLM_URL/
+     * LLM_API_TYPE/LLM_AUTHKEY, read fresh per /ask invocation) actually
+     * benefit from this. Values consumed once at startup to construct a
+     * long-lived object (TOKEN, DATABASE_FILEPATH, SOCKET_URL_*, etc.) won't
+     * retroactively reconfigure anything - those still need a real restart.
+     */
+    bool reload();
+
+    /**
+     * configFilePath - Resolves where the file-backed config source would be
+     * read from (same lookup `reload()`/the constructor use), without
+     * reading it. Returns std::nullopt if no candidate file exists.
+     */
+    [[nodiscard]] std::optional<std::filesystem::path> configFilePath() const;
 
     /**
      * serializeHelpToOStream - Function used to serialize the help information
@@ -234,6 +259,10 @@ class UTILS_EXPORT ConfigManager {
         virtual ~Backend() = default;
 
         virtual bool load() { return true; }
+        // Re-runs load(); backends with nothing meaningful to reload (Env,
+        // Cmdline) inherit this unchanged. Only ConfigBackendFile overrides
+        // it with safe parse-into-temp-then-swap semantics.
+        virtual bool reload() { return load(); }
         virtual std::optional<std::string> get(const std::string_view name) = 0;
 
         /**
@@ -271,4 +300,14 @@ class UTILS_EXPORT ConfigManager {
         }
     } storage;
     // CommandLine, Env, File
+
+    // Guards `storage` against concurrent get()/reload(): get() takes a
+    // shared (read) lock, reload() takes a unique (write) lock while it
+    // re-parses and swaps in the file backend's fresh values. Held via
+    // unique_ptr (rather than a plain std::shared_mutex member) so
+    // ConfigManager stays movable - Fruit's DI provider constructs it by
+    // value and moves it out (`return ConfigManager(std::move(line));`),
+    // which a non-movable member would break.
+    mutable std::unique_ptr<std::shared_mutex> mLock =
+        std::make_unique<std::shared_mutex>();
 };

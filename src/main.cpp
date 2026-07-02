@@ -39,6 +39,7 @@
 #include "DatabaseBase.hpp"
 #include "src/api/net/SocketServiceImpl.hpp"
 #include "tgbot/TgException.h"
+#include "utils/ConfigFileWatcher.hpp"
 #include "utils/Env.hpp"
 
 class RegexHandlerInterface : public RegexHandler::Interface {
@@ -237,6 +238,18 @@ getNetworkLogSinkComponent() {
         });
 }
 
+fruit::Component<fruit::Required<ThreadManager, ConfigManager>,
+                 Unused<ConfigFileWatcher>>
+getConfigFileWatcherComponent() {
+    return fruit::createComponent().registerProvider(
+        [](ThreadManager* thread,
+           ConfigManager* configMgr) -> Unused<ConfigFileWatcher> {
+            thread->create<ConfigFileWatcher>(
+                ThreadManager::Usage::CONFIG_WATCHER_THREAD, configMgr);
+            return {};
+        });
+}
+
 using SocketComponentFactory_t = std::function<Unused<SocketServiceImpl>(
     ThreadManager::Usage usage, SocketServiceImpl::Url* path)>;
 fruit::Component<fruit::Required<TgBotApi, WrapPtr<SpamBlockBase>,
@@ -285,7 +298,7 @@ getRegexHandlerComponent() {
 
 fruit::Component<TgBotApi, AuthContext, DatabaseBase, ThreadManager,
                  ConfigManager, Unused<RegexHandler>, Unused<NetworkLogSink>,
-                 WrapPtr<SpamBlockBase>, RefLock,
+                 Unused<ConfigFileWatcher>, WrapPtr<SpamBlockBase>, RefLock,
 #ifdef TGBOTCPP_ENABLE_WEBSERVER
                  Unused<TgBotWebServer>,
 #endif
@@ -301,6 +314,7 @@ getAllComponent(CommandLine cmd) {
         .install(getTgBotApiImplComponent)
         .install(getRegexHandlerComponent)
         .install(getNetworkLogSinkComponent)
+        .install(getConfigFileWatcherComponent)
         .install(getSpamBlockComponent)
 #ifdef TGBOTCPP_ENABLE_WEBSERVER
         .install(getWebServerComponent)
@@ -482,7 +496,7 @@ int app_main(int argc, char** argv) {
     // Initialize dependencies
     fruit::Injector<TgBotApi, AuthContext, DatabaseBase, ThreadManager,
                     ConfigManager, Unused<RegexHandler>, Unused<NetworkLogSink>,
-                    WrapPtr<SpamBlockBase>, RefLock,
+                    Unused<ConfigFileWatcher>, WrapPtr<SpamBlockBase>, RefLock,
 #ifdef TGBOTCPP_ENABLE_WEBSERVER
                     Unused<TgBotWebServer>,
 #endif
@@ -558,6 +572,7 @@ int app_main(int argc, char** argv) {
 
     // Not directly used components
     injector.get<Unused<NetworkLogSink>*>();
+    injector.get<Unused<ConfigFileWatcher>*>();
     injector.get<Unused<RegexHandler>*>();
     injector.get<WrapPtr<SpamBlockBase>*>();
 

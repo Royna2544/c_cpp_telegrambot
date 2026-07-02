@@ -10,8 +10,10 @@
 #include <iostream>
 #include <libfs.hpp>
 #include <memory>
+#include <mutex>
 #include <optional>
 #include <ostream>
+#include <shared_mutex>
 #include <string_view>
 #include <type_traits>
 #include <utility>
@@ -143,42 +145,69 @@ struct ConfigBackendBoostPOBase : public ConfigManager::Backend {
 struct ConfigBackendFile : public ConfigBackendBoostPOBase {
     static constexpr const char* kTgBotConfigFiles[] = {
         "tgbotserver." BUILD_TYPE_STR ".ini", "tgbotserver.ini"};
-    bool load() override {
+
+    // Shared by load()/reload() and ConfigManager::configFilePath() so there
+    // is exactly one place that decides which candidate file wins.
+    static std::optional<std::filesystem::path> resolvePath() {
         std::filesystem::path home;
-
         if (!FS::getHomePath(home)) {
-            return false;
+            return std::nullopt;
         }
-
-        std::ifstream ifs;
-        std::filesystem::path confPath;
         for (const char* filename : kTgBotConfigFiles) {
-            confPath = home / filename;
-            ifs.open(confPath);
-            if (ifs.fail()) {
-                LOG(WARNING) << "Opening " << confPath << " failed";
-            } else
-                break;
+            std::filesystem::path confPath = home / filename;
+            std::ifstream probe(confPath);
+            if (probe.good()) {
+                return confPath;
+            }
+            LOG(WARNING) << "Opening " << confPath << " failed";
         }
-        if (ifs.fail()) {
-            LOG(ERROR) << "No suitable config file found";
-            return false;
-        }
-        try {
-            po::store(po::parse_config_file(ifs, getTgBotOptionsDesc()), mp);
-        } catch (const boost::program_options::error& e) {
-            LOG(ERROR) << "File backend failed to parse: " << e.what();
-            return false;
-        }
-        po::notify(mp);
+        return std::nullopt;
+    }
 
-        LOG(INFO) << "Loaded " << mp.size() << " entries from " << confPath;
+    bool load() override { return parseInto(mp); }
+
+    // Parses into a local map first; only swaps it into `mp` on success, so a
+    // half-written file (non-atomic editor save) or a bad edit never
+    // corrupts the already-live config.
+    bool reload() override {
+        po::variables_map tmp;
+        if (!parseInto(tmp)) {
+            return false;
+        }
+        mp = std::move(tmp);
         return true;
     }
+
     [[nodiscard]] std::string_view name() const override { return "File"; }
 
     ConfigBackendFile() = default;
     ~ConfigBackendFile() override = default;
+
+   private:
+    static bool parseInto(po::variables_map& target) {
+        const auto confPath = resolvePath();
+        if (!confPath) {
+            LOG(ERROR) << "No suitable config file found";
+            return false;
+        }
+        std::ifstream ifs(*confPath);
+        if (!ifs) {
+            LOG(ERROR) << "Failed to open " << *confPath;
+            return false;
+        }
+        try {
+            po::store(po::parse_config_file(ifs, getTgBotOptionsDesc()),
+                     target);
+            po::notify(target);
+        } catch (const std::exception& e) {
+            LOG(ERROR) << "File backend failed to parse " << *confPath << ": "
+                      << e.what();
+            return false;
+        }
+        LOG(INFO) << "Loaded " << target.size() << " entries from "
+                 << *confPath;
+        return true;
+    }
 };
 
 struct ConfigBackendCmdline : public ConfigBackendBoostPOBase {
@@ -227,7 +256,22 @@ ConfigManager::ConfigManager(CommandLine line) {
     DLOG(INFO) << "Loaded " << storage.size() << " config sources";
 }
 
+bool ConfigManager::reload() {
+    std::unique_lock lock(*mLock);
+    auto& file = storage[BackendType::FILE];
+    if (!file) {
+        LOG(WARNING) << "ConfigManager::reload(): no file backend loaded";
+        return false;
+    }
+    return file->reload();
+}
+
+std::optional<std::filesystem::path> ConfigManager::configFilePath() const {
+    return ConfigBackendFile::resolvePath();
+}
+
 std::optional<std::string> ConfigManager::get(Configs config) const {
+    std::shared_lock lock(*mLock);
     const auto it = std::ranges::find_if(
         kConfigMap,
         [config](const Entry& entry) { return entry.config == config; });

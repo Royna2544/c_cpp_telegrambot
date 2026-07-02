@@ -59,6 +59,7 @@ class ThreadManager {
         SPAMBLOCK_THREAD,
         LOGSERVER_THREAD,
         WEBSERVER_THREAD,
+        CONFIG_WATCHER_THREAD,
         MAX
     };
 
@@ -102,6 +103,9 @@ struct fmt::formatter<ThreadManager::Usage> : formatter<std::string_view> {
                 break;
             case ThreadManager::Usage::WEBSERVER_THREAD:
                 name = "WEBSERVER_THREAD";
+                break;
+            case ThreadManager::Usage::CONFIG_WATCHER_THREAD:
+                name = "CONFIG_WATCHER_THREAD";
                 break;
             default:
                 LOG(ERROR) << "Unknown usage: " << static_cast<int>(c);

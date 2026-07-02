@@ -109,6 +109,7 @@ tgbot_exe(
     src/global_handlers/SpamBlockManager.cpp
     src/ml/ChatDataCollector.cpp
     src/logging/LoggingServer.cpp
+    src/utils/ConfigFileWatcher.cpp
     src/ThreadManager.cpp
     src/ManagedThread.cpp
     ${httplib_srcs}
