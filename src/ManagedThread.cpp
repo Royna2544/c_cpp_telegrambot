@@ -1,6 +1,7 @@
 #include <fmt/format.h>
 
 #include <ManagedThreads.hpp>
+#include <atomic>
 #include <stop_token>
 
 void ThreadRunner::run() {
@@ -8,25 +9,21 @@ void ThreadRunner::run() {
     isRunning = true;
 }
 
-int load_before_inc_dec(std::atomic_int* counter) {
-    int current = counter->load(std::memory_order_acquire);
-    while (!counter->compare_exchange_strong(current, current,
-                                             std::memory_order_acquire)) {
-        // Reload current until no inc/dec operations interfere
-    }
-    return current;
-}
-
 void ThreadRunner::threadFunction() {
     initLatch.wait();
 
-    ++(*mgr_priv.launched);
-    DLOG(INFO) << fmt::format("{} started (launched: {})", mgr_priv.usage,
-                              load_before_inc_dec(mgr_priv.launched));
+    // Relaxed: `launched` is a plain counter (no other memory is published
+    // alongside it) - ThreadManager::destroy() reads it under
+    // mControllerLock, which already provides the happens-before relationship
+    // with kControllers, so the counter itself needs no stronger ordering.
+    mgr_priv.launched->fetch_add(1, std::memory_order_relaxed);
+    DLOG(INFO) << fmt::format(
+        "{} started (launched: {})", mgr_priv.usage,
+        mgr_priv.launched->load(std::memory_order_relaxed));
     auto callback = std::make_unique<StopCallBackJust>(mgr_priv.stopToken,
                                                        [this] { onPreStop(); });
     runFunction(mgr_priv.stopToken);
-    --(*mgr_priv.launched);
+    mgr_priv.launched->fetch_sub(1, std::memory_order_relaxed);
     if (!mgr_priv.stopToken.stop_requested()) {
         LOG(WARNING) << fmt::format("{} has stopped before stop request",
                                     mgr_priv.usage);
@@ -34,8 +31,8 @@ void ThreadRunner::threadFunction() {
     } else {
         mgr_priv.completeLatch->count_down();
     }
-    DLOG(INFO) << fmt::format("{} joined the barrier (launched: {})",
-                              mgr_priv.usage,
-                              load_before_inc_dec(mgr_priv.launched));
+    DLOG(INFO) << fmt::format(
+        "{} joined the barrier (launched: {})", mgr_priv.usage,
+        mgr_priv.launched->load(std::memory_order_relaxed));
     isRunning = false;
 }
