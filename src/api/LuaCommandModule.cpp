@@ -35,6 +35,10 @@ void binds(TgBotApi::Ptr api, MessageExt* message,
     msg["date"] = message->message()->date;  // seconds since epoch
     msg["user_id"] = message->get<MessageAttrs::User>()->id;
     msg["text"] = message->get<MessageAttrs::ExtraText>();
+    msg["has_reply"] = message->reply()->exists();
+    if (message->reply()->exists()) {
+        msg["reply_user_id"] = message->reply()->get<MessageAttrs::User>()->id;
+    }
     lua["message"] = msg;
 
     /*───────────────────  time helpers  ────────────────────*/
