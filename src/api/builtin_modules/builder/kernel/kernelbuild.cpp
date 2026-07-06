@@ -489,6 +489,9 @@ void KernelBuildHandler::handle_continue(
         }
     }
     request.set_clone_depth(1);
+    // A failed fetch of an existing checkout shouldn't abort the build;
+    // the builder falls back to the sources already on disk.
+    request.set_fail_on_fetch(false);
     if (gitToken) {
         request.set_github_token(*gitToken);
     }

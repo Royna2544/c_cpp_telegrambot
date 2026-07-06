@@ -444,19 +444,33 @@ impl linux_kernel_build_service_server::LinuxKernelBuildService for BuildService
                                                 "Repository fast-forwarded successfully."
                                             );
                                         }
+                                        // Fatal only when the client opts in via
+                                        // fail_on_fetch: an unreachable remote or rejected
+                                        // credentials shouldn't kill the build when a
+                                        // usable checkout is already on disk.
                                         Err(e) => {
+                                            if req.fail_on_fetch {
+                                                report_blk!(
+                                                    tx_for_inner,
+                                                    Failed,
+                                                    format!(
+                                                        "Failed to fast-forward repository. Error: {}",
+                                                        e
+                                                    )
+                                                );
+                                                return Err(Status::internal(format!(
+                                                    "Failed to fast-forward repository: {}",
+                                                    e
+                                                )));
+                                            }
                                             report_blk!(
                                                 tx_for_inner,
-                                                Failed,
+                                                InProgressDownload,
                                                 format!(
-                                                    "Failed to fast-forward repository. Error: {}",
+                                                    "Failed to fast-forward repository, continuing with existing sources. Error: {}",
                                                     e
                                                 )
                                             );
-                                            return Err(Status::internal(format!(
-                                                "Failed to fast-forward repository: {}",
-                                                e
-                                            )));
                                         }
                                     }
                                 } else {
