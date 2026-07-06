@@ -26,7 +26,7 @@
 //! # };
 //! ```
 
-use std::{num::NonZero, path::PathBuf};
+use std::{cell::RefCell, num::NonZero, path::PathBuf};
 
 use crate::util::LogErr;
 
@@ -37,7 +37,7 @@ use tracing::{debug, error, info, warn};
 pub struct GitRepo {
     repo: Repository,
     remote_name: String,
-    cred_callback: Box<CredCallback>,
+    github_token: Option<String>,
     progress_callback: Option<Box<ProgressCallback>>,
     ratelimit: RateLimit,
 }
@@ -47,8 +47,34 @@ type CredCallback =
 pub type ProgressCallback = dyn Fn(&git2::Progress) + Send + Sync;
 
 impl GitRepo {
+    /// Builds a libgit2 credential callback. Attempt tracking lives inside the
+    /// closure, so a fresh callback must be created for every clone/fetch.
+    ///
+    /// libgit2 re-invokes the callback after the server rejects the offered
+    /// credentials. There is no interactive fallback here, so a retry would
+    /// replay the same credentials until libgit2 hits its replay cap and
+    /// reports an opaque "too many redirects or authentication replays"
+    /// error — instead, a second request for the same URL is answered with a
+    /// clear authentication error.
     fn get_cred_callback(github_token: Option<String>) -> Box<CredCallback> {
-        Box::new(move |url, username_from_url, _allowed_types| {
+        let last_url: RefCell<Option<String>> = RefCell::new(None);
+        Box::new(move |url, username_from_url, allowed_types| {
+            // A USERNAME-only query is libgit2 asking which username to use
+            // (ssh URLs without one embedded), not an authentication attempt.
+            if allowed_types == git2::CredentialType::USERNAME {
+                return git2::Cred::username(username_from_url.unwrap_or("git"));
+            }
+            if last_url.borrow().as_deref() == Some(url) {
+                error!("Credentials for {} were rejected by the server", url);
+                return Err(git2::Error::new(
+                    git2::ErrorCode::Auth,
+                    git2::ErrorClass::Callback,
+                    format!(
+                        "authentication failed for '{url}': credentials were rejected by the remote server"
+                    ),
+                ));
+            }
+            *last_url.borrow_mut() = Some(url.to_string());
             // Try to open default config, fall back to new empty config if that fails
             let config = git2::Config::open_default()
                 .inspect_err(|x| {
@@ -112,7 +138,7 @@ impl GitRepo {
             repo,
             remote_name: remote_name.to_string(),
             progress_callback,
-            cred_callback: Self::get_cred_callback(github_token),
+            github_token,
             ratelimit: RateLimit::new(NonZero::new(5).unwrap()),
         })
     }
@@ -148,7 +174,8 @@ impl GitRepo {
     pub fn fetch_branch(&self, branch: &str) -> Result<(), git2::Error> {
         let mut fo = git2::FetchOptions::new();
         let mut ro = git2::RemoteCallbacks::new();
-        ro.credentials(self.cred_callback.as_ref());
+        // Fresh callback per operation so its auth-attempt tracking resets.
+        ro.credentials(Self::get_cred_callback(self.github_token.clone()));
         if let Some(progress_cb) = &self.progress_callback {
             ro.transfer_progress(self.with_rate_limit(progress_cb));
         }
@@ -333,9 +360,8 @@ impl GitRepo {
 /// services rely on. Implemented by [`GitRepo`] in production and by a mock in
 /// tests, so the build workflow can be exercised without touching real repos.
 ///
-/// Not `Send`: mirrors `GitRepo`, whose libgit2 credential callback is not
-/// `Send`. Handles are used within a single task and not held across awaits,
-/// exactly as the concrete `GitRepo` was before this seam.
+/// Not `Send`: handles are used within a single task and not held across
+/// awaits, exactly as the concrete `GitRepo` was before this seam.
 pub trait RepoHandle {
     fn get_remote_url(&self) -> Result<String, git2::Error>;
     fn get_branch_name(&self) -> Result<String, git2::Error>;
@@ -430,6 +456,58 @@ impl GitProvider for RealGitProvider {
             github_token,
             progress_callback,
         )
+    }
+}
+
+#[cfg(test)]
+mod cred_callback_tests {
+    //! Exercises the credential callback directly. URLs are chosen so no
+    //! external process is invoked: github.com + token short-circuits before
+    //! the credential helper, and ssh:// never reaches it.
+    use super::GitRepo;
+
+    #[test]
+    fn second_attempt_for_same_url_is_an_auth_error() {
+        let cb = GitRepo::get_cred_callback(Some("test-token".to_string()));
+        let url = "https://github.com/foo/bar";
+        cb(url, None, git2::CredentialType::USER_PASS_PLAINTEXT)
+            .expect("first attempt should yield token credentials");
+        // libgit2 asking again for the same URL means the server rejected them.
+        let err = match cb(url, None, git2::CredentialType::USER_PASS_PLAINTEXT) {
+            Ok(_) => panic!("second attempt for the same URL should fail"),
+            Err(e) => e,
+        };
+        assert_eq!(err.code(), git2::ErrorCode::Auth);
+        assert!(err.message().contains(url), "error should name the URL: {err}");
+    }
+
+    #[test]
+    fn a_different_url_gets_a_fresh_attempt() {
+        let cb = GitRepo::get_cred_callback(Some("test-token".to_string()));
+        cb("https://github.com/foo/a", None, git2::CredentialType::USER_PASS_PLAINTEXT)
+            .expect("first URL should yield credentials");
+        // A new URL (e.g. after a redirect) is not a rejection of the previous one.
+        cb("https://github.com/foo/b", None, git2::CredentialType::USER_PASS_PLAINTEXT)
+            .expect("a different URL should get a fresh attempt");
+        let err = match cb("https://github.com/foo/b", None, git2::CredentialType::USER_PASS_PLAINTEXT) {
+            Ok(_) => panic!("second attempt for the same URL should fail"),
+            Err(e) => e,
+        };
+        assert_eq!(err.code(), git2::ErrorCode::Auth);
+    }
+
+    #[test]
+    fn username_query_does_not_count_as_an_attempt() {
+        let cb = GitRepo::get_cred_callback(None);
+        let url = "ssh://example.com/foo/bar";
+        cb(url, None, git2::CredentialType::USERNAME)
+            .expect("username query should be answered");
+        // The follow-up SSH_KEY request is the first real attempt. It may fail
+        // when no ssh-agent is reachable, but it must not be misreported as
+        // the server rejecting credentials.
+        if let Err(e) = cb(url, Some("git"), git2::CredentialType::SSH_KEY) {
+            assert_ne!(e.code(), git2::ErrorCode::Auth, "unexpected rejection: {e}");
+        }
     }
 }
 
