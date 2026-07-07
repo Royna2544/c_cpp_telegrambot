@@ -21,7 +21,7 @@ struct LocaleResData {
     bool isDefault;
 };
 
-using invalid_xml_error = std::exception;
+using invalid_xml_error = std::invalid_argument;
 
 namespace {
 
@@ -68,8 +68,7 @@ std::pair<LocaleResData, StringResLoader::PerLocaleMapImpl> parseLocaleResource(
     if (doc == nullptr) {
         LOG(ERROR) << fmt::format("Could not parse file {} (code: {})",
                                   filename.string(), ctx.code);
-        LOG(ERROR) << "libxml2 error:\n" << ctx.message;
-        throw invalid_xml_error();
+        throw invalid_xml_error(fmt::format("libxml2: {}", ctx.message));
     }
 
     // Get the root element node
@@ -77,22 +76,16 @@ std::pair<LocaleResData, StringResLoader::PerLocaleMapImpl> parseLocaleResource(
 
     // Ensure the root element is <resources>
     if (xmlStrcmp(rootElement->name, resourceKey) != 0) {
-        LOG(ERROR) << "Root element is not <resources>";
-        throw invalid_xml_error();
+        throw invalid_xml_error("parser: Root element is not <resources>");
     }
 
     XmlCharWrapper localeAttr = xmlGetProp(rootElement, localeProp);
     if (!localeAttr) {
-        LOG(ERROR) << "No locale= key in <resources>";
-        throw invalid_xml_error();
+        throw invalid_xml_error("parser: No locale= key in <resources>");
     }
 
     XmlCharWrapper defaultAttr = xmlGetProp(rootElement, defaultProp);
-    bool isDefault = false;
-
-    if (defaultAttr == "yes") {
-        isDefault = true;
-    }
+    bool isDefault = defaultAttr == "yes";
 
     m_data.reserve(STRINGRES_MAX);
     for (xmlNodePtr cur = rootElement->children; cur != nullptr;
@@ -125,7 +118,7 @@ std::pair<LocaleResData, StringResLoader::PerLocaleMapImpl> parseLocaleResource(
     }
     if (absent != 0) {
         LOG(ERROR) << "Incomplete XML file. Missing strings: " << absent;
-        throw invalid_xml_error();
+        throw invalid_xml_error(fmt::format("Incomplete XML file. Missing strings: {}", absent));
     }
     return {LocaleResData{localeAttr.str(), isDefault}, std::move(m_data)};
 }
@@ -154,7 +147,7 @@ StringResLoader::StringResLoader(std::filesystem::path path)
                       << " File: " << entry.path().filename()
                       << " isDefault: " << locale.isDefault;
         } catch (const invalid_xml_error& e) {
-            LOG(ERROR) << "Invalid XML file: " << entry.path();
+            LOG(ERROR) << "Invalid XML file: " << entry.path() << ": " << e.what();
             continue;
         }
     }
