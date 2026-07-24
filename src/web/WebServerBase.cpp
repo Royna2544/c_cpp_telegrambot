@@ -62,9 +62,9 @@ void TgBotWebServerBase::startServer() {
     // Static pages
     svr.Get(Constants::kWebRootNode,
             [](const httplib::Request&, httplib::Response& res) {
-                res.set_redirect(Constants::kAboutPage);
+                res.set_redirect(Constants::kIndexPage);
             });
-    svr.Get(Constants::kAboutPage,
+    svr.Get(Constants::kIndexPage,
             [this](const httplib::Request& req, httplib::Response& res) {
                 callback.showIndex(req, res);
             });
@@ -148,7 +148,7 @@ TgBotWebServerBase::TgBotWebServerBase(int serverPort,
 
 void TgBotWebServerBase::Callbacks::showIndex(const httplib::Request& req,
                                               httplib::Response& res) {
-    std::ifstream stream(server->webServerRootPath / "about.html");
+    std::ifstream stream(server->webServerRootPath / "index.html");
     if (!stream.is_open()) {
         LOG(ERROR) << "Failed to open web page index";
         res.status = httplib::StatusCode::InternalServerError_500;

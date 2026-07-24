@@ -20,6 +20,9 @@
 //! # };
 //! ```
 
+use futures_util::StreamExt;
+use std::{sync::OnceLock, time::Duration};
+use tokio::io::AsyncReadExt;
 use tracing::{error, info};
 
 /// Base URL for the GoFile API
@@ -27,6 +30,47 @@ const GOFILE_API_BASE: &str = "https://api.gofile.io";
 
 /// Expected status value for successful API responses
 const API_STATUS_OK: &str = "ok";
+const MAX_UPLOAD_BYTES: u64 = 2_684_354_560;
+const MAX_RESPONSE_BYTES: usize = 1024 * 1024;
+
+fn http_client() -> &'static reqwest::Client {
+    static CLIENT: OnceLock<reqwest::Client> = OnceLock::new();
+    CLIENT.get_or_init(|| {
+        reqwest::Client::builder()
+            .connect_timeout(Duration::from_secs(15))
+            .timeout(Duration::from_secs(30 * 60))
+            .build()
+            .expect("valid shared HTTP client configuration")
+    })
+}
+
+fn validate_upload_size(size: u64) -> Result<(), Box<dyn std::error::Error>> {
+    if size > MAX_UPLOAD_BYTES {
+        return Err(format!("File exceeds GoFile upload limit of {MAX_UPLOAD_BYTES} bytes").into());
+    }
+    Ok(())
+}
+
+fn validate_response_size(size: usize) -> Result<(), Box<dyn std::error::Error>> {
+    if size > MAX_RESPONSE_BYTES {
+        return Err(format!("GoFile response exceeds {MAX_RESPONSE_BYTES} bytes").into());
+    }
+    Ok(())
+}
+
+async fn bounded_response_text(
+    response: reqwest::Response,
+) -> Result<String, Box<dyn std::error::Error>> {
+    let response = response.error_for_status()?;
+    let mut bytes = Vec::new();
+    let mut stream = response.bytes_stream();
+    while let Some(chunk) = stream.next().await {
+        let chunk = chunk?;
+        validate_response_size(bytes.len().saturating_add(chunk.len()))?;
+        bytes.extend_from_slice(&chunk);
+    }
+    Ok(String::from_utf8(bytes)?)
+}
 
 #[derive(serde::Deserialize, Debug)]
 pub struct ServerEntry {
@@ -77,13 +121,14 @@ pub struct UploadFileResponse {
 impl ServersJson {
     pub async fn get() -> Result<ServersJson, Box<dyn std::error::Error>> {
         let url = format!("{}/servers", GOFILE_API_BASE);
-        let resp = reqwest::get(&url).await.inspect_err(|x| {
+        let resp = http_client().get(&url).send().await.inspect_err(|x| {
             error!("Cannot GET /servers: {}", x);
         })?;
-        let resp: ServersJson = serde_json::from_str(&resp.text().await.inspect_err(|x| {
-            error!("Cannot obtain servers list in str: {}", x);
-        })?)
-        .inspect_err(|x| error!("Cannot parse JSON from response: {}", x))?;
+        let resp: ServersJson =
+            serde_json::from_str(&bounded_response_text(resp).await.inspect_err(|x| {
+                error!("Cannot obtain servers list in str: {}", x);
+            })?)
+            .inspect_err(|x| error!("Cannot parse JSON from response: {}", x))?;
 
         if resp.status != API_STATUS_OK {
             Err(format!(
@@ -122,28 +167,42 @@ impl ServersJson {
 pub async fn upload_file_to_gofile(
     file_path: &str,
 ) -> Result<UploadFileResponse, Box<dyn std::error::Error>> {
-    let upload_url = ServersJson::get_upload_url().await?;
-    let file_bytes = tokio::fs::read(file_path).await?;
+    let file = tokio::fs::File::open(file_path).await?;
+    let file_size = file.metadata().await?.len();
+    validate_upload_size(file_size)?;
     let file_name = std::path::Path::new(file_path)
         .file_name()
         .ok_or("Invalid file name")?
         .to_string_lossy()
         .to_string();
+    let upload_url = ServersJson::get_upload_url().await?;
 
+    let file_stream = futures_util::stream::try_unfold(
+        (file, vec![0_u8; 1024 * 1024]),
+        |(mut file, mut buffer)| async move {
+            let count = file.read(&mut buffer).await?;
+            if count == 0 {
+                Ok::<_, std::io::Error>(None)
+            } else {
+                let chunk = buffer[..count].to_vec();
+                Ok(Some((chunk, (file, buffer))))
+            }
+        },
+    );
+    let body = reqwest::Body::wrap_stream(file_stream);
     let form = reqwest::multipart::Form::new().part(
         "file",
-        reqwest::multipart::Part::bytes(file_bytes).file_name(file_name),
+        reqwest::multipart::Part::stream_with_length(body, file_size).file_name(file_name),
     );
 
-    let client = reqwest::Client::new();
-    let resp = client
+    let resp = http_client()
         .post(&upload_url)
         .multipart(form)
         .send()
         .await
         .inspect_err(|x| error!("Failed to send upload request: {}", x))?;
 
-    let resp_text = resp.text().await.inspect_err(|x| {
+    let resp_text = bounded_response_text(resp).await.inspect_err(|x| {
         error!("Failed to read response text from upload request: {}", x);
     })?;
 
@@ -166,6 +225,18 @@ pub async fn upload_file_to_gofile(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn upload_limit_is_exactly_two_and_a_half_gibibytes() {
+        assert!(validate_upload_size(2_684_354_560).is_ok());
+        assert!(validate_upload_size(2_684_354_561).is_err());
+    }
+
+    #[test]
+    fn response_body_limit_rejects_oversized_payloads() {
+        assert!(validate_response_size(MAX_RESPONSE_BYTES).is_ok());
+        assert!(validate_response_size(MAX_RESPONSE_BYTES + 1).is_err());
+    }
 
     #[test]
     fn test_parse_servers_response() {

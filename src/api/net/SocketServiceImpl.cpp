@@ -117,6 +117,7 @@ class SocketServiceImpl::Service : public SocketService::Service {
         ChecksumAlgorithm checksumAlgorithm = ChecksumAlgorithm::None;
         std::string checksum;
         bool overwriteExisting = false;
+        transfer::UploadCoverage coverage;
     };
 
     std::map<std::string, TranferEntry> activeTransfers_;
@@ -437,6 +438,7 @@ Status SocketServiceImpl::Service::requestFileTransfer(
             return Status::OK;
         }
         entry.totalSize = request->file_size();
+        entry.coverage = transfer::UploadCoverage(entry.totalSize);
         // Create the file first, then resize
         entry.fileStream.open(entry.filePath, std::ios::binary | std::ios::out);
         entry.fileStream.close();
@@ -628,6 +630,9 @@ Status SocketServiceImpl::Service::uploadFileLoop(
                 stream->Write(response);
                 return Status::OK;
             }
+            it->second.coverage.add(
+                static_cast<std::uintmax_t>(msg.chunk_offset()),
+                msg.chunk_data().size());
         }
         // Send success response
         FileChunkResponse response;
@@ -665,6 +670,16 @@ Status SocketServiceImpl::Service::endFileTransfer(
                        << request->uuid() << ": expected "
                        << entry.destinationPath.string() << ", got "
                        << request->file_path();
+            std::filesystem::remove(entry.filePath);
+            activeTransfers_.erase(it);
+            return Status::OK;
+        }
+        if (!entry.coverage.complete()) {
+            response->set_code(GenericResponseCode::ErrorInvalidArgument);
+            response->set_message("Upload is incomplete");
+            LOG(ERROR) << "Incomplete upload for UUID " << request->uuid()
+                       << ": received " << entry.coverage.coveredBytes()
+                       << " of " << entry.totalSize << " bytes";
             std::filesystem::remove(entry.filePath);
             activeTransfers_.erase(it);
             return Status::OK;
@@ -707,9 +722,12 @@ Status SocketServiceImpl::Service::endFileTransfer(
             std::filesystem::rename(entry.filePath, entry.destinationPath,
                                     moveEc);
             if (moveEc == std::errc::cross_device_link) {
-                std::filesystem::copy_file(
-                    entry.filePath, entry.destinationPath,
-                    std::filesystem::copy_options::overwrite_existing);
+                const auto copyOptions =
+                    entry.overwriteExisting
+                        ? std::filesystem::copy_options::overwrite_existing
+                        : std::filesystem::copy_options::none;
+                std::filesystem::copy_file(entry.filePath,
+                                           entry.destinationPath, copyOptions);
                 std::filesystem::remove(entry.filePath);
             } else if (moveEc) {
                 throw std::filesystem::filesystem_error(

@@ -7,9 +7,31 @@
 using namespace tgbot::socket::transfer;
 
 TEST(FileTransferValidation, SizeCap) {
+    EXPECT_EQ(kMaxTransferSize, 5ULL * 1024 * 1024 * 1024 / 2);
     EXPECT_TRUE(sizeWithinCap(0));
     EXPECT_TRUE(sizeWithinCap(kMaxTransferSize));
     EXPECT_FALSE(sizeWithinCap(kMaxTransferSize + 1));
+}
+
+TEST(FileTransferValidation, CoverageRequiresEveryDeclaredByte) {
+    UploadCoverage coverage(10);
+    coverage.add(5, 5);
+    EXPECT_FALSE(coverage.complete());
+    coverage.add(0, 3);
+    EXPECT_FALSE(coverage.complete());
+    coverage.add(3, 2);
+    EXPECT_TRUE(coverage.complete());
+}
+
+TEST(FileTransferValidation, CoverageMergesOverlapAndDuplicates) {
+    UploadCoverage coverage(8);
+    coverage.add(0, 4);
+    coverage.add(2, 4);
+    coverage.add(0, 4);
+    EXPECT_FALSE(coverage.complete());
+    coverage.add(6, 2);
+    EXPECT_TRUE(coverage.complete());
+    EXPECT_EQ(coverage.coveredBytes(), 8U);
 }
 
 TEST(FileTransferValidation, ChunkCount) {

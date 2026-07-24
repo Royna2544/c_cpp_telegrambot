@@ -57,6 +57,12 @@ impl RealCommandExecutor {
     }
 }
 
+impl Default for RealCommandExecutor {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 struct LegacyEventSender {
     output_tx: mpsc::Sender<String>,
     stdout_lines: Arc<Mutex<Vec<String>>>,
@@ -183,6 +189,12 @@ impl MockCommandExecutor {
             delay_ms: None,
         })
         .await;
+    }
+}
+
+impl Default for MockCommandExecutor {
+    fn default() -> Self {
+        Self::new()
     }
 }
 

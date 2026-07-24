@@ -1,4 +1,5 @@
 #include "ImageTypeWEBP.hpp"
+#include "WebPValidation.hpp"
 
 #include <absl/log/check.h>
 #include <absl/log/log.h>
@@ -15,7 +16,7 @@ PhotoBase::TinyStatus WebPImage::read(const std::filesystem::path& filename,
                                       const Target target) {
     int width = 0;
     int height = 0;
-    uint8_t* decoded_data = nullptr;
+
     F file;
 
     if (target != Target::kPhoto) {
@@ -47,19 +48,27 @@ PhotoBase::TinyStatus WebPImage::read(const std::filesystem::path& filename,
     }
     file.close();
 
-    decoded_data = WebPDecodeRGBA(data.get(), *file_size, &width, &height);
-
-    if (decoded_data == nullptr) {
+    if (!WebPGetInfo(data.get(), *file_size, &width, &height)) {
         return {PhotoBase::Status::kInternalError,
                 "Couldn't decode image data"};
     }
-
+    constexpr std::size_t kMaxDecodedBytes = 100 * 1024 * 1024;
+    const auto bufferSize =
+        imagep::webp::decodedByteSize(width, height, kMaxDecodedBytes);
+    if (!bufferSize) {
+        return {PhotoBase::Status::kInvalidArgument,
+                "Decoded image dimensions are too large"};
+    }
+    auto decoded = std::make_unique_for_overwrite<uint8_t[]>(*bufferSize);
+    const auto stride = static_cast<int>(static_cast<std::size_t>(width) * 4);
+    if (WebPDecodeRGBAInto(data.get(), *file_size, decoded.get(), *bufferSize,
+                          stride) == nullptr) {
+        return {PhotoBase::Status::kInternalError,
+                "Couldn't decode image data"};
+    }
     width_ = width;
     height_ = height;
-    const auto bufferSize = width * height * 4;
-    data_ = std::make_unique_for_overwrite<uint8_t[]>(bufferSize);
-    memcpy(data_.get(), decoded_data, bufferSize);
-    WebPFree(decoded_data);
+    data_ = std::move(decoded);
 
     return PhotoBase::TinyStatus::ok();
 }

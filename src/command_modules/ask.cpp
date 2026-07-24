@@ -197,9 +197,11 @@ llm::ToolExecutor makeSaveChatInfoExecutor(const Providers* provider) {
 // Dispatches by tool name to whichever admin tool was actually called; each
 // underlying executor already ignores the `name` parameter it's handed.
 llm::ToolExecutor makeCombinedExecutor(TgBotApi::Ptr api, ChatId chatId,
+                                       UserId initiatingUserId,
                                        const Providers* provider) {
     auto sendMsg = makeSendMessageExecutor(api);
-    auto askConfirm = llm::ask_confirm::makeAskConfirmExecutor(api, chatId);
+    auto askConfirm = llm::ask_confirm::makeAskConfirmExecutor(
+        api, chatId, initiatingUserId, provider->auth.get());
     auto getChatId = makeGetChatIdExecutor(provider);
     auto getChatName = makeGetChatNameExecutor(provider);
     auto saveChatInfo = makeSaveChatInfoExecutor(provider);
@@ -343,7 +345,10 @@ DECLARE_COMMAND_HANDLER(ask) {
                                 {kSendMessageTool, llm::ask_confirm::kAskConfirmTool,
                                  kGetChatIdTool, kGetChatNameTool,
                                  kSaveChatInfoTool},
-                                makeCombinedExecutor(api, chatId, provider))
+                                makeCombinedExecutor(
+                                    api, chatId,
+                                    message->get<MessageAttrs::User>()->id,
+                                    provider))
                 : backend->chat(model, SYSTEM_PROMPT, query, chatId);
     if (!answer) {
         api->sendReplyMessage(message->message(),

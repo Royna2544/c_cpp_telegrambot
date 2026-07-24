@@ -21,17 +21,12 @@ list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/CMake")
 # ############################# OPTIONS ##############################
 option(TGBOTCPP_BUILD_TESTS "TgBot-Cpp: Build the test suite" OFF)
 option(TGBOTCPP_CROSS_COMPILING "TgBot-Cpp: Cross compiling" OFF)
+option(TGBOTCPP_RUST_MODULES "TgBot-Cpp: Build Rust-backed command modules" OFF)
 option(BUILD_SHARED_LIBS "Build some dependent libraries as shared" OFF)
 
 include(CMakeDependentOption)
 cmake_dependent_option(TGBOTCPP_AUTODETECT_CROSS_COMPILING "TgBot-Cpp: Auto-detect cross compiling" ON "NOT TGBOTCPP_CROSS_COMPILING" OFF)
 
-if (TGBOTCPP_CROSS_COMPILING)
-  option(TGBOTCPP_CROSS_COMPILE_INSTALL_PATH "TgBot-Cpp: Install prefix for cross-compiling" "/usr/")
-  option(TGBOTCPP_CROSS_COMPILE_CC "TgBot-Cpp: C compiler available on remote host" "/usr/bin/cc")
-  option(TGBOTCPP_CROSS_COMPILE_CXX "TgBot-Cpp: C++ compiler available on remote host" "/usr/bin/c++")
-  option(TGBOTCPP_CROSS_COMPILE_PYTHON "TgBot-Cpp: Python executable available on remote host" "/usr/bin/python3")
-endif()
 # ##############################################################################
 
 # ##############################################################################
@@ -52,8 +47,8 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 # ##############################################################################
 
-include(CMake/inc/CompilerConfig.cmake)
 include(CMake/inc/GitBuildInfo.cmake)
+include(CMake/inc/CompilerConfig.cmake)
 include(CMake/inc/TargetDeclare.cmake)
 if (TGBOTCPP_RUST_MODULES)
   include(CMake/inc/RustModule.cmake)
@@ -93,10 +88,8 @@ if(httplib_FOUND)
   set(httplib_srcs src/web/TgBotWebServer.cpp)
   set(httplib_libs Web)
   add_subdirectory(src/web)
-  install(
-    DIRECTORY www/
-    DESTINATION share/${PROJECT_NAME}/www
-  )
+  install(FILES www/index.html www/favicon.ico
+          DESTINATION share/${PROJECT_NAME}/www)
   message(STATUS "Found httplib, enabling webserver support")
 endif()
 
@@ -147,9 +140,12 @@ install(
   FILES_MATCHING
   PATTERN "*"
   PATTERN "*.in" EXCLUDE)
+install(FILES "${TGBOTCPP_GENERATED_RESOURCE_DIR}/about.html"
+        DESTINATION share/${PROJECT_NAME})
 
 file(COPY resources/ DESTINATION ${CMAKE_BINARY_DIR}/share/${PROJECT_NAME})
-file(COPY www/ DESTINATION ${CMAKE_BINARY_DIR}/share/${PROJECT_NAME}/www)
+file(COPY www/index.html www/favicon.ico
+     DESTINATION ${CMAKE_BINARY_DIR}/share/${PROJECT_NAME}/www)
 
 include(CMake/inc/CPackDefs.cmake)
 # Include last for CPack

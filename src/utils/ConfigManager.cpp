@@ -60,7 +60,7 @@ struct ConfigBackendEnv : public ConfigManager::Backend {
     ~ConfigBackendEnv() override = default;
     ConfigBackendEnv() = default;
 
-    std::optional<std::string> get(const std::string_view name) override {
+    std::optional<std::string> get(const std::string_view name) const override {
         Env env;
         if (auto v = env[name].get(); v) {
             return *v;
@@ -128,9 +128,10 @@ struct ConfigBackendBoostPOBase : public ConfigManager::Backend {
         return desc;
     }
 
-    std::optional<std::string> get(const std::string_view name) override {
-        if (const auto it = mp[std::string(name)]; !it.empty()) {
-            return it.as<std::string>();
+    std::optional<std::string> get(const std::string_view name) const override {
+        const auto it = mp.find(std::string(name));
+        if (it != mp.end() && !it->second.empty()) {
+            return it->second.as<std::string>();
         }
         return std::nullopt;
     }

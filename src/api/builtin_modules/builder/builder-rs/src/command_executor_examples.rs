@@ -2,7 +2,6 @@
 ///
 /// This module demonstrates the testing pattern without requiring
 /// full integration with the build services (which need protoc to compile).
-
 #[cfg(test)]
 mod tests {
     use crate::command_executor::{CommandExecutor, MockCommandExecutor, MockResponse};

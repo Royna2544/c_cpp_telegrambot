@@ -1,10 +1,13 @@
 #pragma once
 
 #include <api/StringResLoader.hpp>
+#include <RefLock.hpp>
+#include <atomic>
 #include <filesystem>
 #include <functional>
 #include <limits>
 #include <memory>
+#include <optional>
 #include <set>
 #include <string_view>
 #include <type_traits>
@@ -105,10 +108,43 @@ constexpr DynModule::Flags operator|(const DynModule::Flags& lhs,
 
 // Command Module Base
 class CommandModule {
+    RefLock executionLock;
+    std::atomic_bool acceptingExecutions{false};
+
+   protected:
+    [[nodiscard]] RefLock::ExclusiveLease acquireUnloadLease() {
+        return executionLock.acquireExclusive();
+    }
+
    public:
     using Ptr = std::unique_ptr<CommandModule>;
     using command_callback_t =
         std::function<std::remove_pointer_t<DynModule::command_callback_t>>;
+
+    [[nodiscard]] std::optional<RefLock::SharedLease>
+    acquireExecutionLease() {
+        if (!acceptingExecutions.load(std::memory_order_acquire)) {
+            return std::nullopt;
+        }
+        auto lease = executionLock.acquireShared();
+        if (!acceptingExecutions.load(std::memory_order_acquire)) {
+            return std::nullopt;
+        }
+        return std::optional<RefLock::SharedLease>(std::move(lease));
+    }
+
+    [[nodiscard]] RefLock::ExclusiveLease stopAndAcquireUnloadLease() {
+        acceptingExecutions.store(false, std::memory_order_release);
+        return executionLock.acquireExclusive();
+    }
+
+    void stopExecutions() {
+        acceptingExecutions.store(false, std::memory_order_release);
+    }
+
+    void enableExecutions() {
+        acceptingExecutions.store(true, std::memory_order_release);
+    }
 
     // Module information.
     struct Info {

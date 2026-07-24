@@ -145,7 +145,6 @@ impl KernelConfig {
         self.env
             .iter()
             .map(|var| (var.name.clone(), var.value.clone()))
-            .into_iter()
             .chain(std::iter::once((path.name, path.value)))
             .chain(std::iter::once((build_user.name, build_user.value)))
             .chain(std::iter::once((build_host.name, build_host.value)))
@@ -153,6 +152,6 @@ impl KernelConfig {
     }
 
     pub fn new(file_path: &PathBuf) -> Result<KernelConfig, ()> {
-        new_impl(&file_path)
+        new_impl(file_path)
     }
 }

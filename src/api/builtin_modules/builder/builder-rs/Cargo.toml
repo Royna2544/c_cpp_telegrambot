@@ -35,6 +35,7 @@ regex = "1.10.4"
 anyhow = "1.0.101"
 toml = "0.8"
 tempfile = "3.24"
+sha2 = "0.10"
 
 [target.'cfg(unix)'.dependencies]
 nix = { version = "0.27", features = ["signal", "resource", "mount"] }

@@ -5,6 +5,7 @@
 #include <fmt/format.h>
 #include <tgbot/TgException.h>
 
+#include <api/AuthContext.hpp>
 #include <api/TgBotApi.hpp>
 #include <api/typedefs.h>
 
@@ -41,6 +42,8 @@ struct PendingConfirmation {
     std::mutex mtx;
     std::condition_variable cv;
     std::optional<ConfirmationAnswer> result;
+    UserId initiatingUserId{};
+    const AuthContext* auth{};
 };
 
 // Same first-name(+last-name) display-name convention used in q.cpp.
@@ -69,44 +72,58 @@ confirmationRegistry() {
 // purging every listener registered under the unloading module's own name.
 // Registering under any other key would leave a dangling closure (pointing
 // into a possibly-unloaded DLL) permanently registered.
+inline void handleCallback(TgBotApi::Ptr api,
+                           const TgBot::CallbackQuery::Ptr& query) {
+    std::string_view data = query->data;
+    if (!absl::ConsumePrefix(&data, kAskConfirmPrefix)) {
+        return;
+    }
+    const auto sep = data.find(':');
+    if (sep == std::string_view::npos) {
+        return;
+    }
+    const std::string token(data.substr(0, sep));
+    const std::string choice(data.substr(sep + 1));
+
+    std::shared_ptr<PendingConfirmation> pending;
+    {
+        auto [mtx, map] = confirmationRegistry();
+        const std::lock_guard lock(mtx);
+        if (auto it = map.find(token); it != map.end()) {
+            pending = it->second;
+        }
+    }
+    if (!pending) {
+        api->answerCallbackQuery(query->id,
+                                 "This confirmation has expired.", true);
+        return;
+    }
+    const bool isInitiator =
+        query->from && query->from->id == pending->initiatingUserId;
+    const bool remainsAuthorized =
+        !pending->auth ||
+        pending->auth->isAuthorized(query->from,
+                                    AuthContext::AccessLevel::AdminUser);
+    if (!isInitiator || !remainsAuthorized) {
+        api->answerCallbackQuery(
+            query->id,
+            "Only the initiating admin can answer this confirmation.", true);
+        return;
+    }
+    {
+        const std::lock_guard lock(pending->mtx);
+        pending->result =
+            ConfirmationAnswer{choice, displayName(query->from)};
+    }
+    pending->cv.notify_all();
+    api->answerCallbackQuery(query->id, "Recorded.");
+}
+
 inline void ensureListenerRegistered(TgBotApi::Ptr api) {
     static std::once_flag flag;
     std::call_once(flag, [api] {
         api->onCallbackQuery("ask", [api](TgBot::CallbackQuery::Ptr query) {
-            std::string_view data = query->data;
-            if (!absl::ConsumePrefix(&data, kAskConfirmPrefix)) {
-                return;  // Not one of ours.
-            }
-            const auto sep = data.find(':');
-            if (sep == std::string_view::npos) {
-                return;
-            }
-            const std::string token(data.substr(0, sep));
-            const std::string choice(data.substr(sep + 1));
-
-            std::shared_ptr<PendingConfirmation> pending;
-            {
-                auto [mtx, map] = confirmationRegistry();
-                const std::lock_guard lock(mtx);
-                if (auto it = map.find(token); it != map.end()) {
-                    pending = it->second;
-                }
-            }
-            if (!pending) {
-                // Already resolved or timed out (the waiter is the only
-                // side that erases registry entries); ack anyway so the
-                // button doesn't spin forever in the Telegram client.
-                api->answerCallbackQuery(
-                    query->id, "This confirmation has expired.", true);
-                return;
-            }
-            {
-                const std::lock_guard lock(pending->mtx);
-                pending->result =
-                    ConfirmationAnswer{choice, displayName(query->from)};
-            }
-            pending->cv.notify_all();
-            api->answerCallbackQuery(query->id, "Recorded.");
+            handleCallback(api, query);
         });
     });
 }
@@ -123,10 +140,12 @@ inline const llm::Tool kAskConfirmTool{
                   {"required", {"question"}}}};
 
 inline llm::ToolExecutor makeAskConfirmExecutor(TgBotApi::Ptr api,
-                                                ChatId chatId) {
-    return [api, chatId](const std::string& /*name*/,
-                        const nlohmann::json& input,
-                        bool& isError) -> std::string {
+                                                ChatId chatId,
+                                                UserId initiatingUserId,
+                                                const AuthContext* auth) {
+    return [api, chatId, initiatingUserId, auth](
+               const std::string& /*name*/, const nlohmann::json& input,
+               bool& isError) -> std::string {
         isError = false;
         std::string question;
         try {
@@ -160,6 +179,8 @@ inline llm::ToolExecutor makeAskConfirmExecutor(TgBotApi::Ptr api,
         }
 
         auto pending = std::make_shared<PendingConfirmation>();
+        pending->initiatingUserId = initiatingUserId;
+        pending->auth = auth;
         {
             auto [mtx, map] = confirmationRegistry();
             const std::lock_guard lock(mtx);

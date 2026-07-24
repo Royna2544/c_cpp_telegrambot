@@ -1,1 +1,0 @@
-<button id="gotop_btn" class="gotop_btn" onclick="window.scrollTo(0,0);">Top</button>

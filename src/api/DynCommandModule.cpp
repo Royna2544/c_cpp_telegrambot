@@ -118,10 +118,13 @@ bool DynCommandModule::load() {
                                   fmt::ptr(modulePtr));
     }
     handle = dlwrapper.underlying();
+    enableExecutions();
     return true;
 }
 
 bool DynCommandModule::unload() {
+    stopExecutions();
+    auto executionLease = acquireUnloadLease();
     if (!mLock.try_lock()) {
         // Already concurrent.
         return false;

@@ -1,6 +1,12 @@
 
 string(TIMESTAMP TODAY "%Y-%m-%d %H:%M:%S UTC" UTC)
 
+set(TGBOTCPP_GENERATED_INCLUDE_DIR "${CMAKE_BINARY_DIR}/generated/include")
+set(TGBOTCPP_GENERATED_RESOURCE_DIR
+    "${CMAKE_BINARY_DIR}/share/${PROJECT_NAME}")
+file(MAKE_DIRECTORY "${TGBOTCPP_GENERATED_INCLUDE_DIR}")
+file(MAKE_DIRECTORY "${TGBOTCPP_GENERATED_RESOURCE_DIR}")
+
 find_package(Git REQUIRED) # It will obviously have
 function(git_execute_proc)
   cmake_parse_arguments(
@@ -68,6 +74,7 @@ git_execute_proc(
   VAR
   GIT_ORIGIN_URL)
 
-configure_file(resources/about.html.in ${CMAKE_SOURCE_DIR}/resources/about.html)
+configure_file(resources/about.html.in
+               ${TGBOTCPP_GENERATED_RESOURCE_DIR}/about.html)
 configure_file(src/include/GitBuildInfo.hpp.inc
-               ${CMAKE_SOURCE_DIR}/src/include/GitBuildInfo.hpp)
+               ${TGBOTCPP_GENERATED_INCLUDE_DIR}/GitBuildInfo.hpp)

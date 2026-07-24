@@ -116,7 +116,38 @@ TEST_P(DatabaseBaseTest, MediaInfoOperations) {
     // Get all media infos
     auto allMedia = db->getAllMediaInfos();
     EXPECT_EQ(allMedia.size(), 2);
+
+    EXPECT_FALSE(db->deleteMediaInfo("does-not-exist"));
+    EXPECT_TRUE(db->deleteMediaInfo("media1"));
+    EXPECT_FALSE(db->queryMediaInfo("name1").has_value());
 }
+
+#ifdef DATABASE_HAVE_SQLITE
+TEST(SQLiteDatabaseTest, FailedOpenDoesNotPoisonNextLoad) {
+    SQLiteDatabase db(getCmdLine().getPath(FS::PathType::RESOURCES_SQL));
+    EXPECT_FALSE(db.load(std::filesystem::temp_directory_path()));
+    EXPECT_TRUE(db.load(DatabaseBase::kInMemoryDatabase));
+    EXPECT_TRUE(db.unload());
+}
+
+TEST(SQLiteDatabaseTest, RejectsUnsupportedFutureSchemaVersion) {
+    const auto path = std::filesystem::temp_directory_path() /
+                      "glider-sqlite-future-schema-test.db";
+    std::filesystem::remove(path);
+    sqlite3* raw = nullptr;
+    ASSERT_EQ(sqlite3_open(path.c_str(), &raw), SQLITE_OK);
+    ASSERT_EQ(sqlite3_exec(raw, "PRAGMA user_version=999", nullptr, nullptr,
+                           nullptr),
+              SQLITE_OK);
+    ASSERT_EQ(sqlite3_close(raw), SQLITE_OK);
+
+    SQLiteDatabase db(getCmdLine().getPath(FS::PathType::RESOURCES_SQL));
+    EXPECT_FALSE(db.load(path));
+    EXPECT_TRUE(db.load(DatabaseBase::kInMemoryDatabase));
+    EXPECT_TRUE(db.unload());
+    std::filesystem::remove(path);
+}
+#endif
 
 // Test chat info operations
 TEST_P(DatabaseBaseTest, ChatInfoOperations) {

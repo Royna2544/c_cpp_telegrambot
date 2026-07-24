@@ -23,7 +23,7 @@ function(command_module)
   endif()
 
   # 1. Rust support gate
-  if(CMD_RUST AND NOT ENABLE_RUST_SUPPORT)
+  if(CMD_RUST AND NOT TGBOTCPP_RUST_MODULES)
     message(STATUS "Command ${CMD_NAME} disabled (no Rust support)")
     return()
   endif()

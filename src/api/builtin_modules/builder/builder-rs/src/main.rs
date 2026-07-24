@@ -35,7 +35,7 @@ use crate::system_monitor::grpc_monitor::system_monitor_service_server::SystemMo
 use crate::{health::HealthCheckServiceServer, kernelbuild::service::BuildService};
 use clap::Parser;
 use serde::Deserialize;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use tonic::transport::Server;
 use tracing::{debug, error, info, warn};
 use tracing_subscriber::EnvFilter;
@@ -85,13 +85,13 @@ impl Config {
 }
 
 fn make_kernel_builder_service(
-    kernelbuild_output_dir: &PathBuf,
+    kernelbuild_output_dir: &Path,
     kernelbuild_json_dir: &PathBuf,
-    temp_dir: &PathBuf,
+    temp_dir: &Path,
 ) -> Option<BuildService> {
     // Load Kernel Configurations
     let configs = util::for_each_json_file(&PathBuf::from(&kernelbuild_json_dir), move |path| {
-        match KernelConfig::new(&path) {
+        match KernelConfig::new(path) {
             Ok(cfg) => Ok(cfg),
             Err(_) => {
                 error!("Failed to parse kernel config from file {:?}", path);
@@ -229,28 +229,25 @@ async fn main() {
 
     let output_dir = config.kernelbuild_output_dir.clone();
     let rombuild_output_dir = config.rombuild_output_dir.clone();
-    let canonical_output: PathBuf;
-    let canonical_rombuild_output: PathBuf;
-
-    match util::make_canonical_path_mkdirs(&output_dir) {
+    let canonical_output = match util::make_canonical_path_mkdirs(&output_dir) {
         Some(o) => {
             info!("Using canonical output directory: {:?}", o);
-            canonical_output = o;
+            o
         }
         None => {
             return;
         }
-    }
+    };
 
-    match util::make_canonical_path_mkdirs(&rombuild_output_dir) {
+    let canonical_rombuild_output = match util::make_canonical_path_mkdirs(&rombuild_output_dir) {
         Some(r) => {
             info!("Using canonical ROM build output directory: {:?}", r);
-            canonical_rombuild_output = r;
+            r
         }
         None => {
             return;
         }
-    }
+    };
 
     // 2. Initialize Kernel Build Service
     let build_service = make_kernel_builder_service(
@@ -279,6 +276,7 @@ async fn main() {
 
     // Subscribe to shutdown signal from Kernel Build Service
     let mut kernel_shutdown_rx = build_service.shutdown_tx.subscribe();
+    let rom_registry = android_build_service.registry.clone();
 
     // Build and Run the Server
     let server = Server::builder()
@@ -308,4 +306,5 @@ async fn main() {
             info!("KRN: Shutdown signal received, stopping server");
         }
     }
+    ROMBuildService::shutdown_registry(rom_registry).await;
 }

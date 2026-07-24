@@ -16,7 +16,7 @@ class GlobalStorage {
     APPLE_INJECT(GlobalStorage()) = default;
 
     // Retrieve or create a shared storage object by key.
-    SharedMalloc& getStorage(const std::string& key) {
+    SharedMalloc getStorage(const std::string& key) {
         std::lock_guard<std::mutex> lock(storage_mutex_);
         return storage_map_[key];
     }
@@ -39,5 +39,5 @@ class GlobalStorage {
         storage_map_.clear(); 
     }
 
-    SharedMalloc& operator[](const std::string& key) { return getStorage(key); }
+    SharedMalloc operator[](const std::string& key) { return getStorage(key); }
 };

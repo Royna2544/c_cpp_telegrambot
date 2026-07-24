@@ -16,8 +16,15 @@ pub struct BuildContext {
     pub(crate) kill_signal: Option<mpsc::Sender<()>>,
 }
 
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub(crate) enum BuildLifecycle {
+    Prepared,
+    Running,
+    Finished,
+}
+
 pub(crate) struct PerBuildIdStatus {
     pub(crate) build_id: i32,
-    pub(crate) finished: bool,
+    pub(crate) lifecycle: BuildLifecycle,
     pub(crate) succeeded: bool,
 }

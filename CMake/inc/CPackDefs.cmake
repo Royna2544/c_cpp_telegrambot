@@ -57,7 +57,9 @@ if(WIN32)
     file(GLOB _vcredist_glob
       "C:/Program Files/Microsoft Visual Studio/*/*/VC/Redist/MSVC/*/vc_redist.x64.exe"
     )
-    list(GET _vcredist_glob 0 _vcredist_path)
+    if(_vcredist_glob)
+      list(GET _vcredist_glob 0 _vcredist_path)
+    endif()
   endif()
 
   # Normalize to a forward-slash path. $ENV{VCToolsRedistDir} is a backslash

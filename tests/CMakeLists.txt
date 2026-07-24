@@ -3,6 +3,7 @@ tgbot_exe(
   SRCS
     TestMain.cpp
     AuthorizationTest.cpp
+    AskConfirmToolTest.cpp
     commands/CommandModulesTest.cpp
     commands/AliveCmdTest.cpp
     commands/CmdCmdTest.cpp
@@ -12,7 +13,23 @@ tgbot_exe(
   TEST
 )
 target_link_libraries(test_main PRIVATE Api fruit GTest::gtest GTest::gmock Utils)
-target_include_directories(test_main PRIVATE $<TARGET_PROPERTY:TgBot,INTERFACE_INCLUDE_DIRECTORIES>)
+target_include_directories(test_main PRIVATE
+  ${CMAKE_SOURCE_DIR}/src/command_modules
+  ${CMAKE_CURRENT_SOURCE_DIR}
+  $<TARGET_PROPERTY:TgBot,INTERFACE_INCLUDE_DIRECTORIES>)
+
+tgbot_exe(
+  NAME commanddispatch
+  SRCS
+    TestMain.cpp
+    CommandDispatchTest.cpp
+    ${CMAKE_SOURCE_DIR}/src/api/components/Async.cpp
+  TEST
+)
+target_link_libraries(test_commanddispatch PRIVATE GTest::gtest Api)
+target_include_directories(test_commanddispatch PRIVATE
+  ${CMAKE_SOURCE_DIR}/src/include
+  $<TARGET_PROPERTY:TgBot,INTERFACE_INCLUDE_DIRECTORIES>)
 
 tgbot_exe(
   NAME database
@@ -139,3 +156,15 @@ tgbot_exe(
 )
 target_link_libraries(test_filetransfer PRIVATE GTest::gtest)
 target_include_directories(test_filetransfer PRIVATE ${CMAKE_SOURCE_DIR}/src/api/net)
+
+tgbot_exe(
+  NAME corecorrectness
+  SRCS
+    TestMain.cpp
+    CoreCorrectnessTest.cpp
+  TEST
+)
+target_link_libraries(test_corecorrectness PRIVATE GTest::gtest)
+target_include_directories(test_corecorrectness PRIVATE
+  ${CMAKE_SOURCE_DIR}/src
+  ${CMAKE_SOURCE_DIR}/src/include)

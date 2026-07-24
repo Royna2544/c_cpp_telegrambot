@@ -10,8 +10,7 @@ use crate::{
     },
 };
 
-#[cfg(unix)]
-use nix::libc::{rlimit, setrlimit};
+use sha2::{Digest, Sha256};
 use std::{
     path::{Path, PathBuf},
     sync::Arc,
@@ -31,7 +30,7 @@ pub(crate) struct ActiveBuild {
     // Used to broadcast logs to any connected client
     pub(crate) log_tx: broadcast::Sender<BuildLogEntry>,
     // Used to wait for the task to finish (optional, for cleanup)
-    pub(crate) _task: JoinHandle<Result<(), BuildError>>,
+    pub(crate) task: JoinHandle<Result<(), BuildError>>,
 }
 
 #[derive(Clone)]
@@ -63,6 +62,8 @@ pub(crate) struct BuildTask {
     pub(crate) log_tx_clone: broadcast::Sender<BuildLogEntry>,
     pub(crate) registry: Arc<RomBuildRegistry>,
     pub(crate) askpass_path_clone: Option<PathBuf>,
+    /// Owns per-build secret files; Drop removes them on every exit path.
+    pub(crate) secret_dir: Option<tempfile::TempDir>,
     pub(crate) runner: Arc<dyn ProcessRunner>,
     pub(crate) git: Arc<dyn GitProvider>,
     pub(crate) fs: Arc<dyn Filesystem>,
@@ -86,8 +87,53 @@ pub struct BuildService {
 }
 
 impl BuildService {
+    pub(crate) async fn shutdown_registry(registry: Arc<RomBuildRegistry>) {
+        let active = registry.active.lock().await.take();
+        if let Some(active) = active {
+            let _ = active.kill_tx.send(()).await;
+            if tokio::time::timeout(std::time::Duration::from_secs(20), active.task)
+                .await
+                .is_err()
+            {
+                tracing::warn!("Timed out waiting for ROM build cleanup");
+            }
+        }
+    }
+
+    const RBE_CLI_INSTANCE: &str = "RIgZbzyrfxCef-d3UAlcDQJywjWlod0R5NRaMJ9op88C";
+    const RBE_CLI_SHA256: &str = "4488196f3cab7f109e7fe77750095c0d0272c235a5a1dd11e4d45a309f68a7cf";
+
+    pub(crate) fn rbe_cli_url_for_arch(arch: &str) -> Result<String, Status> {
+        match arch {
+            "x86_64" | "amd64" => Ok(format!(
+                "https://chrome-infra-packages.appspot.com/dl/infra/rbe/client/linux-amd64/+/{}",
+                Self::RBE_CLI_INSTANCE
+            )),
+            _ => Err(Status::failed_precondition(
+                "RBE CLI not supported for this arch",
+            )),
+        }
+    }
+
+    pub(crate) fn verify_rbe_archive(bytes: &[u8]) -> Result<(), Status> {
+        let actual = format!("{:x}", Sha256::digest(bytes));
+        if actual != Self::RBE_CLI_SHA256 {
+            return Err(Status::internal(format!(
+                "RBE CLI SHA-256 mismatch: expected {}, got {}",
+                Self::RBE_CLI_SHA256,
+                actual
+            )));
+        }
+        Ok(())
+    }
+
     pub(crate) fn shell_single_quote(value: &str) -> String {
         format!("'{}'", value.replace('\'', "'\\''"))
+    }
+
+    pub(crate) fn clamp_parallel_jobs(requested: Option<i32>, nproc: usize) -> i32 {
+        let nproc = nproc.max(1).min(i32::MAX as usize) as i32;
+        requested.unwrap_or(nproc).clamp(1, nproc.saturating_mul(2))
     }
 
     pub(crate) fn configure_repo_command_env(
@@ -109,22 +155,21 @@ impl BuildService {
     pub(crate) async fn setup_rbe_env(
         fs: &dyn Filesystem,
         build_dir: PathBuf,
+        secret_dir: &Path,
         rbe_api_token: &str,
-    ) -> Result<(), Status> {
-        let rbe_env_path = build_dir.join("rbe_env.sh");
+    ) -> Result<PathBuf, Status> {
+        let rbe_env_path = secret_dir.join("rbe_env.sh");
         let rbe_cli_path = build_dir.join("rbe_cli");
 
-        const RBE_CLI_URL: &str =
-            "https://chrome-infra-packages.appspot.com/dl/infra/rbe/client/linux-amd64/+/stable";
+        let rbe_cli_url = Self::rbe_cli_url_for_arch(std::env::consts::ARCH)?;
         if !fs.exists(&rbe_cli_path) {
-            // Download rbe_cli binary
-            info!("Downloading RBE CLI from {}", RBE_CLI_URL);
+            info!("Downloading pinned RBE CLI artifact from {}", rbe_cli_url);
             let client = reqwest::Client::new();
             let response = client
-                .get(RBE_CLI_URL)
+                .get(&rbe_cli_url)
                 .send()
                 .await
-                .map_err(|e| Status::internal(format!("Failed to download RBE CLI: {}", e)))?;
+                .map_err(|e| Status::internal(format!("Failed to download RBE CLI: {e}")))?;
 
             if !response.status().is_success() {
                 return Err(Status::internal(format!(
@@ -135,14 +180,18 @@ impl BuildService {
             let bytes = response
                 .bytes()
                 .await
-                .map_err(|e| Status::internal(format!("Failed to read RBE CLI response: {}", e)))?;
-            // Unzip the downloaded file.
-            let mut archive = zip::ZipArchive::new(std::io::Cursor::new(bytes))
-                .map_err(|e| Status::internal(format!("Failed to read RBE CLI zip: {}", e)))?;
-            // Unzip the files to rbe_cli/
-            archive
-                .extract(&rbe_cli_path)
-                .map_err(|e| Status::internal(format!("Failed to extract RBE CLI: {}", e)))?;
+                .map_err(|e| Status::internal(format!("Failed to read RBE CLI response: {e}")))?;
+            Self::verify_rbe_archive(&bytes)?;
+            let extract_path = rbe_cli_path.clone();
+            tokio::task::spawn_blocking(move || {
+                let mut archive = zip::ZipArchive::new(std::io::Cursor::new(bytes))
+                    .map_err(|e| Status::internal(format!("Failed to read RBE CLI zip: {e}")))?;
+                archive
+                    .extract(&extract_path)
+                    .map_err(|e| Status::internal(format!("Failed to extract RBE CLI: {e}")))
+            })
+            .await
+            .map_err(|e| Status::internal(format!("RBE extraction task failed: {e}")))??;
         }
         let content = format!(
             r##"# Remote Build Execution (RBE) configurations
@@ -208,7 +257,7 @@ export RBE_LINT_POOL=default"##,
                 Status::internal(format!("Failed to set permissions for RBE env file: {}", e))
             })?;
         }
-        Ok(())
+        Ok(rbe_env_path)
     }
 
     pub fn new(build_dir: PathBuf, temp_dir: PathBuf, configs: ROMBuildConfig) -> Self {
@@ -256,6 +305,7 @@ export RBE_LINT_POOL=default"##,
 }
 
 impl BuildService {
+    #[allow(clippy::ptr_arg)]
     pub(crate) async fn find_artifact(
         fs: &dyn Filesystem,
         build_dir: &PathBuf,
@@ -266,7 +316,7 @@ impl BuildService {
             .join("out")
             .join("target")
             .join("product")
-            .join(&codename);
+            .join(codename);
         match rom_entry.artifact.matcher {
             ROMArtifactMatcher::ZipFilePrefixer => {
                 let prefix = &rom_entry.artifact.data;
@@ -452,6 +502,28 @@ mod runner_tests {
         assert_eq!(git.opens.lock().unwrap().len(), 0);
         assert_eq!(fs.written.lock().unwrap().len(), 0);
     }
+
+    #[test]
+    fn parallel_jobs_are_clamped_to_one_through_twice_nproc() {
+        assert_eq!(BuildService::clamp_parallel_jobs(Some(0), 8), 1);
+        assert_eq!(BuildService::clamp_parallel_jobs(Some(12), 8), 12);
+        assert_eq!(BuildService::clamp_parallel_jobs(Some(99), 8), 16);
+        assert_eq!(BuildService::clamp_parallel_jobs(None, 8), 8);
+    }
+
+    #[test]
+    fn rbe_cli_supports_only_amd64_with_an_immutable_artifact() {
+        let url = BuildService::rbe_cli_url_for_arch("x86_64").unwrap();
+        assert!(url.contains("/+/RIgZbzyrfxCef-d3UAlcDQJywjWlod0R5NRaMJ9op88C"));
+        let error = BuildService::rbe_cli_url_for_arch("aarch64").unwrap_err();
+        assert_eq!(error.message(), "RBE CLI not supported for this arch");
+    }
+
+    #[test]
+    fn rbe_archive_hash_must_match_the_pinned_digest() {
+        let error = BuildService::verify_rbe_archive(b"not the archive").unwrap_err();
+        assert!(error.message().contains("SHA-256 mismatch"));
+    }
 }
 
 #[cfg(test)]
@@ -625,6 +697,7 @@ mod workflow_tests {
             log_tx_clone: broadcast::channel(100).0,
             registry: Arc::new(RomBuildRegistry::with_known(known_builds)),
             askpass_path_clone: None,
+            secret_dir: None,
             runner,
             git,
             fs,

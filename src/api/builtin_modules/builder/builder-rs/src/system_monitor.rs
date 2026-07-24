@@ -34,6 +34,10 @@ pub struct MonitorService {
 }
 
 impl MonitorService {
+    fn watch_interval_seconds(requested: Option<u32>) -> u64 {
+        u64::from(requested.unwrap_or(2).max(1))
+    }
+
     pub fn new() -> Self {
         let mut sys = System::new_all();
         // First refresh to establish baseline CPU
@@ -126,9 +130,9 @@ impl SystemMonitorService for MonitorService {
         let sys_handle = self.sys.clone();
 
         tokio::spawn(async move {
-            let mut ticker = interval(Duration::from_secs(
-                _request.into_inner().interval_seconds.unwrap_or(2).into(),
-            ));
+            let mut ticker = interval(Duration::from_secs(Self::watch_interval_seconds(
+                _request.into_inner().interval_seconds,
+            )));
 
             loop {
                 ticker.tick().await;
@@ -155,5 +159,16 @@ impl SystemMonitorService for MonitorService {
         let sys = self.sys.lock().await;
         let info = Self::collect_info(&sys, _request.get_ref().disk_path.as_deref()).await;
         Ok(Response::new(info))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::MonitorService;
+
+    #[test]
+    fn zero_watch_interval_is_clamped_to_one_second() {
+        assert_eq!(MonitorService::watch_interval_seconds(Some(0)), 1);
+        assert_eq!(MonitorService::watch_interval_seconds(None), 2);
     }
 }

@@ -19,6 +19,7 @@ use tokio::fs::File as TokioFile;
 
 #[derive(Debug, Deserialize, Serialize, PartialEq, Clone)]
 #[serde(rename_all = "lowercase")]
+#[allow(clippy::upper_case_acronyms)]
 pub enum CompilerType {
     GCC,
     Clang,
@@ -26,6 +27,7 @@ pub enum CompilerType {
 
 #[derive(Debug, Deserialize, Serialize, Clone)]
 #[serde(rename_all = "lowercase")]
+#[allow(clippy::upper_case_acronyms)]
 pub enum Architecture {
     Any,
     ARM,
@@ -96,6 +98,7 @@ impl Toolchain {
         }
     }
 
+    #[allow(clippy::ptr_arg)]
     pub fn exec_and_get_version(&self, path: &PathBuf) -> Option<String> {
         debug!("Getting version for toolchain: {:?}", self.name);
         let output = match std::process::Command::new(path.join("bin").join(self.exe_name()))
@@ -194,7 +197,7 @@ impl Toolchain {
     pub async fn clone_to_dir(&self, dest_path: &PathBuf) -> Result<(), Status> {
         if std::path::Path::new(&dest_path).exists() {
         } else {
-            if let Err(e) = std::fs::create_dir_all(&dest_path) {
+            if let Err(e) = std::fs::create_dir_all(dest_path) {
                 info!("Failed to create directory {}: {}", dest_path.display(), e);
             }
         }
@@ -220,12 +223,10 @@ impl Toolchain {
                         );
                         Ok(())
                     }
-                    Err(e) => {
-                        return Err(Status::internal(format!(
-                            "Failed to initialize git repo: {}",
-                            e
-                        )));
-                    }
+                    Err(e) => Err(Status::internal(format!(
+                        "Failed to initialize git repo: {}",
+                        e
+                    ))),
                 }
             }
             Source::Tarball => {
@@ -240,7 +241,7 @@ impl Toolchain {
                 .await
                 .map_err(|e| Status::internal(format!("Download failed: {}", e)))?;
 
-                Self::extract_tar_gz(&dest_file, &dest_path)
+                Self::extract_tar_gz(&dest_file, dest_path)
                     .map_err(|e| Status::internal(format!("Extraction failed: {}", e)))?;
                 info!(
                     "Successfully downloaded and extracted toolchain {}",

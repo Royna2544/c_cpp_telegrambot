@@ -1,4 +1,5 @@
 #include "ChatDataCollector.hpp"
+#include "Csv.hpp"
 
 #include <absl/log/log.h>
 #include <absl/strings/str_split.h>
@@ -111,10 +112,9 @@ ChatDataCollector::ChatDataCollector(TgBotApi::Ptr api) {
     if (std::filesystem::exists("user_dict.csv")) {
         // Load existing user dict
         std::ifstream userDictFile("user_dict.csv");
-        std::string line;
-        std::getline(userDictFile, line);  // Skip header
-        while (std::getline(userDictFile, line)) {
-            std::vector<std::string> parts = absl::StrSplit(line, ',');
+        std::vector<std::string> parts;
+        csv::readRow(userDictFile, &parts);  // Skip header
+        while (csv::readRow(userDictFile, &parts)) {
             if (parts.size() < 5) {
                 continue;  // Malformed line
             }
@@ -135,10 +135,9 @@ ChatDataCollector::ChatDataCollector(TgBotApi::Ptr api) {
     if (std::filesystem::exists("chat_dict.csv")) {
         // Load existing chat dict
         std::ifstream chatDictFile("chat_dict.csv");
-        std::string line;
-        std::getline(chatDictFile, line);  // Skip header
-        while (std::getline(chatDictFile, line)) {
-            std::vector<std::string> parts = absl::StrSplit(line, ',');
+        std::vector<std::string> parts;
+        csv::readRow(chatDictFile, &parts);  // Skip header
+        while (csv::readRow(chatDictFile, &parts)) {
             if (parts.size() < 2) {
                 continue;  // Malformed line
             }
@@ -165,17 +164,17 @@ ChatDataCollector::~ChatDataCollector() {
     std::ofstream userDictFile("user_dict.csv");
     userDictFile << "user_id,first_name,last_name,username,is_premium\n";
     for (const auto& [userId, userPtr] : userDict_) {
-        userDictFile << fmt::format(
-            "{},{},{},{},{}\n", userId, userPtr->firstName,
-            userPtr->lastName.value_or(""), userPtr->username.value_or(""),
-            userPtr->isPremium && *userPtr->isPremium ? "1" : "0");
+        userDictFile << csv::encodeRow(
+            {fmt::format("{}", userId), userPtr->firstName,
+             userPtr->lastName.value_or(""), userPtr->username.value_or(""),
+             userPtr->isPremium && *userPtr->isPremium ? "1" : "0"});
     }
 
     // Write chat dict
     std::ofstream chatDictFile("chat_dict.csv");
     chatDictFile << "chat_id,chat_title\n";
     for (const auto& [chatId, chatPtr] : chatDict_) {
-        chatDictFile << fmt::format("{},{}\n", chatId,
-                                    chatPtr->title.value_or(""));
+        chatDictFile << csv::encodeRow(
+            {fmt::format("{}", chatId), chatPtr->title.value_or("")});
     }
 }

@@ -2,6 +2,7 @@ use super::{
     config_resolver::{ConfigType, ResolvedRomConfig},
     domain::{RomBuildTask, RomUploadMethod},
     grpc::grpc_pb::{BuildLogEntry, LogLevel},
+    registry::RomBuildRegistry,
     service::{BuildService, BuildStatus, BuildTask, UploadTask},
 };
 use crate::build_common::{
@@ -127,12 +128,15 @@ impl RomBuildHarness {
             log_tx_clone,
             registry,
             askpass_path_clone,
+            secret_dir,
             runner,
             git,
             fs,
             mut kill_rx,
             span,
         } = task;
+        // Hold the guard for the complete pipeline; Drop removes all secret files.
+        let _secret_dir = secret_dir;
         let RomBuildTask {
             id,
             request: req,
@@ -216,9 +220,9 @@ impl RomBuildHarness {
                     // Open .repo/manifest git repository and check URL and branch
                     let mut need_reinit = false;
                     let manifest_repo_path = &build_dir_clone.join(".repo").join("manifests.git");
-                    if fs.exists(&manifest_repo_path) {
+                    if fs.exists(manifest_repo_path) {
                         send_log!(LogLevel::Debug, format!("Opening manifest git repository at {:?}", manifest_repo_path));
-                        let repo = git.open(&manifest_repo_path, "origin", None, None)
+                        let repo = git.open(manifest_repo_path, "origin", None, None)
                             .map_err(|e| {
                                 BuildError::internal(format!(
                                     "Failed to open manifest git repository: {}",
@@ -280,7 +284,7 @@ impl RomBuildHarness {
                             .await
                             .map_err(|e| BuildError::internal(format!("Failed to send to stdin: {}", e)))?;
 
-                        let error_file = (&tempdir_clone).join(format!("{}-{}", "repo-init", &build_log_filename_suffix));
+                        let error_file = tempdir_clone.join(format!("{}-{}", "repo-init", &build_log_filename_suffix));
                         info!("Repo init output log path: {:?}", &error_file);
 
                         let res = run_process(
@@ -313,7 +317,7 @@ impl RomBuildHarness {
                     match config_entry {
                         ConfigType::Standard(rom) => {
                             match git.open(
-                                &local_manifest_dir,
+                                local_manifest_dir,
                                 "origin",
                                 req.github_token.clone(),
                                 None,
@@ -327,7 +331,7 @@ impl RomBuildHarness {
                                     })? != rom.url
                                     {
                                         send_log!(LogLevel::Warning, "Local manifest repository URL mismatch, re-cloning...".to_string());
-                                        fs.remove_dir_all(&local_manifest_dir).map_err(|e| {
+                                        fs.remove_dir_all(local_manifest_dir).map_err(|e| {
                                             BuildError::internal(format!(
                                                 "Failed to remove existing local manifest directory: {}",
                                                 e
@@ -350,12 +354,12 @@ impl RomBuildHarness {
                                         })?;
                                     } else {
                                         send_log!(LogLevel::Info, "Local manifest repository URL matches expected URL.".to_string());
-                                        if &repo.get_branch_name().map_err(|e| {
+                                        if repo.get_branch_name().map_err(|e| {
                                             BuildError::internal(format!(
                                                 "Failed to get branch name of local manifest repository: {}",
                                                 e
                                             ))
-                                        })? != &branch_entry.name {
+                                        })? != branch_entry.name {
                                             send_log!(LogLevel::Warning, "Local manifest repository branch mismatch, checking out correct branch...".to_string());
                                             repo.checkout_branch(&branch_entry.name).map_err(|e| {
                                                 BuildError::internal(format!(
@@ -394,7 +398,7 @@ impl RomBuildHarness {
                             }
 
                             // Handle custom attribute: recurse_submodules:bool on the manifest entry
-                            for path in fs.read_dir(&local_manifest_dir).map_err(|e| {
+                            for path in fs.read_dir(local_manifest_dir).map_err(|e| {
                                 BuildError::internal(format!(
                                     "Failed to read local manifests directory: {}",
                                     e
@@ -441,8 +445,8 @@ impl RomBuildHarness {
                                                                 "--force-sync",
                                                                 "--no-clone-bundle",
                                                                 "--no-tags",
-                                                                format!("-j{}", parallel_jobs.to_string()).as_str(),
-                                                                &(&sub_repo_name.clone()),
+                                                                format!("-j{}", parallel_jobs).as_str(),
+                                                                (&sub_repo_name.clone()),
                                                             ])
                                                             .current_dir(&build_dir_clone);
                                                         BuildService::configure_repo_command_env(
@@ -450,7 +454,7 @@ impl RomBuildHarness {
                                                             &build_dir_clone,
                                                             askpass_path_clone.as_deref(),
                                                         );
-                                                        let error_file = (&tempdir_clone).join(format!("{}-{}-submodule-sync.log", "repo-sync", &build_id_clone));
+                                                        let error_file = tempdir_clone.join(format!("{}-{}-submodule-sync.log", "repo-sync", &build_id_clone));
                                                         info!("Repo sync for submodule output log path: {:?}", &error_file);
                                                         let repo_sync_status = run_process(
                                                             runner.as_ref(),
@@ -466,7 +470,7 @@ impl RomBuildHarness {
                                                         }
 
                                                         let sub_repo = git.open(
-                                                            &PathBuf::from(build_dir_clone.join(&sub_repo_path)),
+                                                            &build_dir_clone.join(&sub_repo_path),
                                                             "origin",
                                                             req.github_token.clone(),
                                                             None,
@@ -496,8 +500,8 @@ impl RomBuildHarness {
                             }
                         }
                         ConfigType::Recovery(recov) => {
-                            if !fs.exists(&local_manifest_dir) {
-                                fs.create_dir_all(&local_manifest_dir).map_err(|e| {
+                            if !fs.exists(local_manifest_dir) {
+                                fs.create_dir_all(local_manifest_dir).map_err(|e| {
                                     BuildError::internal(format!(
                                         "Failed to create local manifests directory: {}",
                                         e
@@ -607,7 +611,7 @@ impl RomBuildHarness {
                             "--force-sync",
                             "--no-clone-bundle",
                             "--no-tags",
-                            format!("-j{}", parallel_jobs.to_string()).as_str(),
+                            format!("-j{}", parallel_jobs).as_str(),
                         ])
                         .current_dir(&build_dir_clone);
                     if force_checkout {
@@ -618,7 +622,7 @@ impl RomBuildHarness {
                         &build_dir_clone,
                         askpass_path_clone.as_deref(),
                     );
-                    let error_file = (&tempdir_clone).join(format!("{}-{}", "repo-sync", &build_log_filename_suffix));
+                    let error_file = tempdir_clone.join(format!("{}-{}", "repo-sync", &build_log_filename_suffix));
                     info!("Repo sync output log path: {:?}", &error_file);
 
                     let repo_sync_status = run_process(
@@ -648,24 +652,41 @@ impl RomBuildHarness {
 
                 #[cfg(unix)]
                 {
-                    // Get current nofile limits
+                    // ROM builds intentionally require these process limits.
                     use nix::sys::resource::{getrlimit, Resource};
-                    let (soft_limit, hard_limit) = getrlimit(
-                        Resource::RLIMIT_NOFILE,
-                    ).map_err(|e| {
-                        BuildError::internal(format!("Failed to get nofile limit: {}", e))
-                    })?;
+                    let (soft_limit, hard_limit) =
+                        getrlimit(Resource::RLIMIT_NOFILE).map_err(|e| {
+                            BuildError::internal(format!(
+                                "Failed to get nofile limit: {}",
+                                e
+                            ))
+                        })?;
 
-                    send_log!(LogLevel::Info, format!("Current nofile limits - soft: {}, hard: {}", soft_limit, hard_limit));
+                    send_log!(
+                        LogLevel::Info,
+                        format!(
+                            "Current nofile limits - soft: {}, hard: {}",
+                            soft_limit, hard_limit
+                        )
+                    );
 
-                    // AOSP requires us to have at least 16000, but why not 65536?
                     let aosp_soft_limit = 65536;
                     let new_hard_limit = std::cmp::max(hard_limit, aosp_soft_limit);
                     let new_soft_limit = std::cmp::max(aosp_soft_limit, soft_limit);
                     if new_soft_limit == soft_limit && new_hard_limit == hard_limit {
-                        send_log!(LogLevel::Info, "Current nofile limits meet AOSP requirements, no need to change.".to_string());
+                        send_log!(
+                            LogLevel::Info,
+                            "Current nofile limits meet AOSP requirements, no need to change."
+                                .to_string()
+                        );
                     } else {
-                        send_log!(LogLevel::Info, format!("Setting nofile limits - soft: {}, hard: {}", new_soft_limit, new_hard_limit));
+                        send_log!(
+                            LogLevel::Info,
+                            format!(
+                                "Setting nofile limits - soft: {}, hard: {}",
+                                new_soft_limit, new_hard_limit
+                            )
+                        );
                         let rlim = rlimit {
                             rlim_cur: new_soft_limit,
                             rlim_max: new_hard_limit,
@@ -674,10 +695,15 @@ impl RomBuildHarness {
                             use nix::sys::resource::Resource;
 
                             if setrlimit(Resource::RLIMIT_NOFILE as u32, &rlim) != 0 {
-                                return Err(BuildError::internal("Failed to set nofile limit."));
+                                return Err(BuildError::internal(
+                                    "Failed to set nofile limit.",
+                                ));
                             }
                         }
-                        send_log!(LogLevel::Info, "Successfully set nofile limits.".to_string());
+                        send_log!(
+                            LogLevel::Info,
+                            "Successfully set nofile limits.".to_string()
+                        );
                     }
                 }
 
@@ -687,17 +713,25 @@ impl RomBuildHarness {
                 let use_ccache = build_settings.use_ccache;
                 let use_rbe = build_settings.use_rbe_service;
 
-                if use_rbe {
+                let rbe_env_path = if use_rbe {
                     send_log!(LogLevel::Info, "Writing RBE environment configuration...".to_string());
-                    BuildService::setup_rbe_env(
+                    let secret_path = _secret_dir
+                        .as_ref()
+                        .ok_or_else(|| BuildError::internal("Missing per-build secret directory"))?
+                        .path();
+                    let path = BuildService::setup_rbe_env(
                         fs.as_ref(),
                         build_dir_clone.clone(),
+                        secret_path,
                         build_settings.rbe_api_token.as_deref().unwrap_or(""),
                     ).await.map_err(|e| {
                         BuildError::internal(format!("Failed to write RBE environment configuration: {}", e))
                     })?;
                     send_log!(LogLevel::Info, "RBE environment configuration written successfully.".to_string());
-                }
+                    Some(path)
+                } else {
+                    None
+                };
 
                 // Detect vendor type.
                 let vendor_dir = build_dir_clone.join("vendor");
@@ -744,7 +778,7 @@ impl RomBuildHarness {
                     // Check build/release/build_config, scl for Android 14
                     let _build_config_path = path.join("build_config");
                     if fs.is_dir(&_build_config_path) {
-                        for file in fs.read_dir(&path).map_err(|e| {
+                        for file in fs.read_dir(path).map_err(|e| {
                             BuildError::internal(format!("Failed to read release directory: {}", e))
                         })? {
                             if file.extension().and_then(|s| s.to_str()) == Some("scl") {
@@ -767,7 +801,7 @@ impl RomBuildHarness {
                             if file.extension().and_then(|s| s.to_str()) == Some("textproto") {
                                 let file_name = file.file_name().unwrap_or_default().to_string_lossy().to_string();
                                 let release_name = file_name.trim_end_matches(".textproto");
-                                if vec!["root", "trunk"].contains(&release_name) {
+                                if ["root", "trunk"].contains(&release_name) {
                                     continue;
                                 }
                                 send_log!(LogLevel::Info, format!("Detected release from release_configs textproto file: {}", release_name));
@@ -777,10 +811,10 @@ impl RomBuildHarness {
                         }
                     }
                 };
-                if release.is_none() {
-                    send_log!(LogLevel::Warning, "Could not detect release from build/release directory.".to_string());
+                if let Some(release) = &release {
+                    send_log!(LogLevel::Info, format!("Using release: {} for build.", release));
                 } else {
-                    send_log!(LogLevel::Info, format!("Using release: {} for build.", release.as_ref().unwrap()));
+                    send_log!(LogLevel::Warning, "Could not detect release from build/release directory.".to_string());
                 }
 
                 let build_variant = req.variant.to_string();
@@ -830,8 +864,11 @@ impl RomBuildHarness {
 
                 let mut command_list = Vec::new();
                 command_list.push("set -e".to_string());
-                if use_rbe {
-                    command_list.push(format!("source {}", build_dir_clone.join("rbe_env.sh").to_string_lossy()));
+                if let Some(path) = rbe_env_path {
+                    command_list.push(format!(
+                        "source {}",
+                        BuildService::shell_single_quote(&path.to_string_lossy())
+                    ));
                 }
                 if !use_ccache {
                     command_list.push("unset USE_CCACHE; unset CCACHE_EXEC;".to_string());
@@ -864,11 +901,11 @@ impl RomBuildHarness {
                 command_list.push("exit 0".to_string());
 
                 for line in command_list {
-                    stdin_tx.send((&line).clone().into()).await.map_err(|e| BuildError::internal(format!("Failed to send to stdin: {}", e)))?;
+                    stdin_tx.send(line.clone()).await.map_err(|e| BuildError::internal(format!("Failed to send to stdin: {}", e)))?;
                     send_log!(LogLevel::Info, format!("Sent to stdin: {}", line));
                 }
 
-                let error_file_path = (&tempdir_clone).join(format!("{}-{}", "build-output", &build_log_filename_suffix));
+                let error_file_path = tempdir_clone.join(format!("{}-{}", "build-output", &build_log_filename_suffix));
                 if !run_process(
                     runner.as_ref(),
                     cmd,
@@ -881,7 +918,7 @@ impl RomBuildHarness {
                     // Update known builds entry to contain failure
                     let known_builds_self = &mut registry.known.lock().await;
                     if let Some(build_entry) = known_builds_self.iter_mut().find(|b| b.id == build_id_clone) {
-                        let error_file = (&build_dir_clone).join("out").join("error.log");
+                        let error_file = build_dir_clone.join("out").join("error.log");
                         send_log!(LogLevel::Info, format!("Reading error log from {:?}", error_file));
                         let content = fs.read_to_string(&error_file).unwrap_or_else(|_| "Failed to read error log.".to_string());
                         if content.is_empty() {
@@ -956,6 +993,11 @@ impl RomBuildHarness {
                             _ => {
                                 send_log!(LogLevel::Warning, "Unknown upload method specified, skipping upload.".to_string());
                             }
+                        }
+
+                        let excess = uploads.len().saturating_sub(RomBuildRegistry::MAX_HISTORY);
+                        if excess > 0 {
+                            uploads.drain(..excess);
                         }
 
                         }

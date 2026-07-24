@@ -103,6 +103,7 @@ impl std::fmt::Display for ConfigError {
 impl std::error::Error for ConfigError {}
 
 impl ROMBuildConfig {
+    #[allow(clippy::ptr_arg)]
     pub fn load(json_dir: &PathBuf) -> Result<Self, ConfigError> {
         let config = Self {
             targets: load_json(&json_dir.join("targets.json"))?,

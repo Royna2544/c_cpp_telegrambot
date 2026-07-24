@@ -1,6 +1,6 @@
 use super::{
     builder_config::BuilderConfig,
-    domain::{BuildContext, PerBuildIdStatus},
+    domain::{BuildContext, BuildLifecycle, PerBuildIdStatus},
     kernel_config::KernelConfig,
 };
 use crate::{
@@ -39,6 +39,16 @@ pub(crate) type WrappedBuildStatus = Arc<Mutex<Vec<PerBuildIdStatus>>>;
 pub(crate) type WrappedContexts = Arc<Mutex<Vec<BuildContext>>>;
 
 impl BuildService {
+    pub(crate) const MAX_BUILD_HISTORY: usize = 256;
+
+    pub(crate) async fn prune_kernel_statuses(statuses: &WrappedBuildStatus) {
+        let mut statuses = statuses.lock().await;
+        let excess = statuses.len().saturating_sub(Self::MAX_BUILD_HISTORY);
+        if excess > 0 {
+            statuses.drain(..excess);
+        }
+    }
+
     pub(crate) fn validate_config_name(name: &str) -> Result<(), Status> {
         if name.is_empty() {
             return Err(Status::invalid_argument("Config name cannot be empty"));
@@ -121,7 +131,7 @@ impl BuildService {
 
         BuildService {
             kernel_configs: Arc::new(Mutex::new(kernel_configs)),
-            contexts: contexts,
+            contexts,
             id: Arc::new(Mutex::new(0)),
             build_statuses: Arc::new(Mutex::new(Vec::new())),
             builder_config,
@@ -152,7 +162,7 @@ impl BuildService {
     ) {
         let mut statuses = peridstat.lock().await;
         if let Some(entry) = statuses.iter_mut().find(|s| s.build_id == build_id) {
-            entry.finished = true;
+            entry.lifecycle = BuildLifecycle::Finished;
             entry.succeeded = success;
         }
     }
@@ -160,7 +170,7 @@ impl BuildService {
     pub(crate) async fn is_build_finished(peridstat: &WrappedBuildStatus, build_id: i32) -> bool {
         let statuses = peridstat.lock().await;
         if let Some(entry) = statuses.iter().find(|s| s.build_id == build_id) {
-            entry.finished
+            entry.lifecycle == BuildLifecycle::Finished
         } else {
             false
         }
@@ -169,6 +179,24 @@ impl BuildService {
     pub(crate) async fn is_valid_build_id(peridstat: &WrappedBuildStatus, build_id: i32) -> bool {
         let statuses = peridstat.lock().await;
         statuses.iter().any(|s| s.build_id == build_id)
+    }
+
+    pub(crate) async fn claim_prepared_build(
+        peridstat: &WrappedBuildStatus,
+        build_id: i32,
+    ) -> Result<(), Status> {
+        let mut statuses = peridstat.lock().await;
+        let entry = statuses
+            .iter_mut()
+            .find(|status| status.build_id == build_id)
+            .ok_or_else(|| Status::not_found(format!("No build found with ID: {build_id}")))?;
+        if entry.lifecycle != BuildLifecycle::Prepared {
+            return Err(Status::failed_precondition(format!(
+                "Build ID {build_id} is not in a prepared state"
+            )));
+        }
+        entry.lifecycle = BuildLifecycle::Running;
+        Ok(())
     }
 
     pub(crate) async fn inc_and_get_build_id(id_lock: &Arc<Mutex<i32>>) -> i32 {
@@ -181,12 +209,12 @@ impl BuildService {
         archive_file_path: &Path,
         target_dir: &Path,
     ) -> Result<(), Status> {
-        let file = File::create(&archive_file_path)?;
+        let file = File::create(archive_file_path)?;
         let mut zip = ZipWriter::new(file);
 
         let options = FileOptions::<()>::default().compression_method(CompressionMethod::Deflated);
 
-        for entry in walkdir::WalkDir::new(&target_dir) {
+        for entry in walkdir::WalkDir::new(target_dir) {
             let entry = entry.map_err(|e| {
                 Status::internal(format!(
                     "Failed to read entry in target directory {:?}: {}",
@@ -202,7 +230,7 @@ impl BuildService {
                     .starts_with(".")
             {
                 let name = path
-                    .strip_prefix(&target_dir)
+                    .strip_prefix(target_dir)
                     .map_err(|e| {
                         Status::internal(format!(
                             "Failed to get relative path for {:?}: {}",
@@ -211,7 +239,7 @@ impl BuildService {
                     })?
                     .to_string_lossy()
                     .to_string();
-                if std::fs::File::open(&path)?
+                if std::fs::File::open(path)?
                     .metadata()
                     .map_err(|e| {
                         Status::internal(format!(
@@ -231,7 +259,7 @@ impl BuildService {
                 zip.start_file(name, options).map_err(|e| {
                     Status::internal(format!("Failed to add file to zip {:?}: {}", path, e))
                 })?;
-                let mut f = std::fs::File::open(&path).map_err(|e| {
+                let mut f = std::fs::File::open(path).map_err(|e| {
                     Status::internal(format!("Failed to open file {:?} for zipping: {}", path, e))
                 })?;
                 std::io::copy(&mut f, &mut zip).map_err(|e| {
@@ -320,5 +348,44 @@ mod runner_tests {
             .await
             .unwrap();
         assert!(ok, "default scripted result is success");
+    }
+}
+
+#[cfg(test)]
+mod lifecycle_tests {
+    use super::*;
+    use crate::kernelbuild::domain::{BuildLifecycle, PerBuildIdStatus};
+
+    #[tokio::test]
+    async fn claim_build_is_atomic_and_rejects_duplicate_start() {
+        let statuses = Arc::new(Mutex::new(vec![PerBuildIdStatus {
+            build_id: 7,
+            lifecycle: BuildLifecycle::Prepared,
+            succeeded: false,
+        }]));
+
+        assert!(
+            BuildService::claim_prepared_build(&statuses, 7)
+                .await
+                .is_ok()
+        );
+        let duplicate = BuildService::claim_prepared_build(&statuses, 7)
+            .await
+            .expect_err("a running build must not be claimed twice");
+        assert_eq!(duplicate.code(), tonic::Code::FailedPrecondition);
+    }
+
+    #[tokio::test]
+    async fn kernel_status_registry_is_bounded() {
+        let statuses = Arc::new(Mutex::new(Vec::new()));
+        for id in 0..300 {
+            statuses.lock().await.push(PerBuildIdStatus {
+                build_id: id,
+                lifecycle: BuildLifecycle::Finished,
+                succeeded: true,
+            });
+            BuildService::prune_kernel_statuses(&statuses).await;
+        }
+        assert_eq!(statuses.lock().await.len(), BuildService::MAX_BUILD_HISTORY);
     }
 }

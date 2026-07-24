@@ -22,7 +22,7 @@ class TgBotWebServerBase {
                          const httplib::Response& res);
     struct Constants {
         static constexpr const char* kWebRootNode = "/";
-        static constexpr const char* kAboutPage = "/about.html";
+        static constexpr const char* kIndexPage = "/index.html";
         static constexpr const char* kAPIVotesKey = "votes";
         static constexpr const char* kBindToIp = "0.0.0.0";
 

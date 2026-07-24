@@ -1,0 +1,542 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dim">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Bot Admin Dashboard</title>
+
+    <link href="https://cdn.jsdelivr.net/npm/daisyui@4.7.2/dist/full.min.css" rel="stylesheet" />
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+    <style>
+        body { font-family: 'JetBrains Mono', monospace; }
+        .input-group-text { @apply px-3 bg-base-300 border border-base-content/20 flex items-center; }
+    </style>
+</head>
+<body class="min-h-screen bg-base-200 p-4 lg:p-8">
+
+    <div class="navbar bg-base-100 rounded-box shadow-lg mb-6">
+        <div class="flex-1">
+            <a class="btn btn-ghost text-xl text-primary gap-2">
+                <i class="fa-solid fa-robot"></i> CPP-BOT <div class="badge badge-outline text-xs">V2 API</div>
+            </a>
+        </div>
+        <div class="flex-none gap-2">
+            <div id="status-indicator" class="badge badge-error gap-2">Offline</div>
+            <button onclick="fetchStats()" class="btn btn-ghost btn-circle"><i class="fa-solid fa-rotate"></i></button>
+        </div>
+    </div>
+
+    <div class="grid grid-cols-1 xl:grid-cols-3 gap-6">
+
+        <div class="xl:col-span-1 flex flex-col gap-6">
+
+            <div class="card bg-base-100 shadow-xl border-l-4 border-warning">
+                <div class="card-body p-5">
+                    <h2 class="card-title text-sm uppercase opacity-70 flex justify-between">
+                        <span><i class="fa-solid fa-microchip"></i> Hardware Monitor</span>
+                        <span id="hw-cpu-model" class="text-xs opacity-50 font-normal">Detecting...</span>
+                    </h2>
+                    
+                    <div class="w-full h-32 mt-2">
+                        <canvas id="hwChart"></canvas>
+                    </div>
+
+                    <div class="grid grid-cols-2 gap-2 mt-2 text-xs">
+                        <div class="bg-base-200 p-2 rounded">
+                            <div class="opacity-50">CPU Load</div>
+                            <div id="hw-cpu-val" class="text-lg font-bold text-warning">0%</div>
+                        </div>
+                        <div class="bg-base-200 p-2 rounded">
+                            <div class="opacity-50">RAM Usage</div>
+                            <div id="hw-ram-val" class="text-lg font-bold text-info">0/0 GB</div>
+                        </div>
+                    </div>
+
+                    <div class="mt-2">
+                        <div class="flex justify-between text-xs opacity-70 mb-1">
+                            <span>Disk Usage</span>
+                            <span id="hw-disk-text">0/0 GB</span>
+                        </div>
+                        <progress id="hw-disk-bar" class="progress progress-success w-full" value="0" max="100"></progress>
+                    </div>
+
+                    <div class="divider my-1"></div>
+                    <div class="text-xs opacity-60 space-y-1">
+                        <div class="flex justify-between"><span>Host:</span> <span id="hw-hostname">...</span></div>
+                        <div class="flex justify-between"><span>Kernel:</span> <span id="hw-kernel">...</span></div>
+                        <div class="flex justify-between"><span>OS:</span> <span id="hw-os">...</span></div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card bg-base-100 shadow-xl border-l-4 border-primary">
+                <div class="card-body p-5">
+                    <h2 class="card-title text-sm uppercase opacity-70">System Status</h2>
+                    <div class="stats stats-vertical bg-base-200 shadow-sm mt-2">
+                        <div class="stat p-3">
+                            <div class="stat-title">Uptime</div>
+                            <div class="stat-value text-xl font-mono" id="uptime-display">--:--</div>
+                        </div>
+                        <div class="stat p-3">
+                            <div class="stat-title">Bot Info</div>
+                            <div class="stat-value text-sm truncate" id="bot-info">@loading...</div>
+                        </div>
+                    </div>
+
+                    <div class="join w-full mt-4">
+                        <button onclick="sendVote('up')" class="btn btn-sm btn-success join-item flex-1 text-white">
+                            <i class="fa-solid fa-thumbs-up"></i>
+                        </button>
+                        <button onclick="sendVote('down')" class="btn btn-sm btn-error join-item flex-1 text-white">
+                            <i class="fa-solid fa-thumbs-down"></i>
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card bg-base-100 shadow-xl border-l-4 border-secondary">
+                <div class="card-body p-5">
+                    <h2 class="card-title text-sm uppercase opacity-70"><i class="fa-solid fa-address-book"></i> Chat Manager</h2>
+                    <p class="text-xs opacity-50 mb-2">Map IDs to Names. Use Trash to delete.</p>
+                    <form onsubmit="manageChat(event)" class="flex flex-col gap-2">
+                        <div class="join w-full">
+                            <input id="manage-chat-id" type="number" class="input input-sm input-bordered join-item w-full" placeholder="Chat ID" required />
+                        </div>
+                        <div class="join w-full">
+                            <input id="manage-chat-name" class="input input-sm input-bordered join-item w-full" placeholder="Alias Name" />
+                            <button type="submit" class="btn btn-sm btn-secondary join-item">Save</button>
+                            <button type="button" onclick="deleteChat()" class="btn btn-sm btn-error join-item text-white" title="Delete Name">
+                                <i class="fa-solid fa-trash"></i>
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+
+            <div class="card bg-base-100 shadow-xl border-l-4 border-accent">
+                <div class="card-body p-5">
+                    <h2 class="card-title text-sm uppercase opacity-70"><i class="fa-solid fa-images"></i> Media Manager</h2>
+                    <p class="text-xs opacity-50 mb-2">Map IDs to Aliases. Use Trash to delete.</p>
+
+                    <form onsubmit="manageMedia(event)" class="flex flex-col gap-2">
+                        
+                        <select id="manage-media-type" class="select select-sm select-bordered w-full">
+                            <option value="photo">Photo</option>
+                            <option value="video">Video</option>
+                            <option value="audio">Audio</option>
+                            <option value="document">Document</option>
+                            <option value="sticker">Sticker</option>
+                            <option value="gif">GIF</option>
+                            <option value="dice">Dice</option>
+                        </select>
+
+                        <input id="manage-media-id" class="input input-sm input-bordered w-full font-mono text-xs" placeholder="File ID (e.g. CgAC...)" required />
+                        
+                        <input id="manage-media-unique-id" class="input input-sm input-bordered w-full font-mono text-xs" placeholder="Unique ID (Required)" required />
+
+                        <div class="join w-full">
+                            <input id="manage-media-alias" class="input input-sm input-bordered join-item w-full" placeholder="Aliases (e.g. cat,funny)" />
+                            <button type="submit" class="btn btn-sm btn-accent join-item">Save</button>
+                            <button type="button" onclick="deleteMedia()" class="btn btn-sm btn-error join-item text-white" title="Delete Alias">
+                                <i class="fa-solid fa-trash"></i>
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+
+        </div>
+
+        <div class="xl:col-span-2">
+            <div class="card bg-base-100 shadow-xl h-full border-t-4 border-info">
+                <div class="card-body">
+                    <h2 class="card-title mb-6">
+                        <i class="fa-solid fa-paper-plane text-info"></i> Send Message
+                        <span class="badge badge-ghost font-mono text-xs">POST /api/v1/messages</span>
+                    </h2>
+
+                    <form onsubmit="handleSend(event)" class="space-y-5">
+                        <div class="form-control">
+                            <label class="label"><span class="label-text">Recipient (Chat ID)</span></label>
+                            <div class="join">
+                                <input id="chat-resolver-input" class="input input-bordered join-item w-full max-w-xs" placeholder="Search by Name..." />
+                                <button type="button" onclick="resolveChatName()" class="btn btn-square join-item"><i class="fa-solid fa-magnifying-glass"></i></button>
+                                <input type="number" id="final-chat-id" class="input input-bordered join-item w-full font-mono bg-base-200" placeholder="Final ID used..." required />
+                            </div>
+                            <label class="label"><span class="label-text-alt text-warning hidden" id="chat-resolve-error">Name not found!</span></label>
+                        </div>
+
+                        <div class="form-control">
+                            <label class="label"><span class="label-text">Text Content</span></label>
+                            <textarea id="msg-text" class="textarea textarea-bordered h-32 font-mono text-sm leading-relaxed" placeholder="Type message..."></textarea>
+                        </div>
+
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div class="form-control">
+                                <label class="label"><span class="label-text">Attachment Type</span></label>
+                                <select id="file-type" class="select select-bordered w-full" onchange="toggleFileSection()">
+                                    <option value="none">Text Only</option>
+                                    <option value="photo">Photo</option>
+                                    <option value="video">Video</option>
+                                    <option value="audio">Audio</option>
+                                    <option value="document">Document</option>
+                                    <option value="sticker">Sticker</option>
+                                    <option value="gif">GIF</option>
+                                    <option value="dice">Dice</option>
+                                </select>
+                            </div>
+
+                            <div id="file-section" class="form-control hidden">
+                                <label class="label"><span class="label-text">File Source</span></label>
+                                <div role="tablist" class="tabs tabs-lifted tabs-sm mb-2">
+                                    <a role="tab" class="tab tab-active" onclick="switchTab(this, 'path')">Path</a>
+                                    <a role="tab" class="tab" onclick="switchTab(this, 'id')">File ID</a>
+                                    <a role="tab" class="tab" onclick="switchTab(this, 'alias')">Alias</a>
+                                </div>
+                                <input id="input-path" class="input input-bordered w-full file-input-group" placeholder="/var/www/img.png" />
+                                <input id="input-id" class="input input-bordered w-full file-input-group hidden" placeholder="File ID string..." />
+                                <div id="input-alias" class="join w-full file-input-group hidden">
+                                    <input id="media-alias-search" class="input input-bordered join-item w-full" placeholder="Media Alias..." />
+                                    <button type="button" onclick="resolveMediaAlias()" class="btn join-item"><i class="fa-solid fa-search"></i></button>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="card-actions justify-end mt-8">
+                            <button type="submit" id="btn-send" class="btn btn-info w-full md:w-auto px-8">
+                                <i class="fa-solid fa-paper-plane"></i> Send Payload
+                            </button>
+                        </div>
+                    </form>
+
+                    <div class="mockup-code mt-6 bg-neutral text-neutral-content hidden" id="console-box">
+                        <pre data-prefix=">"><code id="console-out">Waiting...</code></pre>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="toast toast-end z-50" id="toast-container"></div>
+
+    <script>
+        // --- API ENDPOINTS (RESTful) ---
+        const API = {
+            STATS:    '/api/v1/stats',
+            HARDWARE: '/api/v1/hardware',
+            VOTES:    '/api/v1/votes',
+            CHATS:    '/api/v1/chats',
+            MEDIA:    '/api/v1/media',
+            MESSAGES: '/api/v1/messages'
+        };
+
+        let fileSourceMode = 'path';
+        let chartInstance = null;
+        
+        // Chart Config
+        const MAX_DATA_POINTS = 30;
+        const chartData = {
+            labels: Array(MAX_DATA_POINTS).fill(''),
+            datasets: [
+                {
+                    label: 'CPU %',
+                    borderColor: '#fbbd23', 
+                    backgroundColor: 'rgba(251, 189, 35, 0.1)',
+                    data: Array(MAX_DATA_POINTS).fill(0),
+                    tension: 0.3,
+                    fill: true,
+                    pointRadius: 0
+                },
+                {
+                    label: 'RAM %',
+                    borderColor: '#3abff8',
+                    backgroundColor: 'rgba(58, 191, 248, 0.1)',
+                    data: Array(MAX_DATA_POINTS).fill(0),
+                    tension: 0.3,
+                    fill: true,
+                    pointRadius: 0
+                }
+            ]
+        };
+
+        // --- INIT ---
+        document.addEventListener('DOMContentLoaded', () => {
+            initChart();
+            fetchStats();
+            fetchHardware();
+            setInterval(fetchStats, 5000);
+            setInterval(fetchHardware, 2000);
+        });
+
+        function initChart() {
+            const ctx = document.getElementById('hwChart').getContext('2d');
+            Chart.defaults.color = '#a6adbb'; 
+            Chart.defaults.borderColor = '#2a323c';
+            chartInstance = new Chart(ctx, {
+                type: 'line',
+                data: chartData,
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { legend: { display: false } },
+                    scales: {
+                        y: { beginAtZero: true, max: 100, grid: { display: true, color: '#2a323c' } },
+                        x: { display: false }
+                    },
+                    animation: false
+                }
+            });
+        }
+
+        async function fetchHardware() {
+            try {
+                const res = await fetch(API.HARDWARE);
+                if (!res.ok) throw new Error();
+                const data = await res.json();
+                if (!data.success) return;
+
+                document.getElementById('hw-cpu-model').innerText = data.cpu.name;
+                document.getElementById('hw-cpu-val').innerText = data.cpu.usage_percent.toFixed(1) + '%';
+                
+                const usedGB = (data.memory.used_mbytes / 1024).toFixed(1);
+                const totalGB = (data.memory.total_mbytes / 1024).toFixed(1);
+                document.getElementById('hw-ram-val').innerText = `${usedGB}/${totalGB} GB`;
+
+                const diskUsed = data.disk.used_gbytes;
+                const diskTotal = data.disk.total_gbytes;
+                document.getElementById('hw-disk-text').innerText = `${diskUsed}/${diskTotal} GB`;
+                document.getElementById('hw-disk-bar').value = (diskUsed / diskTotal) * 100;
+
+                document.getElementById('hw-hostname').innerText = data.os.hostname;
+                document.getElementById('hw-kernel').innerText = data.os.kernel_version;
+                document.getElementById('hw-os').innerText = `${data.os.name} ${data.os.version}`;
+
+                const ramPercent = (data.memory.used_mbytes / data.memory.total_mbytes) * 100;
+                chartData.datasets[0].data.shift();
+                chartData.datasets[0].data.push(data.cpu.usage_percent);
+                chartData.datasets[1].data.shift();
+                chartData.datasets[1].data.push(ramPercent);
+                chartInstance.update();
+            } catch (e) { console.log("HW Fetch Error", e); }
+        }
+
+        async function fetchStats() {
+            try {
+                const res = await fetch(API.STATS);
+                if(!res.ok) throw new Error();
+                const data = await res.json();
+                
+                const badge = document.getElementById('status-indicator');
+                if (data.success) {
+                    badge.className = "badge badge-success gap-2";
+                    badge.innerHTML = '<i class="fa-solid fa-circle"></i> Online';
+                } else {
+                    badge.className = "badge badge-warning gap-2";
+                    badge.innerHTML = '<i class="fa-solid fa-triangle-exclamation"></i> Busy';
+                }
+
+                const t = data.uptime;
+                document.getElementById('uptime-display').innerText = 
+                    `${t.days}d ${String(t.hours).padStart(2,'0')}h ${String(t.minutes).padStart(2,'0')}m`;
+                document.getElementById('bot-info').innerText = `@${data.username} (ID: ${data.user_id})`;
+            } catch (e) {
+                const badge = document.getElementById('status-indicator');
+                badge.className = "badge badge-error gap-2";
+                badge.innerText = "Offline";
+            }
+        }
+
+        // --- MANAGERS ---
+
+        // 1. SAVE CHAT (PUT)
+        async function manageChat(e) {
+            e.preventDefault();
+            const id = document.getElementById('manage-chat-id').value;
+            const name = document.getElementById('manage-chat-name').value;
+            
+            if(!id || !name.trim()) return showToast("ID and Name required", "warning");
+
+            // PUT /api/v1/chats/:id
+            await requestJson('PUT', `${API.CHATS}/${id}`, { chat_name: name }, "Chat Saved");
+        }
+
+        // 2. DELETE CHAT (DELETE)
+        async function deleteChat() {
+            const id = document.getElementById('manage-chat-id').value;
+            if(!id) return showToast("Enter Chat ID", "warning");
+            
+            // DELETE /api/v1/chats/:id
+            await requestJson('DELETE', `${API.CHATS}/${id}`, {}, "Chat Deleted");
+            document.getElementById('manage-chat-name').value = ""; // Clear UI
+        }
+
+        // 3. SAVE MEDIA (PUT)
+        async function manageMedia(e) {
+            e.preventDefault();
+            const id = document.getElementById('manage-media-id').value;
+            const aliases = document.getElementById('manage-media-alias').value;
+            const type = document.getElementById('manage-media-type').value;
+            const uniqueId = document.getElementById('manage-media-unique-id').value; 
+
+            // CHANGED: Validation now includes uniqueId
+            if(!id || !aliases.trim() || !uniqueId.trim()) {
+                return showToast("ID, UniqueID and Alias are ALL required", "warning");
+            }
+
+            const payload = { 
+                media_type: type,
+                alias: aliases.split(',').map(s => s.trim()),
+                media_unique_id: uniqueId.trim() // Always send
+            };
+            
+            // PUT /api/v1/media/:id
+            await requestJson('PUT', `${API.MEDIA}/${id}`, payload, "Media Saved");
+        }
+
+        // 4. DELETE MEDIA (DELETE)
+        async function deleteMedia() {
+            const id = document.getElementById('manage-media-id').value;
+            if(!id) return showToast("Enter File ID", "warning");
+
+            // DELETE /api/v1/media/:id
+            await requestJson('DELETE', `${API.MEDIA}/${id}`, {}, "Media Deleted");
+            document.getElementById('manage-media-alias').value = ""; 
+        }
+
+        async function sendVote(val) {
+            await requestJson('POST', API.VOTES, { votes: val }, `Voted ${val.toUpperCase()}`);
+        }
+
+        // --- RESOLVERS (GET) ---
+
+        async function resolveChatName() {
+            const name = document.getElementById('chat-resolver-input').value;
+            const errorLabel = document.getElementById('chat-resolve-error');
+            const output = document.getElementById('final-chat-id');
+            try {
+                // GET /api/v1/chats?chat_name=X
+                const res = await fetch(`${API.CHATS}?chat_name=${encodeURIComponent(name)}`);
+                const data = await res.json();
+                if (data.success) {
+                    output.value = data.chat_id;
+                    errorLabel.classList.add('hidden');
+                    output.classList.add('input-success');
+                    setTimeout(() => output.classList.remove('input-success'), 1000);
+                } else throw new Error();
+            } catch (e) {
+                errorLabel.classList.remove('hidden');
+                output.value = "";
+            }
+        }
+
+        async function resolveMediaAlias() {
+            const alias = document.getElementById('media-alias-search').value;
+            const inputId = document.getElementById('input-id');
+            try {
+                // GET /api/v1/media?alias=X
+                const res = await fetch(`${API.MEDIA}?alias=${encodeURIComponent(alias)}`);
+                const data = await res.json();
+                if (data.success && data.media_id.length > 0) {
+                    const tabs = document.querySelectorAll('.tab');
+                    switchTab(tabs[1], 'id');
+                    inputId.value = data.media_id[0];
+                    showToast("Media ID Found!", "success");
+                } else showToast("Alias not found", "error");
+            } catch (e) { showToast("Lookup Failed", "error"); }
+        }
+
+        // --- SEND MESSAGE (POST) ---
+        async function handleSend(e) {
+            e.preventDefault();
+            const btn = document.getElementById('btn-send');
+            const consoleBox = document.getElementById('console-box');
+            const consoleOut = document.getElementById('console-out');
+
+            const payload = {
+                chat_id: parseInt(document.getElementById('final-chat-id').value),
+                text: document.getElementById('msg-text').value,
+                file_type: document.getElementById('file-type').value
+            };
+
+            if (payload.file_type !== 'none') {
+                if (fileSourceMode === 'path') {
+                    payload.file_path = document.getElementById('input-path').value;
+                } else {
+                    payload.file_id = document.getElementById('input-id').value;
+                }
+            } else { delete payload.file_type; }
+
+            btn.disabled = true;
+            btn.innerHTML = '<span class="loading loading-dots"></span> Sending...';
+            consoleBox.classList.remove('hidden');
+            consoleOut.innerText = "Transmitting...";
+
+            try {
+                // POST /api/v1/messages
+                const res = await fetch(API.MESSAGES, {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify(payload)
+                });
+                const data = await res.json();
+
+                if (data.success) {
+                    consoleOut.innerText = `SUCCESS (Code ${data.code})\n${data.message || 'OK'}`;
+                    consoleOut.parentElement.classList.remove('bg-error', 'text-error-content');
+                    consoleOut.parentElement.classList.add('bg-success', 'text-success-content');
+                    showToast("Message Sent", "success");
+                } else {
+                    consoleOut.innerText = `FAILED (Code ${data.code})\n${data.message}`;
+                    consoleOut.parentElement.classList.remove('bg-success', 'text-success-content');
+                    consoleOut.parentElement.classList.add('bg-error', 'text-error-content');
+                }
+            } catch (err) {
+                consoleOut.innerText = `NETWORK ERROR\n${err.message}`;
+            } finally {
+                btn.disabled = false;
+                btn.innerHTML = '<i class="fa-solid fa-paper-plane"></i> Send Payload';
+            }
+        }
+
+        // --- HELPER: GENERIC REQUEST ---
+        async function requestJson(method, url, data, successMsg) {
+            try {
+                const res = await fetch(url, {
+                    method: method,
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify(data)
+                });
+                if(res.ok) showToast(successMsg, "success");
+                else showToast("Request Failed", "error");
+            } catch(e) { showToast("Network Error", "error"); }
+        }
+
+        function toggleFileSection() {
+            const type = document.getElementById('file-type').value;
+            const sec = document.getElementById('file-section');
+            if (type === 'none') sec.classList.add('hidden');
+            else sec.classList.remove('hidden');
+        }
+
+        function switchTab(el, mode) {
+            fileSourceMode = mode;
+            document.querySelectorAll('.tab').forEach(t => t.classList.remove('tab-active'));
+            if(el) el.classList.add('tab-active');
+            document.querySelectorAll('.file-input-group').forEach(i => i.classList.add('hidden'));
+            document.getElementById(`input-${mode}`).classList.remove('hidden');
+        }
+
+        function showToast(msg, type="info") {
+            const c = document.getElementById('toast-container');
+            const d = document.createElement('div');
+            d.innerHTML = `<div class="alert alert-${type} shadow-lg"><span>${msg}</span></div>`;
+            c.appendChild(d);
+            setTimeout(() => d.remove(), 3000);
+        }
+    </script>
+</body>
+</html>

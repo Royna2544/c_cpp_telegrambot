@@ -39,6 +39,32 @@ struct PairHash {
         return h1 ^ (h2 + 0x9e3779b9 + (h1 << 6) + (h1 >> 2));
     }
 };
+
+class SQLiteTransaction {
+   public:
+    explicit SQLiteTransaction(sqlite3* db) : db_(db) {
+        active_ = sqlite3_exec(db_, "BEGIN IMMEDIATE", nullptr, nullptr,
+                               nullptr) == SQLITE_OK;
+    }
+    ~SQLiteTransaction() {
+        if (active_) {
+            sqlite3_exec(db_, "ROLLBACK", nullptr, nullptr, nullptr);
+        }
+    }
+    [[nodiscard]] bool active() const { return active_; }
+    bool commit() {
+        if (!active_ || sqlite3_exec(db_, "COMMIT", nullptr, nullptr,
+                                     nullptr) != SQLITE_OK) {
+            return false;
+        }
+        active_ = false;
+        return true;
+    }
+
+   private:
+    sqlite3* db_{};
+    bool active_{};
+};
 }  // namespace
 
 void SQLiteDatabase::Helper::logInvalidState(
@@ -434,9 +460,7 @@ std::vector<SQLiteDatabase::ChatInfo> SQLiteDatabase::getAllChatInfos() const {
 }
 
 bool SQLiteDatabase::load(std::filesystem::path filepath) {
-    int ret = 0;
     std::error_code ec;
-
     if (db != nullptr) {
         LOG(WARNING) << "Attempting to load database while it is already open.";
         return false;
@@ -452,25 +476,79 @@ bool SQLiteDatabase::load(std::filesystem::path filepath) {
         }
     }
 
-    ret = sqlite3_open(filepath.string().c_str(), &db);
+    const int ret = sqlite3_open(filepath.string().c_str(), &db);
     if (ret != SQLITE_OK) {
-        LOG(ERROR) << "Could not open database: " << sqlite3_errmsg(db);
+        LOG(ERROR) << "Could not open database: "
+                   << (db ? sqlite3_errmsg(db) : sqlite3_errstr(ret));
+        if (db != nullptr) sqlite3_close(db);
+        db = nullptr;
         return false;
     }
+    const auto failLoad = [this](const std::string& message) {
+        LOG(ERROR) << message;
+        sqlite3_close(db);
+        db = nullptr;
+        return false;
+    };
 
-    // Check if the database exists and initialize it if necessary.
     if (!existed || filepath == kInMemoryDatabase) {
         LOG(INFO) << "Running initialization script...";
         const auto helper =
             Helper::create(db, _sqlScriptsPath, Helper::kCreateDatabaseFile);
         if (!helper->executeAsScript()) {
-            throw std::runtime_error("Error initializing database");
+            return failLoad("Error initializing database");
         }
     }
-    // Enable foreign key support
-    sqlite3_exec(db, "PRAGMA foreign_keys = ON;", nullptr, nullptr, nullptr);
-    // Enable user version 1
-    sqlite3_exec(db, "PRAGMA user_version = 1;", nullptr, nullptr, nullptr);
+
+    constexpr int kCurrentSchemaVersion = 1;
+    sqlite3_stmt* statement = nullptr;
+    if (sqlite3_prepare_v2(db, "PRAGMA user_version", -1, &statement, nullptr) !=
+            SQLITE_OK ||
+        sqlite3_step(statement) != SQLITE_ROW) {
+        if (statement != nullptr) sqlite3_finalize(statement);
+        return failLoad("Failed to read SQLite schema version");
+    }
+    const int schemaVersion = sqlite3_column_int(statement, 0);
+    sqlite3_finalize(statement);
+    if (schemaVersion < 0 || schemaVersion > kCurrentSchemaVersion) {
+        return failLoad(
+            fmt::format("Unsupported SQLite schema version {}", schemaVersion));
+    }
+
+    // Version 0 predates explicit versioning. Validate its known table set;
+    // initialize a genuinely empty file, but reject a partially-corrupt schema.
+    if (schemaVersion == 0 && existed) {
+        constexpr std::string_view sql =
+            "SELECT count(*) FROM sqlite_master WHERE type='table' AND name IN "
+            "('usermap','mediaids','medianame','mediamap','chatmap')";
+        statement = nullptr;
+        if (sqlite3_prepare_v2(db, sql.data(), -1, &statement, nullptr) !=
+                SQLITE_OK ||
+            sqlite3_step(statement) != SQLITE_ROW) {
+            if (statement != nullptr) sqlite3_finalize(statement);
+            return failLoad("Failed to validate legacy SQLite schema");
+        }
+        const int tableCount = sqlite3_column_int(statement, 0);
+        sqlite3_finalize(statement);
+        if (tableCount == 0) {
+            const auto helper =
+                Helper::create(db, _sqlScriptsPath, Helper::kCreateDatabaseFile);
+            if (!helper->executeAsScript()) {
+                return failLoad("Failed to initialize empty legacy database");
+            }
+        } else if (tableCount != 5) {
+            return failLoad("Incomplete legacy SQLite schema");
+        }
+    }
+    if (schemaVersion == 0 &&
+        sqlite3_exec(db, "PRAGMA user_version = 1", nullptr, nullptr, nullptr) !=
+            SQLITE_OK) {
+        return failLoad("Failed to migrate SQLite schema to version 1");
+    }
+    if (sqlite3_exec(db, "PRAGMA foreign_keys = ON", nullptr, nullptr,
+                     nullptr) != SQLITE_OK) {
+        return failLoad("Failed to enable SQLite foreign keys");
+    }
 
     if (filepath != kInMemoryDatabase) {
         LOG(INFO) << "Loaded SQLite database: " << filepath;
@@ -534,6 +612,11 @@ SQLiteDatabase::AddResult SQLiteDatabase::addMediaInfo(
     if (info.names.size() == 0) {
         LOG(ERROR) << "Zero-length names specified";
         // No names to insert, so no need to run the query
+        return AddResult::BACKEND_ERROR;
+    }
+
+    SQLiteTransaction transaction(db);
+    if (!transaction.active()) {
         return AddResult::BACKEND_ERROR;
     }
 
@@ -657,7 +740,7 @@ SQLiteDatabase::AddResult SQLiteDatabase::addMediaInfo(
             return AddResult::BACKEND_ERROR;
         }
     }
-    return AddResult::OK;
+    return transaction.commit() ? AddResult::OK : AddResult::BACKEND_ERROR;
 }
 
 std::vector<SQLiteDatabase::MediaInfo> SQLiteDatabase::getAllMediaInfos()
@@ -708,7 +791,10 @@ bool SQLiteDatabase::deleteMediaInfo(
         return false;
     }
     helper->addArgument(mediaId).bindArguments();
-    return helper->execute();
+    if (!helper->execute()) {
+        return false;
+    }
+    return sqlite3_changes(db) > 0;
 }
 
 std::optional<std::vector<decltype(SQLiteDatabase::MediaInfo::mediaId)>>

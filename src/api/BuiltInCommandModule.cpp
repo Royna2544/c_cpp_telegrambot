@@ -11,10 +11,16 @@ BuiltinCommandModule::BuiltinCommandModule(const DynModule* dyn) {
 
 bool BuiltinCommandModule::load() {
     bool expected = false;
-    return loaded.compare_exchange_strong(expected, true);
+    const bool didLoad = loaded.compare_exchange_strong(expected, true);
+    if (didLoad) {
+        enableExecutions();
+    }
+    return didLoad;
 }
 
 bool BuiltinCommandModule::unload() {
+    stopExecutions();
+    auto executionLease = acquireUnloadLease();
     bool expected = true;
     return loaded.compare_exchange_strong(expected, false);
 }

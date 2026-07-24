@@ -77,7 +77,7 @@ struct SharedMalloc {
 
     explicit operator bool() const { return parent->size() != 0; }
     bool operator!=(std::nullptr_t value) { return parent.get() != value; }
-    void resize(size_t newSize) const noexcept { parent->realloc(newSize); }
+    void resize(size_t newSize) const { parent->realloc(newSize); }
 
     template <typename T>
     T* getAs() const {
@@ -95,17 +95,26 @@ struct SharedMalloc {
 
    private:
     // A fortify check.
-    inline void validateBoundsForSize(const size_type newSize) const {
-        if (newSize > size()) {
+    [[nodiscard]] inline size_type validateRange(offset_type offset,
+                                                 size_type length) const {
+        size_type normalized = 0;
+        if (offset < 0) {
+            // Avoid negating PTRDIFF_MIN, which is undefined.
+            const auto magnitude = static_cast<size_type>(-(offset + 1)) + 1;
+            if (magnitude > size()) {
+                throw std::out_of_range(
+                    "Negative offset exceeds allocated memory bounds");
+            }
+            normalized = size() - magnitude;
+        } else {
+            normalized = static_cast<size_type>(offset);
+        }
+        // Subtraction form avoids overflow in normalized + length.
+        if (normalized > size() || length > size() - normalized) {
             throw std::out_of_range(
-                "Operation size exceeds allocated memory size");
+                "Operation range exceeds allocated memory bounds");
         }
-    }
-
-    inline void offsetCheck(const offset_type offset) const {
-        if (offset > static_cast<offset_type>(size())) {
-            throw std::out_of_range("Offset exceeds allocated memory bounds");
-        }
+        return normalized;
     }
 
     [[nodiscard]] inline data_type* offsetGet(const offset_type offset) const {
@@ -136,10 +145,8 @@ struct SharedMalloc {
         static_assert(!std::is_const_v<T>,
                       "Using assignTo with a const pointer, did you mean to "
                       "use assignFrom?");
-        if (offset < 0) offset += static_cast<offset_type>(this->size());
-        offsetCheck(offset);
-        validateBoundsForSize(size + offset);
-        memcpy(ref, offsetGet(offset), size);
+        const auto normalized = validateRange(offset, size);
+        memcpy(ref, get() + normalized, size);
     }
 
     /**
@@ -191,7 +198,6 @@ struct SharedMalloc {
     template <typename T>
         requires(!std::is_pointer_v<T>)
     void assignFrom(const T &ref, const size_type offset = 0) {
-        validateBoundsForSize(sizeof(T));
         assignFrom(&ref, sizeof(T), offset);
     }
 
@@ -213,10 +219,8 @@ struct SharedMalloc {
     template <typename T>
     void assignFrom(const T *ref, const size_type size,
                     offset_type offset = 0) {
-        if (offset < 0) offset += static_cast<offset_type>(this->size());
-        offsetCheck(offset);
-        validateBoundsForSize(size + offset);
-        memcpy(offsetGet(offset), ref, size);
+        const auto normalized = validateRange(offset, size);
+        memcpy(get() + normalized, ref, size);
     }
 
     /**
@@ -234,10 +238,9 @@ struct SharedMalloc {
      */
     void move(const offset_type startOffset, const offset_type destOffset,
               const size_type size) {
-        offsetCheck(startOffset);
-        offsetCheck(destOffset);
-        validateBoundsForSize(size + destOffset);
-        memmove(offsetGet(destOffset), offsetGet(startOffset), size);
+        const auto source = validateRange(startOffset, size);
+        const auto destination = validateRange(destOffset, size);
+        memmove(get() + destination, get() + source, size);
     }
 
     bool operator==(const SharedMalloc &other) const noexcept {

@@ -62,12 +62,12 @@ jobs:
           upload: true
 
   # C/C++ requires a real build, so it is split into its own job that mirrors
-  # build.yml's Linux setup. It is heavy (full vcpkg dependency stack), so it
-  # only runs on master pushes + the weekly schedule, not on every PR.
+  # build.yml's Linux setup. Run it on pull requests as well so C++ findings are
+  # merge-blocking rather than being discovered only after landing on master.
   analyze-cpp:
     name: Analyze (c-cpp)
     runs-on: ubuntu-latest
-    if: github.event_name != 'pull_request'
+
     permissions:
       security-events: write
       contents: read

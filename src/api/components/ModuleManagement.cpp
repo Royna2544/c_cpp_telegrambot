@@ -64,11 +64,27 @@ bool TgBotApiImpl::ModulesManagement::load(const std::string& name) {
         accesslevel = AuthContext::AccessLevel::AdminUser;
     }
 
-    _api->getEvents().onCommand(name, [this, accesslevel,
-                                       cmd = name](Message::Ptr message) {
-        commandAsync.emplaceTask(
-            cmd, std::async(std::launch::async, &TgBotApiImpl::commandHandler,
-                            _api, cmd, accesslevel, std::move(message)));
+    auto* module = _handles.at(name).get();
+    _api->getEvents().onCommand(name, [this, accesslevel, cmd = name,
+                                       module](Message::Ptr message) {
+        auto lease = module->acquireExecutionLease();
+        if (!lease) {
+            return;
+        }
+        auto leaseHolder = std::make_shared<RefLock::SharedLease>(
+            std::move(*lease));
+        auto prepared = _api->prepareCommand(cmd, accesslevel, module,
+                                             std::move(message));
+        if (!prepared) {
+            return;
+        }
+        if (!commandAsync.emplaceTask(
+                cmd, [api = _api, cmd, module, prepared,
+                      leaseHolder = std::move(leaseHolder)] {
+                    api->commandHandler(cmd, module, prepared);
+                })) {
+            LOG(WARNING) << "Command queue is full; rejecting " << cmd;
+        }
     });
     return true;
 }
@@ -80,14 +96,17 @@ bool TgBotApiImpl::ModulesManagement::unload(const std::string& name) {
                      << " doesn't exist to unload.";
         return false;
     }
-    if (_handles.at(name)->isLoaded()) {
-        if (!_handles.at(name)->unload()) {
+    auto* module = _handles.at(name).get();
+    module->stopExecutions();
+    // Erase the command handler before dlclose; late deliveries cannot obtain
+    // a new module execution lease.
+    _api->getEvents().onCommand(name, {});
+    if (module->isLoaded()) {
+        if (!module->unload()) {
             LOG(ERROR) << "Failed to unload module with name " << name;
             return false;
         }
     }
-    // Erase command handler
-    _api->getEvents().onCommand(name, {});
     return true;
 }
 

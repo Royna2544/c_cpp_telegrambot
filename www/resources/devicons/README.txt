@@ -1,1 +1,0 @@
-From https://github.com/devicons/devicon/tree/master

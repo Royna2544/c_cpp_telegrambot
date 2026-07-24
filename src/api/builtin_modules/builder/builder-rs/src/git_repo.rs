@@ -26,7 +26,7 @@
 //! # };
 //! ```
 
-use std::{cell::RefCell, num::NonZero, path::PathBuf};
+use std::{cell::RefCell, num::NonZero, path::Path};
 
 use crate::util::LogErr;
 
@@ -47,6 +47,12 @@ type CredCallback =
 pub type ProgressCallback = dyn Fn(&git2::Progress) + Send + Sync;
 
 impl GitRepo {
+    fn is_token_eligible_url(url: &str) -> bool {
+        reqwest::Url::parse(url).is_ok_and(|parsed| {
+            parsed.scheme() == "https" && parsed.host_str() == Some("github.com")
+        })
+    }
+
     /// Builds a libgit2 credential callback. Attempt tracking lives inside the
     /// closure, so a fresh callback must be created for every clone/fetch.
     ///
@@ -87,7 +93,7 @@ impl GitRepo {
                 debug!("SSH URL detected for authentication.");
                 return git2::Cred::ssh_key_from_agent(username);
             }
-            if url.contains("github.com") {
+            if Self::is_token_eligible_url(url) {
                 debug!("GitHub URL detected for authentication.");
                 if let Some(token) = &github_token {
                     info!("Using provided GitHub token for authentication.");
@@ -127,7 +133,7 @@ impl GitRepo {
     }
 
     pub fn new(
-        path: &PathBuf,
+        path: &Path,
         remote_name: &str,
         github_token: Option<String>,
         progress_callback: Option<Box<ProgressCallback>>,
@@ -299,7 +305,7 @@ impl GitRepo {
         url: &str,
         branch: &str,
         clone_depth: Option<i32>,
-        dest_path: &PathBuf,
+        dest_path: &Path,
         github_token: Option<String>,
         progress_callback: &Option<Box<ProgressCallback>>,
     ) -> Result<(), git2::Error> {
@@ -327,7 +333,7 @@ impl GitRepo {
         builder.branch(branch);
         info!("Starting clone operation...");
 
-        match builder.clone(url, &dest_path) {
+        match builder.clone(url, dest_path) {
             Ok(_) => info!("Successfully cloned {} into {}", url, dest_path.display()),
             Err(e) => {
                 error!("Failed to clone repository: {}", e);
@@ -335,7 +341,7 @@ impl GitRepo {
             }
         };
 
-        Self::update_submodules(&Repository::open(&dest_path)?)?;
+        Self::update_submodules(&Repository::open(dest_path)?)?;
         Ok(())
     }
 
@@ -401,7 +407,7 @@ impl RepoHandle for GitRepo {
 pub trait GitProvider: Send + Sync {
     fn open(
         &self,
-        path: &PathBuf,
+        path: &Path,
         remote_name: &str,
         github_token: Option<String>,
         progress_callback: Option<Box<ProgressCallback>>,
@@ -414,7 +420,7 @@ pub trait GitProvider: Send + Sync {
         url: &str,
         branch: &str,
         clone_depth: Option<i32>,
-        dest_path: &PathBuf,
+        dest_path: &Path,
         github_token: Option<String>,
         progress_callback: &Option<Box<ProgressCallback>>,
     ) -> Result<(), git2::Error>;
@@ -426,7 +432,7 @@ pub struct RealGitProvider;
 impl GitProvider for RealGitProvider {
     fn open(
         &self,
-        path: &PathBuf,
+        path: &Path,
         remote_name: &str,
         github_token: Option<String>,
         progress_callback: Option<Box<ProgressCallback>>,
@@ -444,7 +450,7 @@ impl GitProvider for RealGitProvider {
         url: &str,
         branch: &str,
         clone_depth: Option<i32>,
-        dest_path: &PathBuf,
+        dest_path: &Path,
         github_token: Option<String>,
         progress_callback: &Option<Box<ProgressCallback>>,
     ) -> Result<(), git2::Error> {
@@ -467,6 +473,25 @@ mod cred_callback_tests {
     use super::GitRepo;
 
     #[test]
+    fn github_token_is_only_used_for_exact_https_github_host() {
+        assert!(GitRepo::is_token_eligible_url("https://github.com/foo/bar"));
+        assert!(GitRepo::is_token_eligible_url(
+            "https://github.com:443/foo/bar"
+        ));
+        assert!(!GitRepo::is_token_eligible_url("http://github.com/foo/bar"));
+        assert!(!GitRepo::is_token_eligible_url("ssh://github.com/foo/bar"));
+        assert!(!GitRepo::is_token_eligible_url(
+            "https://github.com.evil.test/foo/bar"
+        ));
+        assert!(!GitRepo::is_token_eligible_url(
+            "https://evil.test/github.com/foo/bar"
+        ));
+        assert!(!GitRepo::is_token_eligible_url(
+            "not a URL containing github.com"
+        ));
+    }
+
+    #[test]
     fn second_attempt_for_same_url_is_an_auth_error() {
         let cb = GitRepo::get_cred_callback(Some("test-token".to_string()));
         let url = "https://github.com/foo/bar";
@@ -478,18 +503,33 @@ mod cred_callback_tests {
             Err(e) => e,
         };
         assert_eq!(err.code(), git2::ErrorCode::Auth);
-        assert!(err.message().contains(url), "error should name the URL: {err}");
+        assert!(
+            err.message().contains(url),
+            "error should name the URL: {err}"
+        );
     }
 
     #[test]
     fn a_different_url_gets_a_fresh_attempt() {
         let cb = GitRepo::get_cred_callback(Some("test-token".to_string()));
-        cb("https://github.com/foo/a", None, git2::CredentialType::USER_PASS_PLAINTEXT)
-            .expect("first URL should yield credentials");
+        cb(
+            "https://github.com/foo/a",
+            None,
+            git2::CredentialType::USER_PASS_PLAINTEXT,
+        )
+        .expect("first URL should yield credentials");
         // A new URL (e.g. after a redirect) is not a rejection of the previous one.
-        cb("https://github.com/foo/b", None, git2::CredentialType::USER_PASS_PLAINTEXT)
-            .expect("a different URL should get a fresh attempt");
-        let err = match cb("https://github.com/foo/b", None, git2::CredentialType::USER_PASS_PLAINTEXT) {
+        cb(
+            "https://github.com/foo/b",
+            None,
+            git2::CredentialType::USER_PASS_PLAINTEXT,
+        )
+        .expect("a different URL should get a fresh attempt");
+        let err = match cb(
+            "https://github.com/foo/b",
+            None,
+            git2::CredentialType::USER_PASS_PLAINTEXT,
+        ) {
             Ok(_) => panic!("second attempt for the same URL should fail"),
             Err(e) => e,
         };
@@ -500,8 +540,7 @@ mod cred_callback_tests {
     fn username_query_does_not_count_as_an_attempt() {
         let cb = GitRepo::get_cred_callback(None);
         let url = "ssh://example.com/foo/bar";
-        cb(url, None, git2::CredentialType::USERNAME)
-            .expect("username query should be answered");
+        cb(url, None, git2::CredentialType::USERNAME).expect("username query should be answered");
         // The follow-up SSH_KEY request is the first real attempt. It may fail
         // when no ssh-agent is reachable, but it must not be misreported as
         // the server rejecting credentials.
@@ -512,11 +551,12 @@ mod cred_callback_tests {
 }
 
 #[cfg(test)]
+#[allow(dead_code)]
 pub(crate) mod mock {
     //! In-memory git seam for tests: records open/clone calls and returns canned
     //! handles, performing no real git I/O.
     use super::{GitProvider, ProgressCallback, RepoHandle};
-    use std::path::PathBuf;
+    use std::path::Path;
     use std::sync::Mutex;
 
     #[derive(Default)]
@@ -564,7 +604,7 @@ pub(crate) mod mock {
     impl GitProvider for MockGitProvider {
         fn open(
             &self,
-            path: &PathBuf,
+            path: &Path,
             _remote_name: &str,
             _github_token: Option<String>,
             _progress_callback: Option<Box<ProgressCallback>>,
@@ -584,7 +624,7 @@ pub(crate) mod mock {
             url: &str,
             _branch: &str,
             _clone_depth: Option<i32>,
-            _dest_path: &PathBuf,
+            _dest_path: &Path,
             _github_token: Option<String>,
             _progress_callback: &Option<Box<ProgressCallback>>,
         ) -> Result<(), git2::Error> {

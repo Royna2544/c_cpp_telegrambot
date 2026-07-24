@@ -121,14 +121,15 @@ pub(crate) mod mock {
             self.files.lock().unwrap().insert(path, contents.into());
         }
 
-        /// Make every fallible operation on `path` return an io error.
+        /// Make every fallible operation on `path` return an I/O error.
+        #[allow(dead_code)]
         pub fn fail_on(&self, path: impl Into<PathBuf>) {
             self.fail.lock().unwrap().insert(path.into());
         }
 
         fn check_fail(&self, path: &Path) -> io::Result<()> {
             if self.fail.lock().unwrap().contains(path) {
-                Err(io::Error::new(io::ErrorKind::Other, "mock filesystem failure"))
+                Err(io::Error::other("mock filesystem failure"))
             } else {
                 Ok(())
             }
@@ -247,8 +248,8 @@ pub(crate) mod mock {
 
 #[cfg(test)]
 mod tests {
-    use super::mock::MockFilesystem;
     use super::Filesystem;
+    use super::mock::MockFilesystem;
     use std::path::Path;
 
     #[test]
@@ -272,11 +273,27 @@ mod tests {
         fs.write(Path::new("/repo/out.txt"), b"hi").unwrap();
         assert!(fs.is_file(Path::new("/repo/out.txt")));
         assert_eq!(fs.file_len(Path::new("/repo/out.txt")).unwrap(), 2);
-        assert_eq!(fs.copy(Path::new("/repo/out.txt"), Path::new("/repo/copy.txt")).unwrap(), 2);
+        assert_eq!(
+            fs.copy(Path::new("/repo/out.txt"), Path::new("/repo/copy.txt"))
+                .unwrap(),
+            2
+        );
         fs.remove_file(Path::new("/repo/out.txt")).unwrap();
         assert!(!fs.is_file(Path::new("/repo/out.txt")));
 
-        assert!(fs.written.lock().unwrap().iter().any(|p| p.ends_with("out.txt")));
-        assert!(fs.removed.lock().unwrap().iter().any(|p| p.ends_with("out.txt")));
+        assert!(
+            fs.written
+                .lock()
+                .unwrap()
+                .iter()
+                .any(|p| p.ends_with("out.txt"))
+        );
+        assert!(
+            fs.removed
+                .lock()
+                .unwrap()
+                .iter()
+                .any(|p| p.ends_with("out.txt"))
+        );
     }
 }

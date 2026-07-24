@@ -263,7 +263,8 @@ class UTILS_EXPORT ConfigManager {
         // Cmdline) inherit this unchanged. Only ConfigBackendFile overrides
         // it with safe parse-into-temp-then-swap semantics.
         virtual bool reload() { return load(); }
-        virtual std::optional<std::string> get(const std::string_view name) = 0;
+        virtual std::optional<std::string> get(
+            const std::string_view name) const = 0;
 
         /**
          * @brief This field stores the name of the backend.

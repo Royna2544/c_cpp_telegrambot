@@ -3,6 +3,8 @@
 #include <fmt/format.h>
 
 #include <libfs.hpp>
+#include <chrono>
+#include <future>
 #include <memory>
 
 #include "../GetCommandLine.hpp"
@@ -82,6 +84,22 @@ CommandModule::Ptr CommandModulesTest::loadModule(
 
 void CommandModulesTest::unloadModule(CommandModule::Ptr module) {
     module->unload();
+}
+
+TEST_F(CommandModulesTest, DynamicUnloadWaitsForExecutionLease) {
+    using namespace std::chrono_literals;
+    auto module = loadModule("alive");
+    ASSERT_NE(module, nullptr);
+    auto lease = module->acquireExecutionLease();
+
+    auto unload = std::async(std::launch::async,
+                             [&] { return module->unload(); });
+    EXPECT_EQ(unload.wait_for(100ms), std::future_status::timeout);
+
+    ASSERT_TRUE(lease.has_value());
+    lease->unlock();
+    EXPECT_EQ(unload.wait_for(2s), std::future_status::ready);
+    EXPECT_TRUE(unload.get());
 }
 
 Message::Ptr CommandModulesTest::createDefaultMessage() {

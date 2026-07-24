@@ -1,4 +1,5 @@
 #include <api/components/OnCallbackQuery.hpp>
+#include <api/components/ModuleManagement.hpp>
 
 void TgBotApiImpl::OnCallbackQueryImpl::onCallbackQueryFunction(
     TgBot::CallbackQuery::Ptr query) {
@@ -7,8 +8,24 @@ void TgBotApiImpl::OnCallbackQueryImpl::onCallbackQueryFunction(
         return;
     }
     for (const auto& [command, callback] : listeners) {
-        queryAsync.emplaceTask(command,
-                               std::async(std::launch::async, callback, query));
+        auto* module = (*_api->kModuleLoader)[command];
+        if (module == nullptr) {
+            continue;
+        }
+        auto lease = module->acquireExecutionLease();
+        if (!lease) {
+            continue;
+        }
+        auto leaseHolder = std::make_shared<RefLock::SharedLease>(
+            std::move(*lease));
+        if (!queryAsync.emplaceTask(
+                command, [callback, query,
+                          leaseHolder = std::move(leaseHolder)] {
+                    callback(query);
+                })) {
+            LOG(WARNING) << "Callback-query queue is full; rejecting "
+                         << command;
+        }
     }
 }
 

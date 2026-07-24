@@ -126,22 +126,22 @@ impl ProcessRunner for RealProcessRunner {
             child.id()
         );
 
-        if let Some(mut stdin_rx) = spec.stdin_rx {
-            if let Some(mut child_stdin) = child.stdin.take() {
-                tokio::spawn(async move {
-                    while let Some(message) = stdin_rx.recv().await {
-                        if child_stdin.write_all(message.as_bytes()).await.is_err() {
-                            break;
-                        }
-                        if !message.ends_with('\n') && child_stdin.write_all(b"\n").await.is_err() {
-                            break;
-                        }
-                        if child_stdin.flush().await.is_err() {
-                            break;
-                        }
+        if let Some(mut stdin_rx) = spec.stdin_rx
+            && let Some(mut child_stdin) = child.stdin.take()
+        {
+            tokio::spawn(async move {
+                while let Some(message) = stdin_rx.recv().await {
+                    if child_stdin.write_all(message.as_bytes()).await.is_err() {
+                        break;
                     }
-                });
-            }
+                    if !message.ends_with('\n') && child_stdin.write_all(b"\n").await.is_err() {
+                        break;
+                    }
+                    if child_stdin.flush().await.is_err() {
+                        break;
+                    }
+                }
+            });
         }
 
         let stdout = child

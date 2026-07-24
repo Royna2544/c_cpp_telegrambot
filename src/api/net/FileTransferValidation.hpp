@@ -1,7 +1,10 @@
 #pragma once
 
+#include <algorithm>
 #include <cstddef>
 #include <cstdint>
+#include <iterator>
+#include <map>
 
 // Pure boundary/size helpers for the file-transfer RPCs. Extracted from
 // SocketServiceImpl so the bounds and overflow checks can be unit-tested
@@ -9,7 +12,43 @@
 namespace tgbot::socket::transfer {
 
 inline constexpr std::uintmax_t kChunkSize = 64 * 1024;        // 64 KB
-inline constexpr std::uintmax_t kMaxTransferSize = 2ULL << 30;  // 2 GiB
+inline constexpr std::uintmax_t kMaxTransferSize =
+    5ULL * 1024 * 1024 * 1024 / 2;  // exactly 2.5 GiB
+
+class UploadCoverage {
+   public:
+    explicit UploadCoverage(std::uintmax_t totalSize = 0)
+        : totalSize_(totalSize) {}
+
+    void add(std::uintmax_t offset, std::uintmax_t length) {
+        if (length == 0) return;
+        std::uintmax_t begin = offset;
+        std::uintmax_t end = offset + length;
+        auto it = ranges_.lower_bound(begin);
+        if (it != ranges_.begin()) {
+            auto previous = std::prev(it);
+            if (previous->second >= begin) it = previous;
+        }
+        while (it != ranges_.end() && it->first <= end) {
+            begin = std::min(begin, it->first);
+            end = std::max(end, it->second);
+            coveredBytes_ -= it->second - it->first;
+            it = ranges_.erase(it);
+        }
+        ranges_[begin] = end;
+        coveredBytes_ += end - begin;
+    }
+
+    [[nodiscard]] bool complete() const {
+        return coveredBytes_ == totalSize_;
+    }
+    [[nodiscard]] std::uintmax_t coveredBytes() const { return coveredBytes_; }
+
+   private:
+    std::uintmax_t totalSize_{};
+    std::uintmax_t coveredBytes_{};
+    std::map<std::uintmax_t, std::uintmax_t> ranges_;
+};
 
 // Number of chunks needed to cover a file of `size` bytes.
 inline int chunkCount(std::uintmax_t size) {

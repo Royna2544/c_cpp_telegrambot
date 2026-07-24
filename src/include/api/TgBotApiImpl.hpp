@@ -457,13 +457,17 @@ class TgBotApiImpl : public TgBotApi {
     TgBot::LinkPreviewOptions::Ptr globalLinkOptions;
 
    public:
+    class Async;
+
     void startPoll() override;
 
     bool unloadCommand(const std::string& command) override;
     bool reloadCommand(const std::string& command) override;
-    void commandHandler(const std::string& command,
-                        AuthContext::AccessLevel authflags,
-                        Message::Ptr message);
+    [[nodiscard]] std::shared_ptr<MessageExt> prepareCommand(
+        const std::string& command, AuthContext::AccessLevel authflags,
+        CommandModule* module, Message::Ptr message);
+    void commandHandler(const std::string& command, CommandModule* module,
+                        const std::shared_ptr<MessageExt>& message);
     bool validateValidArgs(const CommandModule::Info* module,
                            MessageExt::Ptr message);
 
@@ -499,7 +503,6 @@ class TgBotApiImpl : public TgBotApi {
 
     [[nodiscard]] bool isMyCommand(const MessageExt::Ptr& message) const;
 
-    class Async;
     Bot _bot;
 
     mutable User::Ptr me;  // Just a cache

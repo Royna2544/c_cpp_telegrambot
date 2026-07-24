@@ -157,45 +157,42 @@ bool TgBotApiImpl::authorized(const MessageExt::Ptr& message,
     return false;
 }
 
-void TgBotApiImpl::commandHandler(const std::string& command,
-                                  const AuthContext::AccessLevel authflags,
-                                  Message::Ptr message) {
-    auto lock = _refLock->acquireShared();
+std::shared_ptr<MessageExt> TgBotApiImpl::prepareCommand(
+    const std::string& command, const AuthContext::AccessLevel authflags,
+    CommandModule* module, Message::Ptr message) {
+    if (module == nullptr || !module->isLoaded()) {
+        LOG(INFO) << "Command module is unavailable: " << command;
+        return {};
+    }
 
-    // Find the module first.
-    const auto* module = (*kModuleLoader)[command];
-
-    // Create MessageExt object.
     SplitMessageText how = module->info.valid_args.enabled
                                ? module->info.valid_args.split_type
                                : SplitMessageText::None;
-    auto ext = std::make_unique<MessageExt>(std::move(message), how);
+    auto ext = std::make_shared<MessageExt>(std::move(message), how);
 
     if (!isMyCommand(ext.get())) {
-        return;
-    }
-
-    if (!module->isLoaded()) {
-        // Probably unloaded.
-        LOG(INFO) << "Command module is unloaded: " << module->info.name;
-        return;
+        return {};
     }
 
     if (!authorized(ext.get(), command, authflags)) {
-        return;
+        return {};
     }
 
-    // Rate-limit per user (fall back to chat id when there is no sender, e.g.
-    // channel posts) so one user cannot exhaust a shared global budget.
     const auto rlUser = ext->get<MessageAttrs::User>();
     const std::int64_t rlKey =
         rlUser ? rlUser->id : ext->get<MessageAttrs::Chat>()->id;
     if (!_rateLimiter.check(rlKey)) {
-        LOG(INFO) << fmt::format("Ratelimiting user {}", rlUser);
-        return;
+        LOG(INFO) << fmt::format("Ratelimiting key {}", rlKey);
+        return {};
     }
+    return ext;
+}
 
-    // Partital offloading to common code.
+void TgBotApiImpl::commandHandler(
+    const std::string& command, CommandModule* module,
+    const std::shared_ptr<MessageExt>& ext) {
+    auto lock = _refLock->acquireShared();
+
     if (!validateValidArgs(&module->info, ext.get())) {
         return;
     }

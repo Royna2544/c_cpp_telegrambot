@@ -24,7 +24,7 @@ pub fn for_each_json_file<T>(
 ) -> Vec<T> {
     let entries: std::fs::ReadDir;
     let mut results: Vec<T> = Vec::new();
-    match std::fs::read_dir(&json_dir) {
+    match std::fs::read_dir(json_dir) {
         Err(e) => {
             error!(
                 "Failed to read JSON directory {}: {}",
@@ -128,18 +128,17 @@ pub fn make_canonical_path_mkdirs(path: &PathBuf) -> Option<PathBuf> {
 /// # Returns
 ///
 /// The deserialized object or an error
+#[allow(clippy::result_unit_err)]
 pub fn new_impl<T>(file_path: &PathBuf) -> Result<T, ()>
 where
     T: for<'de> Deserialize<'de>,
 {
-    let file = std::fs::File::open(file_path).or_else(|err| {
+    let file = std::fs::File::open(file_path).map_err(|err| {
         error!("Failed to open file {:?}: {}", file_path, err);
-        Err(())
     })?;
     let reader = std::io::BufReader::new(file);
     let config: T = serde_json::from_reader(reader).map_err(|x| {
         error!("JSON parsing error: {}", x);
-        ()
     })?;
     Ok(config)
 }
@@ -275,6 +274,7 @@ mod tests {
     #[test]
     fn test_new_impl_valid_json() {
         #[derive(Deserialize)]
+        #[allow(dead_code)]
         struct TestConfig {
             key: String,
         }
@@ -295,6 +295,7 @@ mod tests {
     #[test]
     fn test_new_impl_invalid_json() {
         #[derive(Deserialize)]
+        #[allow(dead_code)]
         struct TestConfig {
             key: String,
         }
@@ -313,6 +314,7 @@ mod tests {
     #[test]
     fn test_new_impl_nonexistent_file() {
         #[derive(Deserialize)]
+        #[allow(dead_code)]
         struct TestConfig {
             key: String,
         }

@@ -1,3 +1,4 @@
+#[allow(non_camel_case_types)]
 pub(crate) mod grpc_pb {
     include!(concat!(env!("OUT_DIR"), "/tgbot.builder.android.rs"));
 }
@@ -282,13 +283,8 @@ impl rom_build_service_server::RomBuildService for BuildService {
             })
             .map_err(build_error_to_status)?;
 
-        let parallel_jobs = match req.parallel_jobs {
-            Some(jobs) => {
-                info!("Using {} parallel jobs for build", jobs);
-                jobs
-            }
-            None => num_cpus::get() as i32,
-        };
+        let parallel_jobs = Self::clamp_parallel_jobs(req.parallel_jobs, num_cpus::get());
+        info!("Using {} parallel jobs for build", parallel_jobs);
 
         let build_variant = rom_build_variant(req.build_variant)?;
 
@@ -299,11 +295,19 @@ impl rom_build_service_server::RomBuildService for BuildService {
             config_name: req.config_name.clone(),
             success: BuildStatus::InProgress,
         };
-        self.registry.known.lock().await.push(known_builds_entry);
+        self.registry.push_known(known_builds_entry).await;
+
+        // Secrets live in a per-build TempDir and are removed when the task drops.
+        let secret_dir = tempfile::Builder::new()
+            .prefix("rom-build-secrets-")
+            .tempdir_in(&self.tempdir)
+            .map_err(|e| {
+                Status::internal(format!("Failed to create per-build secret directory: {e}"))
+            })?;
 
         // Write git-askpass file if github token is provided
         let askpass_path = if let Some(token) = &req.github_token {
-            let askpass_path = self.build_dir.join("git-askpass.sh");
+            let askpass_path = secret_dir.path().join("git-askpass.sh");
             info!("Writing git-askpass file to {:?}", askpass_path);
             let script = format!(
                 "#!/bin/sh\nprintf '%s\\n' {}\n",
@@ -364,6 +368,7 @@ impl rom_build_service_server::RomBuildService for BuildService {
             log_tx_clone,
             registry: self.registry.clone(),
             askpass_path_clone,
+            secret_dir: Some(secret_dir),
             runner,
             git,
             fs,
@@ -377,7 +382,7 @@ impl rom_build_service_server::RomBuildService for BuildService {
             id: build_id.clone(),
             kill_tx,
             log_tx,
-            _task: task_handle,
+            task: task_handle,
         });
 
         info!("Build with ID: {} has been queued.", build_id);
@@ -411,13 +416,23 @@ impl rom_build_service_server::RomBuildService for BuildService {
 
         let output = async_stream::try_stream! {
             loop {
-                let log_entry = log_rx.recv().await.map_err(|e| {
-                    tonic::Status::internal(format!("Failed to receive log entry: {}", e))
-                })?;
-                if log_entry.is_finished {
-                    break;
+                match log_rx.recv().await {
+                    Ok(log_entry) => {
+                        if log_entry.is_finished {
+                            break;
+                        }
+                        yield log_entry;
+                    }
+                    Err(broadcast::error::RecvError::Lagged(skipped)) => {
+                        yield BuildLogEntry {
+                            timestamp: chrono::Utc::now().timestamp(),
+                            level: grpc_pb::LogLevel::Warning.into(),
+                            message: format!("[log stream lagged: {skipped} messages skipped]"),
+                            is_finished: false,
+                        };
+                    }
+                    Err(broadcast::error::RecvError::Closed) => break,
                 }
-                yield log_entry;
             }
         };
 
@@ -538,7 +553,7 @@ impl rom_build_service_server::RomBuildService for BuildService {
             let upload_task_ = upload_tasks
                 .iter()
                 .find(|task| task.build_id == req.build_id);
-            if !upload_task_.is_some() {
+            if upload_task_.is_none() {
                 tx.send(Ok(BuildResult {
                     success: true,
                     upload_method: UploadMethod::None as i32,

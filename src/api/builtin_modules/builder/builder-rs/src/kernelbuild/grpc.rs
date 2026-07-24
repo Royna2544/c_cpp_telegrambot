@@ -1,3 +1,4 @@
+#[allow(non_camel_case_types)]
 pub(crate) mod grpc_pb {
     include!(concat!(env!("OUT_DIR"), "/tgbot.builder.linuxkernel.rs"));
 }
@@ -6,7 +7,7 @@ pub use grpc_pb::linux_kernel_build_service_server;
 
 use super::{
     builder_config::CompilerType,
-    domain::{BuildContext, PerBuildIdStatus},
+    domain::{BuildContext, BuildLifecycle, PerBuildIdStatus},
     harness::run_process,
     kernel_config::KernelConfig,
     service::BuildService,
@@ -36,38 +37,37 @@ fn log_who_asked_me(method: &str, request: &Request<impl std::fmt::Debug>) {
 macro_rules! report {
     ($tx:expr, $status:ident, $msg:expr) => {
         info!("Build Status - {:?}: {}", ProgressStatus::$status, $msg);
-        $tx.send(Ok(BuildStatus {
-            status: ProgressStatus::$status.into(),
-            output: $msg.into(),
-            build_id: None,
-        }))
-        .await
-        .unwrap();
+        let _ = $tx
+            .send(Ok(BuildStatus {
+                status: ProgressStatus::$status.into(),
+                output: $msg.into(),
+                build_id: None,
+            }))
+            .await;
     };
 }
 
 macro_rules! report_blk {
     ($tx:expr, $status:ident, $msg:expr) => {
         info!("Build Status - {:?}: {}", ProgressStatus::$status, $msg);
-        $tx.blocking_send(Ok(BuildStatus {
+        let _ = $tx.blocking_send(Ok(BuildStatus {
             status: ProgressStatus::$status.into(),
             output: $msg.into(),
             build_id: None,
-        }))
-        .unwrap();
+        }));
     };
 }
 
 macro_rules! report_build_id {
     ($tx:expr, $build_id:expr, $status:ident, $msg:expr) => {
         info!("Build Status - {:?}: {}", ProgressStatus::$status, $msg);
-        $tx.send(Ok(BuildStatus {
-            status: ProgressStatus::$status.into(),
-            output: $msg.into(),
-            build_id: Some($build_id),
-        }))
-        .await
-        .unwrap();
+        let _ = $tx
+            .send(Ok(BuildStatus {
+                status: ProgressStatus::$status.into(),
+                output: $msg.into(),
+                build_id: Some($build_id),
+            }))
+            .await;
     };
 }
 
@@ -385,7 +385,7 @@ impl linux_kernel_build_service_server::LinuxKernelBuildService for BuildService
 
             // Now let us clone the kernel source...
             let tx_for_git = tx.clone();
-            let source_dir = outdir.join(&config.name.replace(' ', "_").replace(':', "_"));
+            let source_dir = outdir.join(config.name.replace([' ', ':'], "_"));
             let source_dir_clone = source_dir.clone();
             let source_dir_clone2 = source_dir.clone();
             let config_branch = config.repo.branch.clone();
@@ -665,8 +665,8 @@ impl linux_kernel_build_service_server::LinuxKernelBuildService for BuildService
             let entry = BuildContext {
                 id: current_id,
                 work_dir: source_dir,
-                config: config,
-                toolchain_dir: toolchain_dir,
+                config,
+                toolchain_dir,
                 device_name: req.device_name,
                 toolchain: toolchain.clone(),
                 artifact_path: None,
@@ -679,21 +679,22 @@ impl linux_kernel_build_service_server::LinuxKernelBuildService for BuildService
             let mut per_build_statuses_lock = per_build_statuses.lock().await;
             per_build_statuses_lock.push(PerBuildIdStatus {
                 build_id: current_id,
-                finished: false,
+                lifecycle: BuildLifecycle::Prepared,
                 succeeded: success,
             });
             drop(per_build_statuses_lock);
+            Self::prune_kernel_statuses(&per_build_statuses).await;
 
-            tx.send(Ok(BuildStatus {
-                status: ProgressStatus::Success.into(),
-                output: format!(
-                    "Build preparation completed successfully., Build ID: {}",
-                    current_id
-                ),
-                build_id: Some(current_id),
-            }))
-            .await
-            .unwrap();
+            let _ = tx
+                .send(Ok(BuildStatus {
+                    status: ProgressStatus::Success.into(),
+                    output: format!(
+                        "Build preparation completed successfully., Build ID: {}",
+                        current_id
+                    ),
+                    build_id: Some(current_id),
+                }))
+                .await;
             Ok(())
         });
 
@@ -756,22 +757,6 @@ impl linux_kernel_build_service_server::LinuxKernelBuildService for BuildService
                 req.build_id
             )));
         }
-        if Self::is_build_finished(&peridstat, req.build_id).await {
-            report_build_id!(
-                tx,
-                req.build_id,
-                Failed,
-                format!(
-                    "Build ID {} is not in a pending state. (Already finished?)",
-                    req.build_id
-                )
-            );
-            return Err(Status::failed_precondition(format!(
-                "Build ID {} is not in a pending state. (Already finished?)",
-                req.build_id
-            )));
-        }
-
         let context = {
             let contexts = self.contexts.lock().await;
             let ctx = contexts.iter().find(|c| c.id == req.build_id);
@@ -795,6 +780,7 @@ impl linux_kernel_build_service_server::LinuxKernelBuildService for BuildService
                 }
             }
         };
+        Self::claim_prepared_build(&peridstat, req.build_id).await?;
         let peridstat = self.build_statuses.clone();
         let toolchain_dir = context.toolchain_dir.clone();
         let tmp_dir = self.temp_directory.clone();
@@ -893,6 +879,7 @@ impl linux_kernel_build_service_server::LinuxKernelBuildService for BuildService
                     InProgressBuild,
                     "Packaging with AnyKernel..."
                 );
+                #[allow(clippy::unnecessary_unwrap)]
                 if anykernel.location.is_none() {
                     report_build_id!(
                         tx,
@@ -1048,7 +1035,7 @@ impl linux_kernel_build_service_server::LinuxKernelBuildService for BuildService
                     .iter_mut()
                     .find(|s| s.build_id == req.build_id)
                 {
-                    entry.finished = true;
+                    entry.lifecycle = BuildLifecycle::Finished;
                 }
                 drop(per_build_statuses_lock);
 

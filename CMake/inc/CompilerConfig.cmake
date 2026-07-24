@@ -1,6 +1,8 @@
 # Check if we're cross-compiling
 if(TGBOTCPP_AUTODETECT_CROSS_COMPILING)
-  if(CMAKE_SYSTEM_PROCESSOR AND NOT CMAKE_SYSTEM_PROCESSOR STREQUAL CMAKE_HOST_SYSTEM_PROCESSOR)
+  if(CMAKE_CROSSCOMPILING OR
+     (CMAKE_SYSTEM_PROCESSOR AND
+      NOT CMAKE_SYSTEM_PROCESSOR STREQUAL CMAKE_HOST_SYSTEM_PROCESSOR))
     set(TGBOTCPP_CROSS_COMPILING TRUE)
     message(STATUS "Auto-detected cross-compiling environment (Host: ${CMAKE_HOST_SYSTEM_PROCESSOR}, Target: ${CMAKE_SYSTEM_PROCESSOR})")
   else()
@@ -16,6 +18,14 @@ else()
 endif()
 
 if (TGBOTCPP_CROSS_COMPILING)
+  set(TGBOTCPP_CROSS_COMPILE_INSTALL_PATH "/usr/" CACHE PATH
+      "TgBot-Cpp: Install prefix for cross-compiling")
+  set(TGBOTCPP_CROSS_COMPILE_CC "/usr/bin/cc" CACHE FILEPATH
+      "TgBot-Cpp: C compiler available on remote host")
+  set(TGBOTCPP_CROSS_COMPILE_CXX "/usr/bin/c++" CACHE FILEPATH
+      "TgBot-Cpp: C++ compiler available on remote host")
+  set(TGBOTCPP_CROSS_COMPILE_PYTHON "/usr/bin/python3" CACHE FILEPATH
+      "TgBot-Cpp: Python executable available on remote host")
   message(STATUS "Cross-compiling: Showing config")
   message(STATUS "  Install path for cross-compiling tools: ${TGBOTCPP_CROSS_COMPILE_INSTALL_PATH}")
   message(STATUS "  C compiler on remote host: ${TGBOTCPP_CROSS_COMPILE_CC}")
@@ -36,7 +46,10 @@ endif()
 # Compiler specific settings
 set(GLOBAL_COMPILE_OPTIONS)
 set(GLOBAL_DEFINITIONS)
-set(GLOBAL_INCLUDE_DIRS ${CMAKE_SOURCE_DIR}/src/include ${CMAKE_SOURCE_DIR}/src)
+set(GLOBAL_INCLUDE_DIRS
+    ${TGBOTCPP_GENERATED_INCLUDE_DIR}
+    ${CMAKE_SOURCE_DIR}/src/include
+    ${CMAKE_SOURCE_DIR}/src)
 
 # Test proper c++20 jthread, stop_token
 set(_jthread_test_source

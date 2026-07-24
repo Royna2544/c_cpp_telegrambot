@@ -85,7 +85,7 @@ AuthContext::Result AuthContext::isAuthorized(const User::Ptr& user,
             return {!isInBlacklist, Result::Reason::ForbiddenUser};
         }
         case AccessLevel::AdminUser: {
-            return {isInWhitelist || isOwner,
+            return {!isInBlacklist && (isInWhitelist || isOwner),
                     isInBlacklist ? Result::Reason::ForbiddenUser
                                   : Result::Reason::PermissionDenied};
         }

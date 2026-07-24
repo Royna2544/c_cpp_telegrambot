@@ -3,19 +3,20 @@
 #include <api/TgBotApiImpl.hpp>
 #include <atomic>
 #include <condition_variable>
+#include <functional>
 #include <mutex>
 #include <queue>
+#include <string>
 #include <thread>
 #include <utility>
 #include <vector>
-#include <string>
-#include <future>
 
 class TgBotApiImpl::Async {
     // A flag to stop CallbackQuery worker
     std::atomic<bool> stopWorker = false;
-    // A queue to handle command (commandname, async future)
-    std::queue<std::pair<std::string, std::future<void>>> tasks;
+    // A bounded queue of work consumed by the fixed worker set.
+    std::queue<std::pair<std::string, std::function<void()>>> tasks;
+    std::size_t maxQueueSize;
     // mutex to protect shared queue
     std::mutex mutex;
     // condition variable to wait for async tasks to finish.
@@ -28,9 +29,11 @@ class TgBotApiImpl::Async {
     void threadFunction();
 
    public:
-    explicit Async(std::string name, const int count);
+    explicit Async(std::string name, int count,
+                   std::size_t maxQueueSize = 32);
     ~Async();
 
     NO_COPY_CTOR(Async);
-    void emplaceTask(std::string command, std::future<void> future);
+    [[nodiscard]] bool emplaceTask(std::string command,
+                                   std::function<void()> task);
 };

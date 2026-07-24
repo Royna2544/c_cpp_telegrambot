@@ -9,12 +9,15 @@ class RefLock {
     std::shared_mutex mutex;
 
    public:
-    std::lock_guard<std::shared_mutex> acquireExclusive() {
-        return std::lock_guard<std::shared_mutex>(mutex);
+    using ExclusiveLease = std::unique_lock<std::shared_mutex>;
+    using SharedLease = std::shared_lock<std::shared_mutex>;
+
+    ExclusiveLease acquireExclusive() {
+        return ExclusiveLease(mutex);
     }
 
-    std::shared_lock<std::shared_mutex> acquireShared() {
-        return std::shared_lock<std::shared_mutex>(mutex);
+    SharedLease acquireShared() {
+        return SharedLease(mutex);
     }
 
     bool tryAcquireShared() { return mutex.try_lock_shared(); }

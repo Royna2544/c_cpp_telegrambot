@@ -215,10 +215,13 @@ bool LuaCommandModule::load() {
               << " as command: " << info.name;
 
     _context->isLoaded = true;
+    enableExecutions();
     return true;
 }
 
 bool LuaCommandModule::unload() {
+    stopExecutions();
+    auto executionLease = acquireUnloadLease();
     _context->lua = {};
     _context->isLoaded = false;
     return true;

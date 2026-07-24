@@ -28,6 +28,7 @@ constexpr static UserId FAKE_BLACKLISTED_ID = 123456;
 constexpr static UserId FAKE_WHITELISTED_ID = 1234567890;
 constexpr static UserId FAKE_RANDOM_ID = 1234567891;
 constexpr static UserId FAKE_BACKEND_ERROR_ID = 999999;
+constexpr static UserId FAKE_BLACKLISTED_OWNER_ID = 888888;
 
 std::ostream& operator<<(std::ostream& os, const AuthParam& Authparam) {
     switch (Authparam.userId) {
@@ -149,6 +150,28 @@ TEST_P(AuthContextTest, expectedForMessagesInTime) {
         EXPECT_FALSE(res);
         EXPECT_EQ(res.result.second, Authparam.expected.reason);
     }
+}
+
+TEST_F(AuthContextTest, BlacklistDeniesOwnerAdminAccess) {
+    auto user = std::make_shared<TgBot::User>();
+    user->id = FAKE_BLACKLISTED_OWNER_ID;
+
+    EXPECT_CALL(*database, getOwnerUserId)
+        .WillOnce(Return(FAKE_BLACKLISTED_OWNER_ID));
+    EXPECT_CALL(*database,
+                checkUserInList(DatabaseBase::ListType::BLACKLIST,
+                                FAKE_BLACKLISTED_OWNER_ID))
+        .WillOnce(Return(DatabaseBase::ListResult::OK));
+    EXPECT_CALL(*database,
+                checkUserInList(DatabaseBase::ListType::WHITELIST,
+                                FAKE_BLACKLISTED_OWNER_ID))
+        .WillOnce(Return(DatabaseBase::ListResult::ALREADY_IN_OTHER_LIST));
+
+    const auto result =
+        auth->isAuthorized(user, AuthContext::AccessLevel::AdminUser);
+
+    EXPECT_FALSE(result);
+    EXPECT_EQ(result.result.second, AuthContext::Result::Reason::ForbiddenUser);
 }
 
 INSTANTIATE_TEST_SUITE_P(

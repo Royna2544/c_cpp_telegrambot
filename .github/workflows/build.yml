@@ -48,6 +48,29 @@ jobs:
             real_cc: clang
             real_cxx: clang++
             flags: ''
+          - os: ubuntu-latest
+            cc: GCC-ASan-UBSan
+            real_cc: gcc
+            real_cxx: g++
+            flags: '-DCMAKE_C_FLAGS=-fsanitize=address,undefined -DCMAKE_CXX_FLAGS=-fsanitize=address,undefined -DCMAKE_EXE_LINKER_FLAGS=-fsanitize=address,undefined -DCMAKE_SHARED_LINKER_FLAGS=-fsanitize=address,undefined'
+            str: (ASan, UBSan)
+            asan_options: detect_leaks=0:halt_on_error=1
+            ubsan_options: halt_on_error=1:print_stacktrace=1
+          - os: ubuntu-latest
+            cc: GCC-TSan
+            real_cc: gcc
+            real_cxx: g++
+            flags: '-DCMAKE_C_FLAGS=-fsanitize=thread -DCMAKE_CXX_FLAGS=-fsanitize=thread -DCMAKE_EXE_LINKER_FLAGS=-fsanitize=thread -DCMAKE_SHARED_LINKER_FLAGS=-fsanitize=thread'
+            str: (TSan)
+            tsan_options: halt_on_error=1
+          - os: ubuntu-latest
+            cc: GCC-ARMHF
+            real_cc: arm-linux-gnueabihf-gcc
+            real_cxx: arm-linux-gnueabihf-g++
+            flags: '-DVCPKG_TARGET_TRIPLET=arm-linux-release -DVCPKG_INSTALL_OPTIONS=--allow-unsupported -DVCPKG_OVERLAY_TRIPLETS=${{ github.workspace }}/CMake/triplets -DVCPKG_CHAINLOAD_TOOLCHAIN_FILE=${{ github.workspace }}/CMake/toolchains/toolchain-armhf.cmake'
+            features: 'image;database;luamodules;backtrace;web'
+            build_tests: 'OFF'
+            cross: true
           
           # --- macOS Build ---
           - os: macos-latest
@@ -100,7 +123,8 @@ jobs:
           sudo apt update
           sudo apt install -y autoconf autoconf-archive automake libtool libxrandr-dev \
             libx11-dev libxft-dev libxext-dev libltdl-dev libxi-dev libxtst-dev \
-            x11-xserver-utils gi-docgen nasm mono-complete
+            x11-xserver-utils gi-docgen nasm mono-complete gcc-arm-linux-gnueabihf \
+            g++-arm-linux-gnueabihf
 
       - name: Select vcpkg binary cache sources
         shell: bash
@@ -163,12 +187,11 @@ jobs:
           # Use different path syntax for Windows toolchain if needed
           VCPKG_PATH="$VCPKG_ROOT/scripts/buildsystems/vcpkg.cmake"
 
-          # Skip the heavy OpenCV/ffmpeg backend on PRs for fast feedback; build
-          # the full feature set on pushes to master. The image-processing code
-          # already guards OpenCV (if(OpenCV_FOUND) / IMAGEPROC_HAVE_OPENCV).
-          FEATURES="image;database;luamodules;testing;backtrace;web"
-          if [ "${{ github.event_name }}" = "push" ]; then
-            FEATURES="image-opencv;$FEATURES"
+          # Keep pull requests on the same feature surface as master so image
+          # backend regressions cannot merge without being compiled and tested.
+          FEATURES="${{ matrix.features }}"
+          if [ -z "$FEATURES" ]; then
+            FEATURES="image-opencv;image;database;luamodules;testing;backtrace;web"
           fi
 
           cmake -B build -S . \
@@ -176,7 +199,7 @@ jobs:
             -DCMAKE_TOOLCHAIN_FILE="$VCPKG_PATH" \
             -DVCPKG_MANIFEST_NO_DEFAULT_FEATURES=ON \
             -DVCPKG_MANIFEST_FEATURES="$FEATURES" \
-            -DTGBOTCPP_BUILD_TESTS=ON \
+            -DTGBOTCPP_BUILD_TESTS=${{ matrix.build_tests || 'ON' }} \
             ${{ matrix.flags }}
 
       - name: Build project
@@ -185,7 +208,12 @@ jobs:
           cmake --build build --config Release --target optional_all
 
       - name: Run Tests
+        if: matrix.cross != true
         shell: bash
+        env:
+          ASAN_OPTIONS: ${{ matrix.asan_options }}
+          UBSAN_OPTIONS: ${{ matrix.ubsan_options }}
+          TSAN_OPTIONS: ${{ matrix.tsan_options }}
         run: |
           cd build
           ctest -C Release --output-on-failure --timeout 60
@@ -206,3 +234,45 @@ jobs:
             build/Glider-*.exe
             build/Glider-*.deb
           if-no-files-found: ignore
+
+  rust-quality:
+    name: Rust tests and Clippy
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: src/api/builtin_modules/builder/builder-rs
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          submodules: true
+      - name: Install stable Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy,rustfmt
+      - name: Cache Cargo
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src/api/builtin_modules/builder/builder-rs
+      - name: Check formatting
+        run: cargo fmt --all -- --check
+      - name: Run tests
+        run: cargo test --all-targets --locked
+      - name: Run Clippy
+        run: cargo clippy --all-targets --locked -- -D warnings
+
+  source-hygiene:
+    name: Source and configuration validation
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          submodules: true
+      - name: Validate scripts, JSON, and source text
+        shell: bash
+        run: |
+          python3 -m compileall -q resources/scripts
+          find resources/scripts -type f -name '*.sh' -print0 | xargs -0 -r -n1 bash -n
+          python3 -c 'import json,pathlib; [json.loads(p.read_text()) for p in pathlib.Path(".").rglob("*.json") if "src/third-party" not in p.as_posix() and "vcpkg_installed" not in p.as_posix()]'
+          python3 -c 'import pathlib,sys; suffixes={".c",".cc",".cpp",".h",".hpp"}; bad=[str(p) for p in pathlib.Path("src").rglob("*") if p.suffix in suffixes and "third-party" not in p.parts and b"\0" in p.read_bytes()]; print("Embedded NUL byte found in: " + ", ".join(bad), file=sys.stderr) if bad else None; sys.exit(bool(bad))'

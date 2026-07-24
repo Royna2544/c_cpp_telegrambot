@@ -13,8 +13,6 @@ CMakeUserPresets.json
 
 # Generated
 resources/scripts/git-askpass.sh
-resources/about.html
-src/include/GitBuildInfo.hpp
 __pycache__
 
 # Visual Studio Code
