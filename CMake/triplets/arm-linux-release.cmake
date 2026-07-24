@@ -10,8 +10,9 @@ set(VCPKG_BUILD_TYPE release)
 # Crypto++'s cryptogams *_armv4.S assembly) override the arch with a bare
 # -march=armv7-a, which drops the FPU and makes the hard-float ABI fail with
 # "selected architecture lacks an FPU". Pin an explicit NEON FPU so an FPU is
-# always available regardless of per-source -march overrides. (The .S files are
-# driven through the C compiler, so VCPKG_C_FLAGS is what actually fixes them.)
+# always available regardless of per-source -march overrides. Crypto++ enables
+# ASM as a separate CMake language, so pass the flag through both vcpkg's C/C++
+# settings and CMAKE_ASM_FLAGS.
 set(VCPKG_C_FLAGS "-mfpu=neon")
 set(VCPKG_CXX_FLAGS "-mfpu=neon")
-set(VCPKG_ASM_FLAGS "-mfpu=neon")
+set(VCPKG_CMAKE_CONFIGURE_OPTIONS "-DCMAKE_ASM_FLAGS=-mfpu=neon")
