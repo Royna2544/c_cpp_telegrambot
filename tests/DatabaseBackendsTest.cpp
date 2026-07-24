@@ -135,7 +135,8 @@ TEST(SQLiteDatabaseTest, RejectsUnsupportedFutureSchemaVersion) {
                       "glider-sqlite-future-schema-test.db";
     std::filesystem::remove(path);
     sqlite3* raw = nullptr;
-    ASSERT_EQ(sqlite3_open(path.c_str(), &raw), SQLITE_OK);
+    const auto pathString = path.string();
+    ASSERT_EQ(sqlite3_open(pathString.c_str(), &raw), SQLITE_OK);
     ASSERT_EQ(sqlite3_exec(raw, "PRAGMA user_version=999", nullptr, nullptr,
                            nullptr),
               SQLITE_OK);

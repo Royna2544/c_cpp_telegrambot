@@ -35,6 +35,7 @@ struct popen_wdt_posix_priv {
     int status;
     int pipefd_r;  // Subprocess' readfd, write end for the child
     _Atomic bool process_is_running;
+    bool watchdog_thread_joined;
 };
 
 // Helper to add seconds to timespec safely
@@ -262,6 +263,7 @@ static void popen_watchdog_wait(popen_watchdog_data_t** data_in) {
         pthread_cond_signal(&pdata->condition);
         POPEN_WDT_DBGLOG("Waiting for watchdog");
         pthread_join(pdata->wdt_thread, NULL);
+        pdata->watchdog_thread_joined = true;
         POPEN_WDT_DBGLOG("watchdog joined");
     }
 }
@@ -285,9 +287,10 @@ popen_watchdog_exit_t popen_watchdog_destroy(popen_watchdog_data_t** data_in) {
     pthread_cond_signal(&pdata->condition);
     pthread_mutex_unlock(&pdata->wdt_mutex);
 
-    if (data->watchdog_enabled) {
+    if (data->watchdog_enabled && !pdata->watchdog_thread_joined) {
         POPEN_WDT_DBGLOG("Waiting for watchdog thread to finish");
         pthread_join(pdata->wdt_thread, NULL);
+        pdata->watchdog_thread_joined = true;
         POPEN_WDT_DBGLOG("Watchdog thread finished");
     }
 

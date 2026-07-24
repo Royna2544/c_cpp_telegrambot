@@ -250,6 +250,10 @@ jobs:
         uses: dtolnay/rust-toolchain@stable
         with:
           components: clippy,rustfmt
+      - name: Install protoc
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y protobuf-compiler
       - name: Cache Cargo
         uses: Swatinem/rust-cache@v2
         with:
@@ -274,5 +278,5 @@ jobs:
         run: |
           python3 -m compileall -q resources/scripts
           find resources/scripts -type f -name '*.sh' -print0 | xargs -0 -r -n1 bash -n
-          python3 -c 'import json,pathlib; [json.loads(p.read_text()) for p in pathlib.Path(".").rglob("*.json") if "src/third-party" not in p.as_posix() and "vcpkg_installed" not in p.as_posix()]'
+          python3 -c 'import json,pathlib; [json.loads(p.read_text(encoding="utf-8")) for p in pathlib.Path(".").rglob("*.json") if "src/third-party" not in p.as_posix() and "vcpkg_installed" not in p.as_posix()]'
           python3 -c 'import pathlib,sys; suffixes={".c",".cc",".cpp",".h",".hpp"}; bad=[str(p) for p in pathlib.Path("src").rglob("*") if p.suffix in suffixes and "third-party" not in p.parts and b"\0" in p.read_bytes()]; print("Embedded NUL byte found in: " + ", ".join(bad), file=sys.stderr) if bad else None; sys.exit(bool(bad))'
