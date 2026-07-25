@@ -638,7 +638,7 @@ impl linux_kernel_build_service_server::LinuxKernelBuildService for BuildService
             }
 
             debug!("Running make defconfig in directory: {:?}", &source_dir);
-            let log_file = tmp_dir.join(format!("output-prepare-{}.log", &config.name));
+            let log_file = tmp_dir.join(format!("output-prepare-{}.log", config.name));
             info!("Defconfig log file will be at: {:?}", &log_file);
             let success = run_process(
                 runner.as_ref(),
@@ -819,7 +819,7 @@ impl linux_kernel_build_service_server::LinuxKernelBuildService for BuildService
                 info!("Setting environment variable for make: {}={}", name, value);
                 proc.env(name.clone(), value.clone());
             }
-            let log_file = tmp_dir.join(format!("output-build-{}.log", &context.config.name));
+            let log_file = tmp_dir.join(format!("output-build-{}.log", context.config.name));
             info!("Build log file will be at: {:?}", &log_file);
             debug!("Running make in directory: {:?}", &context.work_dir);
 
