@@ -289,7 +289,7 @@ impl GitRepo {
         let branch_ref = self
             .repo
             .find_branch(&branch, git2::BranchType::Remote)
-            .warn_err_string(format!("Cannot find remote branch {} by name", &branch))?;
+            .warn_err_string(format!("Cannot find remote branch {} by name", branch))?;
         let branch_commit = branch_ref.get().peel_to_commit()?;
 
         info!(
