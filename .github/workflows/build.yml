@@ -67,7 +67,9 @@ jobs:
             cc: GCC-ARMHF
             real_cc: arm-linux-gnueabihf-gcc
             real_cxx: arm-linux-gnueabihf-g++
-            flags: '-DVCPKG_TARGET_TRIPLET=arm-linux-release -DVCPKG_INSTALL_OPTIONS=--allow-unsupported -DVCPKG_OVERLAY_TRIPLETS=${{ github.workspace }}/CMake/triplets -DVCPKG_CHAINLOAD_TOOLCHAIN_FILE=${{ github.workspace }}/CMake/toolchains/toolchain-armhf.cmake'
+            # Matrix strings are not recursively expression-expanded. Use the
+            # runner's shell variable so these paths do not collapse to /CMake.
+            flags: '-DVCPKG_TARGET_TRIPLET=arm-linux-release -DVCPKG_INSTALL_OPTIONS=--allow-unsupported -DVCPKG_OVERLAY_TRIPLETS=$GITHUB_WORKSPACE/CMake/triplets -DVCPKG_CHAINLOAD_TOOLCHAIN_FILE=$GITHUB_WORKSPACE/CMake/toolchains/toolchain-armhf.cmake'
             features: 'image;database;luamodules;backtrace;web'
             build_tests: 'OFF'
             cross: true
