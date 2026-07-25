@@ -208,7 +208,7 @@ impl RomBuildHarness {
         }
 
         let res = async {
-                let build_log_filename_suffix = format!("build-{}.log", &build_id_clone);
+                let build_log_filename_suffix = format!("build-{}.log", build_id_clone);
                 // First, check if repo command is available
                 if build_settings.do_repo_sync {
                     send_log!(LogLevel::Debug, "Checking for 'repo' command availability...".to_string());
@@ -284,7 +284,7 @@ impl RomBuildHarness {
                             .await
                             .map_err(|e| BuildError::internal(format!("Failed to send to stdin: {}", e)))?;
 
-                        let error_file = tempdir_clone.join(format!("{}-{}", "repo-init", &build_log_filename_suffix));
+                        let error_file = tempdir_clone.join(format!("{}-{}", "repo-init", build_log_filename_suffix));
                         info!("Repo init output log path: {:?}", &error_file);
 
                         let res = run_process(
@@ -364,7 +364,7 @@ impl RomBuildHarness {
                                             repo.checkout_branch(&branch_entry.name).map_err(|e| {
                                                 BuildError::internal(format!(
                                                     "Failed to checkout branch {} of local manifest repository: {}",
-                                                    &branch_entry.name, e
+                                                    branch_entry.name, e
                                                 ))
                                             })?;
                                         } else {
@@ -454,7 +454,7 @@ impl RomBuildHarness {
                                                             &build_dir_clone,
                                                             askpass_path_clone.as_deref(),
                                                         );
-                                                        let error_file = tempdir_clone.join(format!("{}-{}-submodule-sync.log", "repo-sync", &build_id_clone));
+                                                        let error_file = tempdir_clone.join(format!("{}-{}-submodule-sync.log", "repo-sync", build_id_clone));
                                                         info!("Repo sync for submodule output log path: {:?}", &error_file);
                                                         let repo_sync_status = run_process(
                                                             runner.as_ref(),
@@ -622,7 +622,7 @@ impl RomBuildHarness {
                         &build_dir_clone,
                         askpass_path_clone.as_deref(),
                     );
-                    let error_file = tempdir_clone.join(format!("{}-{}", "repo-sync", &build_log_filename_suffix));
+                    let error_file = tempdir_clone.join(format!("{}-{}", "repo-sync", build_log_filename_suffix));
                     info!("Repo sync output log path: {:?}", &error_file);
 
                     let repo_sync_status = run_process(
@@ -905,7 +905,7 @@ impl RomBuildHarness {
                     send_log!(LogLevel::Info, format!("Sent to stdin: {}", line));
                 }
 
-                let error_file_path = tempdir_clone.join(format!("{}-{}", "build-output", &build_log_filename_suffix));
+                let error_file_path = tempdir_clone.join(format!("{}-{}", "build-output", build_log_filename_suffix));
                 if !run_process(
                     runner.as_ref(),
                     cmd,

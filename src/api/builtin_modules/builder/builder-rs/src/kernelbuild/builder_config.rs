@@ -231,7 +231,7 @@ impl Toolchain {
             }
             Source::Tarball => {
                 info!("Downloading toolchain {} from {}", self.name, self.url);
-                let dest_file = dest_path.join(format!("{}.tar.gz", &self.name));
+                let dest_file = dest_path.join(format!("{}.tar.gz", self.name));
                 Self::download_file(&self.url, &dest_file, async |_current, total| {
                     info!(
                         "Downloading toolchain... Total downloaded {} KB",
