@@ -196,6 +196,13 @@ jobs:
             FEATURES="image-opencv;image;database;luamodules;testing;backtrace;web"
           fi
 
+          # Cross compilers come from the chainloaded target toolchain. Do not
+          # leak them into vcpkg's native host-tool builds (x64-linux), where
+          # they would be combined with host flags such as -m64.
+          if [ "${{ matrix.cross }}" = "true" ]; then
+            unset CC CXX
+          fi
+
           cmake -B build -S . \
             -DCMAKE_BUILD_TYPE=Release \
             -DCMAKE_TOOLCHAIN_FILE="$VCPKG_PATH" \
