@@ -50,29 +50,27 @@ class LMStudioBackend : public LLMBackend {
                                     const std::string& systemPrompt,
                                     const std::string& userInput,
                                     std::int64_t chatId) override {
-        return runChat(model, systemPrompt, userInput, chatId);
+        LMStudioApi::ChatRequest req;
+        req.model = model;
+        req.input = userInput;
+        req.system_prompt = systemPrompt;
+        if (auto prev = previousResponseId(chatId)) {
+            req.previous_response_id = *prev;
+        }
+        return runChat(std::move(req), chatId);
     }
 
     std::optional<std::string> classify(const std::string& model,
                                         const std::string& systemPrompt,
                                         const std::string& userInput) override {
-        return runChat(model, systemPrompt, userInput, std::nullopt);
+        return runChat(
+            LMStudioApi::makeClassifierRequest(model, systemPrompt, userInput),
+            std::nullopt);
     }
 
    private:
-    std::optional<std::string> runChat(const std::string& model,
-                                       const std::string& systemPrompt,
-                                       const std::string& userInput,
+    std::optional<std::string> runChat(LMStudioApi::ChatRequest req,
                                        std::optional<std::int64_t> chatId) {
-        LMStudioApi::ChatRequest req;
-        req.model = model;
-        req.input = userInput;
-        req.system_prompt = systemPrompt;
-        if (chatId) {
-            if (auto prev = previousResponseId(*chatId)) {
-                req.previous_response_id = *prev;
-            }
-        }
         nlohmann::json payload = req;
 
         auto raw = CurlUtils::send_json_get_reply(

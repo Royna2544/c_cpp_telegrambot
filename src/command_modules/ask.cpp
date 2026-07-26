@@ -167,25 +167,25 @@ const llm::Tool kSaveChatInfoTool{
         {"required", {"chat_id", "name"}}}};
 
 std::vector<llm::Tool> toolsForDomain(llm::tool_router::Domain domain) {
-    using llm::tool_router::Domain;
-    switch (domain) {
-        case Domain::Chat:
-            return {};
-        case Domain::KernelBuild:
-            return {llm::builder_launch::kKernelBuildTool};
-        case Domain::RomBuild:
-            return {llm::builder_launch::kRomBuildTool};
-        case Domain::Build:
-            return {llm::builder_launch::kKernelBuildTool,
-                    llm::builder_launch::kRomBuildTool};
-        case Domain::Telegram:
-            return {kSendMessageTool, kGetChatIdTool, kGetChatNameTool};
-        case Domain::ChatRegistry:
-            return {kGetChatIdTool, kGetChatNameTool, kSaveChatInfoTool};
-        case Domain::Confirmation:
-            return {llm::ask_confirm::kAskConfirmTool};
+    std::vector<llm::Tool> tools;
+    for (const auto name : llm::tool_router::toolNamesForDomain(domain)) {
+        if (name == kSendMessageTool.name) {
+            tools.push_back(kSendMessageTool);
+        } else if (name == llm::ask_confirm::kAskConfirmTool.name) {
+            tools.push_back(llm::ask_confirm::kAskConfirmTool);
+        } else if (name == kGetChatIdTool.name) {
+            tools.push_back(kGetChatIdTool);
+        } else if (name == kGetChatNameTool.name) {
+            tools.push_back(kGetChatNameTool);
+        } else if (name == kSaveChatInfoTool.name) {
+            tools.push_back(kSaveChatInfoTool);
+        } else if (name == llm::builder_launch::kKernelBuildTool.name) {
+            tools.push_back(llm::builder_launch::kKernelBuildTool);
+        } else if (name == llm::builder_launch::kRomBuildTool.name) {
+            tools.push_back(llm::builder_launch::kRomBuildTool);
+        }
     }
-    return {};
+    return tools;
 }
 
 bool isBuilderDomain(llm::tool_router::Domain domain) {
@@ -386,15 +386,13 @@ DECLARE_COMMAND_HANDLER(ask) {
             .kernel = pending.kernel,
             .rom = pending.rom,
         };
-        if (const auto deterministic =
-                llm::tool_router::deterministicRoute(query, pendingRoute)) {
-            toolDomain = *deterministic;
-        } else if (const auto classified = backend->classify(
-                       model, std::string(llm::tool_router::kClassifierPrompt),
-                       query)) {
-            toolDomain = llm::tool_router::parseClassifierResult(*classified)
-                             .value_or(llm::tool_router::Domain::Chat);
-        }
+        toolDomain = llm::tool_router::selectDomain(
+            query, pendingRoute,
+            [&](std::string_view systemPrompt,
+                std::string_view userInput) -> std::optional<std::string> {
+                return backend->classify(model, std::string(systemPrompt),
+                                         std::string(userInput));
+            });
         tools = toolsForDomain(toolDomain);
         LOG(INFO) << "LLM tool route: " << llm::tool_router::name(toolDomain)
                   << " (" << tools.size() << " exposed tools)";

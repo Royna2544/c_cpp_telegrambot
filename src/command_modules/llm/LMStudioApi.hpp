@@ -3,6 +3,7 @@
 #include <nlohmann/json.hpp>
 #include <optional>
 #include <string>
+#include <utility>
 #include <variant>
 #include <vector>
 
@@ -307,6 +308,20 @@ struct ChatResponse {
     std::optional<std::string> response_id;
 };
 
+inline ChatRequest makeClassifierRequest(std::string model,
+                                         std::string systemPrompt,
+                                         std::string userInput) {
+    ChatRequest req;
+    req.model = std::move(model);
+    req.input = std::move(userInput);
+    req.system_prompt = std::move(systemPrompt);
+    req.temperature = 0.0f;
+    req.max_output_tokens = 32;
+    req.reasoning = Reasoning::off;
+    req.store = false;
+    return req;
+}
+
 // API endpoints
 constexpr const char* kModelsEndpoint = "/api/v1/models";
 constexpr const char* kChatEndpoint = "/api/v1/chat";
@@ -318,7 +333,8 @@ inline void to_json(nlohmann::json& j, const Model::Quantization& p) {
                        {"bits_per_weight", p.bits_per_weight}};
 }
 inline void from_json(const nlohmann::json& j, Model::Quantization& p) {
-    if (j.contains("name") && !j["name"].is_null()) j.at("name").get_to(p.name);
+    if (j.contains("name") && !j["name"].is_null())
+        j.at("name").get_to(p.name);
     if (j.contains("bits_per_weight") && !j["bits_per_weight"].is_null())
         j.at("bits_per_weight").get_to(p.bits_per_weight);
 }
@@ -339,9 +355,12 @@ inline void to_json(nlohmann::json& j, const Model::LoadedInstance::Config& p) {
     j = nlohmann::json{{"context_length", p.context_length}};
 
     // Only write optional fields if they have values
-    if (p.eval_batch_size) j["eval_batch_size"] = p.eval_batch_size;
-    if (p.flash_attention) j["flash_attention"] = p.flash_attention;
-    if (p.num_experts) j["num_experts"] = p.num_experts;
+    if (p.eval_batch_size)
+        j["eval_batch_size"] = p.eval_batch_size;
+    if (p.flash_attention)
+        j["flash_attention"] = p.flash_attention;
+    if (p.num_experts)
+        j["num_experts"] = p.num_experts;
     if (p.offload_kv_cache_to_gpu)
         j["offload_kv_cache_to_gpu"] = p.offload_kv_cache_to_gpu;
 }
@@ -353,7 +372,8 @@ inline void from_json(const nlohmann::json& j,
         j.at("eval_batch_size").get_to(p.eval_batch_size);
     if (j.contains("flash_attention"))
         j.at("flash_attention").get_to(p.flash_attention);
-    if (j.contains("num_experts")) j.at("num_experts").get_to(p.num_experts);
+    if (j.contains("num_experts"))
+        j.at("num_experts").get_to(p.num_experts);
     if (j.contains("offload_kv_cache_to_gpu"))
         j.at("offload_kv_cache_to_gpu").get_to(p.offload_kv_cache_to_gpu);
 }
@@ -363,8 +383,10 @@ inline void to_json(nlohmann::json& j, const Model::LoadedInstance& p) {
     j = nlohmann::json{{"id", p.id}, {"config", p.config}};
 }
 inline void from_json(const nlohmann::json& j, Model::LoadedInstance& p) {
-    if (j.contains("id")) j.at("id").get_to(p.id);
-    if (j.contains("config")) j.at("config").get_to(p.config);
+    if (j.contains("id"))
+        j.at("id").get_to(p.id);
+    if (j.contains("config"))
+        j.at("config").get_to(p.config);
 }
 
 // 5. Model (Top Level)
@@ -382,17 +404,24 @@ inline void to_json(nlohmann::json& j, const Model& p) {
         {"format", p.format}};
 
     // Optionals: Only add to JSON if they exist
-    if (p.architecture) j["architecture"] = p.architecture;
-    if (p.capabilities) j["capabilities"] = p.capabilities;
-    if (p.description) j["description"] = p.description;
+    if (p.architecture)
+        j["architecture"] = p.architecture;
+    if (p.capabilities)
+        j["capabilities"] = p.capabilities;
+    if (p.description)
+        j["description"] = p.description;
 }
 
 inline void from_json(const nlohmann::json& j, Model& p) {
     // Required fields (or safe to read with defaults)
-    if (j.contains("type")) j.at("type").get_to(p.type);
-    if (j.contains("publisher")) j.at("publisher").get_to(p.publisher);
-    if (j.contains("key")) j.at("key").get_to(p.key);
-    if (j.contains("display_name")) j.at("display_name").get_to(p.display_name);
+    if (j.contains("type"))
+        j.at("type").get_to(p.type);
+    if (j.contains("publisher"))
+        j.at("publisher").get_to(p.publisher);
+    if (j.contains("key"))
+        j.at("key").get_to(p.key);
+    if (j.contains("display_name"))
+        j.at("display_name").get_to(p.display_name);
 
     // Structs (Recursive)
     if (j.contains("quantization") && !j["quantization"].is_null())
@@ -412,25 +441,31 @@ inline void from_json(const nlohmann::json& j, Model& p) {
     // Optionals
     if (j.contains("architecture") && !j["architecture"].is_null())
         j.at("architecture").get_to(p.architecture);
-    if (j.contains("capabilities")) j.at("capabilities").get_to(p.capabilities);
-    if (j.contains("description")) j.at("description").get_to(p.description);
+    if (j.contains("capabilities"))
+        j.at("capabilities").get_to(p.capabilities);
+    if (j.contains("description"))
+        j.at("description").get_to(p.description);
 }  // --- ChatRequest Internal Structs ---
 
 inline void to_json(nlohmann::json& j, const ChatRequest::InputObject& p) {
     j = nlohmann::json{{"type", p.type}, {"content", p.content}};
 }
 inline void from_json(const nlohmann::json& j, ChatRequest::InputObject& p) {
-    if (j.contains("type")) j.at("type").get_to(p.type);
-    if (j.contains("content")) j.at("content").get_to(p.content);
+    if (j.contains("type"))
+        j.at("type").get_to(p.type);
+    if (j.contains("content"))
+        j.at("content").get_to(p.content);
 }
 
 inline void to_json(nlohmann::json& j, const ChatRequest::Plugin& p) {
     j = nlohmann::json{{"type", p.type}, {"id", p.id}};
-    if (p.allowed_tools) j["allowed_tools"] = p.allowed_tools;
+    if (p.allowed_tools)
+        j["allowed_tools"] = p.allowed_tools;
 }
 inline void from_json(const nlohmann::json& j, ChatRequest::Plugin& p) {
     p.type = j.value("type", "plugin");
-    if (j.contains("id")) j.at("id").get_to(p.id);
+    if (j.contains("id"))
+        j.at("id").get_to(p.id);
     if (j.contains("allowed_tools"))
         j.at("allowed_tools").get_to(p.allowed_tools);
 }
@@ -447,7 +482,8 @@ inline void to_json(nlohmann::json& j, const ChatRequest& p) {
         j["input"] = std::get<std::vector<ChatRequest::InputObject>>(p.input);
     }
 
-    if (p.system_prompt) j["system_prompt"] = p.system_prompt;
+    if (p.system_prompt)
+        j["system_prompt"] = p.system_prompt;
 
     // Handle 'integrations' variant
     if (std::holds_alternative<std::vector<std::string>>(p.integrations)) {
@@ -461,22 +497,33 @@ inline void to_json(nlohmann::json& j, const ChatRequest& p) {
     }
 
     // Optionals
-    if (p.stream) j["stream"] = p.stream;
-    if (p.temperature) j["temperature"] = p.temperature;
-    if (p.top_p) j["top_p"] = p.top_p;
-    if (p.top_k) j["top_k"] = p.top_k;
-    if (p.min_p) j["min_p"] = p.min_p;
-    if (p.repeat_penalty) j["repeat_penalty"] = p.repeat_penalty;
-    if (p.max_output_tokens) j["max_output_tokens"] = p.max_output_tokens;
-    if (p.reasoning) j["reasoning"] = p.reasoning;
-    if (p.context_length) j["context_length"] = p.context_length;
-    if (p.store) j["store"] = p.store;
+    if (p.stream)
+        j["stream"] = p.stream;
+    if (p.temperature)
+        j["temperature"] = p.temperature;
+    if (p.top_p)
+        j["top_p"] = p.top_p;
+    if (p.top_k)
+        j["top_k"] = p.top_k;
+    if (p.min_p)
+        j["min_p"] = p.min_p;
+    if (p.repeat_penalty)
+        j["repeat_penalty"] = p.repeat_penalty;
+    if (p.max_output_tokens)
+        j["max_output_tokens"] = p.max_output_tokens;
+    if (p.reasoning)
+        j["reasoning"] = p.reasoning;
+    if (p.context_length)
+        j["context_length"] = p.context_length;
+    if (p.store)
+        j["store"] = p.store;
     if (p.previous_response_id)
         j["previous_response_id"] = p.previous_response_id;
 }
 
 inline void from_json(const nlohmann::json& j, ChatRequest& p) {
-    if (j.contains("model")) j.at("model").get_to(p.model);
+    if (j.contains("model"))
+        j.at("model").get_to(p.model);
 
     // Manual Logic for 'input' Variant
     if (j.contains("input")) {
@@ -509,19 +556,26 @@ inline void from_json(const nlohmann::json& j, ChatRequest& p) {
     }
 
     // Optionals
-    if (j.contains("stream")) j.at("stream").get_to(p.stream);
-    if (j.contains("temperature")) j.at("temperature").get_to(p.temperature);
-    if (j.contains("top_p")) j.at("top_p").get_to(p.top_p);
-    if (j.contains("top_k")) j.at("top_k").get_to(p.top_k);
-    if (j.contains("min_p")) j.at("min_p").get_to(p.min_p);
+    if (j.contains("stream"))
+        j.at("stream").get_to(p.stream);
+    if (j.contains("temperature"))
+        j.at("temperature").get_to(p.temperature);
+    if (j.contains("top_p"))
+        j.at("top_p").get_to(p.top_p);
+    if (j.contains("top_k"))
+        j.at("top_k").get_to(p.top_k);
+    if (j.contains("min_p"))
+        j.at("min_p").get_to(p.min_p);
     if (j.contains("repeat_penalty"))
         j.at("repeat_penalty").get_to(p.repeat_penalty);
     if (j.contains("max_output_tokens"))
         j.at("max_output_tokens").get_to(p.max_output_tokens);
-    if (j.contains("reasoning")) j.at("reasoning").get_to(p.reasoning);
+    if (j.contains("reasoning"))
+        j.at("reasoning").get_to(p.reasoning);
     if (j.contains("context_length"))
         j.at("context_length").get_to(p.context_length);
-    if (j.contains("store")) j.at("store").get_to(p.store);
+    if (j.contains("store"))
+        j.at("store").get_to(p.store);
     if (j.contains("previous_response_id"))
         j.at("previous_response_id").get_to(p.previous_response_id);
 }
@@ -532,8 +586,10 @@ inline void to_json(nlohmann::json& j, const ChatResponse::Output& p) {
     j = nlohmann::json{{"type", p.type}, {"content", p.content}};
 }
 inline void from_json(const nlohmann::json& j, ChatResponse::Output& p) {
-    if (j.contains("type")) j.at("type").get_to(p.type);
-    if (j.contains("content")) j.at("content").get_to(p.content);
+    if (j.contains("type"))
+        j.at("type").get_to(p.type);
+    if (j.contains("content"))
+        j.at("content").get_to(p.content);
 }
 
 inline void to_json(nlohmann::json& j, const ChatResponse::Stats& p) {
@@ -563,14 +619,18 @@ inline void to_json(nlohmann::json& j, const ChatResponse& p) {
     j = nlohmann::json{{"model_instance_id", p.model_instance_id},
                        {"output", p.output},
                        {"stats", p.stats}};
-    if (p.response_id) j["response_id"] = p.response_id;
+    if (p.response_id)
+        j["response_id"] = p.response_id;
 }
 inline void from_json(const nlohmann::json& j, ChatResponse& p) {
     if (j.contains("model_instance_id"))
         j.at("model_instance_id").get_to(p.model_instance_id);
-    if (j.contains("output")) j.at("output").get_to(p.output);
-    if (j.contains("stats")) j.at("stats").get_to(p.stats);
-    if (j.contains("response_id")) j.at("response_id").get_to(p.response_id);
+    if (j.contains("output"))
+        j.at("output").get_to(p.output);
+    if (j.contains("stats"))
+        j.at("stats").get_to(p.stats);
+    if (j.contains("response_id"))
+        j.at("response_id").get_to(p.response_id);
 }
 
 NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(ModelResponse, models)

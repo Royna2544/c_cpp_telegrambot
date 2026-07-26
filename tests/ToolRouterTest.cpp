@@ -1,5 +1,8 @@
 #include <gtest/gtest.h>
 
+#include <string_view>
+#include <vector>
+
 #include "ToolRouter.hpp"
 
 namespace {
@@ -10,6 +13,9 @@ using llm::tool_router::PendingBuilds;
 TEST(ToolRouterTest, RoutesExplicitKernelBuildWithoutClassifier) {
     EXPECT_EQ(llm::tool_router::deterministicRoute(
                   "Build the Eureka Kernel for a30 using defaults"),
+              Domain::KernelBuild);
+    EXPECT_EQ(llm::tool_router::deterministicRoute(
+                  "I want Eureka on a30 again, using the defaults."),
               Domain::KernelBuild);
 }
 
@@ -57,6 +63,84 @@ TEST(ToolRouterTest, ParsesStrictAndDecoratedClassifierLabels) {
               Domain::Telegram);
     EXPECT_FALSE(llm::tool_router::parseClassifierResult("unknown"));
     EXPECT_FALSE(llm::tool_router::parseClassifierResult("telegram or chat"));
+}
+
+TEST(ToolRouterTest, DeterministicRouteSkipsClassifier) {
+    bool classifierCalled = false;
+    const auto selected = llm::tool_router::selectDomain(
+        "Build the Eureka Kernel for a30", {},
+        [&](std::string_view, std::string_view) -> std::optional<std::string> {
+            classifierCalled = true;
+            return "rom_build";
+        });
+
+    EXPECT_EQ(selected, Domain::KernelBuild);
+    EXPECT_FALSE(classifierCalled);
+
+    EXPECT_EQ(llm::tool_router::selectDomain(
+                  "I want Eureka on a30 again, using the defaults.", {},
+                  [&](std::string_view,
+                      std::string_view) -> std::optional<std::string> {
+                      classifierCalled = true;
+                      return "rom_build";
+                  }),
+              Domain::KernelBuild);
+    EXPECT_FALSE(classifierCalled);
+}
+
+TEST(ToolRouterTest, AmbiguousRequestUsesClassifier) {
+    std::string_view receivedPrompt;
+    std::string_view receivedQuery;
+    const auto selected = llm::tool_router::selectDomain(
+        "Message the release manager", {},
+        [&](std::string_view prompt,
+            std::string_view query) -> std::optional<std::string> {
+            receivedPrompt = prompt;
+            receivedQuery = query;
+            return "telegram";
+        });
+
+    EXPECT_EQ(selected, Domain::Telegram);
+    EXPECT_EQ(receivedPrompt, llm::tool_router::kClassifierPrompt);
+    EXPECT_EQ(receivedQuery, "Message the release manager");
+}
+
+TEST(ToolRouterTest, ClassifierFailureFailsClosedToChat) {
+    EXPECT_EQ(llm::tool_router::selectDomain(
+                  "Do something ambiguous", {},
+                  [](std::string_view, std::string_view)
+                      -> std::optional<std::string> { return std::nullopt; }),
+              Domain::Chat);
+    EXPECT_EQ(llm::tool_router::selectDomain(
+                  "Do something ambiguous", {},
+                  [](std::string_view,
+                     std::string_view) -> std::optional<std::string> {
+                      return "kernel_build or telegram";
+                  }),
+              Domain::Chat);
+}
+
+TEST(ToolRouterTest, ExposesOnlyToolsForSelectedCapability) {
+    const auto names = [](Domain domain) {
+        const auto selected = llm::tool_router::toolNamesForDomain(domain);
+        return std::vector<std::string_view>(selected.begin(), selected.end());
+    };
+
+    EXPECT_EQ(names(Domain::Chat), std::vector<std::string_view>{});
+    EXPECT_EQ(names(Domain::KernelBuild),
+              std::vector<std::string_view>{"kernelbuild"});
+    EXPECT_EQ(names(Domain::RomBuild),
+              std::vector<std::string_view>{"rombuild"});
+    EXPECT_EQ(names(Domain::Build),
+              (std::vector<std::string_view>{"kernelbuild", "rombuild"}));
+    EXPECT_EQ(names(Domain::Telegram),
+              (std::vector<std::string_view>{"send_message", "get_chat_id",
+                                             "get_chat_name"}));
+    EXPECT_EQ(names(Domain::ChatRegistry),
+              (std::vector<std::string_view>{"get_chat_id", "get_chat_name",
+                                             "save_chat_info"}));
+    EXPECT_EQ(names(Domain::Confirmation),
+              std::vector<std::string_view>{"ask"});
 }
 
 }  // namespace

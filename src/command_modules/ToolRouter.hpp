@@ -1,10 +1,13 @@
 #pragma once
 
 #include <algorithm>
+#include <array>
 #include <cctype>
 #include <optional>
+#include <span>
 #include <string>
 #include <string_view>
+#include <utility>
 
 namespace llm::tool_router {
 
@@ -36,7 +39,10 @@ confirmation - ask the invoking admin a yes/no/cancel question
 chat - none of the tool capabilities above are required
 
 Questions merely discussing kernels, Android, Telegram, IDs, or builds are
-chat. Select a tool label only when the user wants the corresponding action.)";
+chat. Eureka, GrassKernel, and Grand Kernel are kernel projects, never ROM
+projects. LineageOS, DerpFest, crDroid, YAAP, Evolution X, and TWRP are ROM or
+recovery projects. Select a tool label only when the user wants the
+corresponding action.)";
 
 inline std::string_view name(Domain domain) {
     switch (domain) {
@@ -104,8 +110,9 @@ inline std::optional<Domain> deterministicRoute(std::string_view query,
         value.starts_with(" where ") || value.starts_with(" who ") ||
         value.starts_with(" explain ") || value.starts_with(" describe ") ||
         value.starts_with(" compare ") || value.starts_with(" tell me about ");
-    const bool buildAction = detail::containsAny(value, "build", "compile",
-                                                 "prepare", "rebuild", "make");
+    const bool buildAction =
+        detail::containsAny(value, "build", "compile", "prepare", "rebuild",
+                            "make", "want", "need", "run", "start", "launch");
     const bool kernel =
         detail::containsAny(value, "kernel", "eureka", "grasskernel") ||
         value.find(" grand kernel ") != std::string::npos;
@@ -174,6 +181,50 @@ inline std::optional<Domain> parseClassifierResult(std::string_view result) {
         start = end + 1;
     }
     return parsed;
+}
+
+template <typename Classify>
+inline Domain selectDomain(std::string_view query, PendingBuilds pending,
+                           Classify&& classify) {
+    if (const auto deterministic = deterministicRoute(query, pending)) {
+        return *deterministic;
+    }
+    if (const auto result =
+            std::forward<Classify>(classify)(kClassifierPrompt, query)) {
+        return parseClassifierResult(*result).value_or(Domain::Chat);
+    }
+    return Domain::Chat;
+}
+
+inline std::span<const std::string_view> toolNamesForDomain(Domain domain) {
+    static constexpr std::array<std::string_view, 1> kKernelBuild{
+        "kernelbuild"};
+    static constexpr std::array<std::string_view, 1> kRomBuild{"rombuild"};
+    static constexpr std::array<std::string_view, 2> kBuild{"kernelbuild",
+                                                            "rombuild"};
+    static constexpr std::array<std::string_view, 3> kTelegram{
+        "send_message", "get_chat_id", "get_chat_name"};
+    static constexpr std::array<std::string_view, 3> kChatRegistry{
+        "get_chat_id", "get_chat_name", "save_chat_info"};
+    static constexpr std::array<std::string_view, 1> kConfirmation{"ask"};
+
+    switch (domain) {
+        case Domain::Chat:
+            return {};
+        case Domain::KernelBuild:
+            return kKernelBuild;
+        case Domain::RomBuild:
+            return kRomBuild;
+        case Domain::Build:
+            return kBuild;
+        case Domain::Telegram:
+            return kTelegram;
+        case Domain::ChatRegistry:
+            return kChatRegistry;
+        case Domain::Confirmation:
+            return kConfirmation;
+    }
+    return {};
 }
 
 }  // namespace llm::tool_router

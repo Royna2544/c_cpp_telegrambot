@@ -117,6 +117,20 @@ TEST(LMStudioAdapter, ChatRequestSerialization) {
     EXPECT_EQ(j.at("previous_response_id"), "resp_1");
 }
 
+TEST(LMStudioAdapter, ClassifierRequestIsSmallDeterministicAndStateless) {
+    const nlohmann::json j = LMStudioApi::makeClassifierRequest(
+        "lm", "classify this", "send a message");
+
+    EXPECT_EQ(j.at("model"), "lm");
+    EXPECT_EQ(j.at("input"), "send a message");
+    EXPECT_EQ(j.at("system_prompt"), "classify this");
+    EXPECT_EQ(j.at("temperature"), 0.0f);
+    EXPECT_EQ(j.at("max_output_tokens"), 32);
+    EXPECT_EQ(j.at("reasoning"), "off");
+    EXPECT_EQ(j.at("store"), false);
+    EXPECT_FALSE(j.contains("previous_response_id"));
+}
+
 TEST(LMStudioAdapter, ChatResponseFindsMessageOutput) {
     const auto j = nlohmann::json::parse(R"({
         "model_instance_id": "x",
@@ -134,8 +148,9 @@ TEST(LMStudioAdapter, ChatResponseFindsMessageOutput) {
     EXPECT_EQ(resp.response_id, std::optional<std::string>("resp_2"));
 
     const auto it = std::ranges::find_if(
-        resp.output,
-        [](const LMStudioApi::ChatResponse::Output& o) { return o.type == "message"; });
+        resp.output, [](const LMStudioApi::ChatResponse::Output& o) {
+            return o.type == "message";
+        });
     ASSERT_NE(it, resp.output.end());
     EXPECT_EQ(it->content, "final");
 }
