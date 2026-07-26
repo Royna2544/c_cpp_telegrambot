@@ -110,6 +110,50 @@ bool TgBotApiImpl::ModulesManagement::unload(const std::string& name) {
     return true;
 }
 
+bool TgBotApiImpl::ModulesManagement::invoke(const std::string& name,
+                                             Message::Ptr message) {
+    CommandModule* module = nullptr;
+    AuthContext::AccessLevel accessLevel = AuthContext::AccessLevel::User;
+    {
+        const std::lock_guard<std::mutex> lock(mutex);
+        const auto it = _handles.find(name);
+        if (it == _handles.end() || !it->second->isLoaded()) {
+            LOG(WARNING) << "Cannot invoke unavailable command " << name;
+            return false;
+        }
+        module = it->second.get();
+        if (module->info.isPrivileged()) {
+            accessLevel = AuthContext::AccessLevel::AdminUser;
+        }
+    }
+
+    auto lease = module->acquireExecutionLease();
+    if (!lease) {
+        LOG(WARNING) << "Command stopped accepting executions: " << name;
+        return false;
+    }
+    auto leaseHolder =
+        std::make_shared<RefLock::SharedLease>(std::move(*lease));
+
+    // The originating command already passed the global rate limiter. Re-run
+    // target authorization but do not charge the same Telegram update twice.
+    auto prepared = _api->prepareCommand(name, accessLevel, module,
+                                         std::move(message), false);
+    if (!prepared) {
+        return false;
+    }
+
+    if (!commandAsync.emplaceTask(name, [api = _api, name, module, prepared,
+                                         leaseHolder = std::move(leaseHolder)] {
+            api->commandHandler(name, module, prepared);
+        })) {
+        LOG(WARNING) << "Command queue is full; rejecting internal dispatch "
+                     << name;
+        return false;
+    }
+    return true;
+}
+
 bool TgBotApiImpl::ModulesManagement::loadAll(
     const std::filesystem::path& directory) {
     std::error_code ec;

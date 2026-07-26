@@ -23,9 +23,9 @@ class LMStudioBackend : public LLMBackend {
         : url_(std::move(url)), authkey_(std::move(authkey)) {}
 
     std::vector<LLMModel> listModels() override {
-        auto raw = CurlUtils::download_memory(
-            url_ + LMStudioApi::kModelsEndpoint, nullptr,
-            std::string_view{authkey_});
+        auto raw =
+            CurlUtils::download_memory(url_ + LMStudioApi::kModelsEndpoint,
+                                       nullptr, std::string_view{authkey_});
         if (!raw) {
             return {};
         }
@@ -50,12 +50,28 @@ class LMStudioBackend : public LLMBackend {
                                     const std::string& systemPrompt,
                                     const std::string& userInput,
                                     std::int64_t chatId) override {
+        return runChat(model, systemPrompt, userInput, chatId);
+    }
+
+    std::optional<std::string> classify(const std::string& model,
+                                        const std::string& systemPrompt,
+                                        const std::string& userInput) override {
+        return runChat(model, systemPrompt, userInput, std::nullopt);
+    }
+
+   private:
+    std::optional<std::string> runChat(const std::string& model,
+                                       const std::string& systemPrompt,
+                                       const std::string& userInput,
+                                       std::optional<std::int64_t> chatId) {
         LMStudioApi::ChatRequest req;
         req.model = model;
         req.input = userInput;
         req.system_prompt = systemPrompt;
-        if (auto prev = previousResponseId(chatId)) {
-            req.previous_response_id = *prev;
+        if (chatId) {
+            if (auto prev = previousResponseId(*chatId)) {
+                req.previous_response_id = *prev;
+            }
         }
         nlohmann::json payload = req;
 
@@ -68,7 +84,9 @@ class LMStudioBackend : public LLMBackend {
         try {
             auto resp =
                 nlohmann::json::parse(*raw).get<LMStudioApi::ChatResponse>();
-            rememberResponseId(chatId, resp.response_id);
+            if (chatId) {
+                rememberResponseId(*chatId, resp.response_id);
+            }
             auto it = std::ranges::find_if(
                 resp.output, [](const LMStudioApi::ChatResponse::Output& o) {
                     return o.type == "message";
@@ -82,13 +100,13 @@ class LMStudioBackend : public LLMBackend {
         }
     }
 
-   private:
     // Per-chat conversation continuity, shared across backend instances (a new
     // backend is built per command invocation).
     static std::optional<std::string> previousResponseId(std::int64_t chatId) {
         auto [mtx, map] = store();
         const std::lock_guard lock(mtx);
-        if (auto it = map.find(chatId); it != map.end() && !it->second.empty()) {
+        if (auto it = map.find(chatId);
+            it != map.end() && !it->second.empty()) {
             return it->second;
         }
         return std::nullopt;
@@ -103,7 +121,8 @@ class LMStudioBackend : public LLMBackend {
             map.erase(chatId);
         }
     }
-    static std::pair<std::mutex&, std::unordered_map<std::int64_t, std::string>&>
+    static std::pair<std::mutex&,
+                     std::unordered_map<std::int64_t, std::string>&>
     store() {
         static std::mutex mtx;
         static std::unordered_map<std::int64_t, std::string> map;

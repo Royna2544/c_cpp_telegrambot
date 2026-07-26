@@ -159,7 +159,7 @@ bool TgBotApiImpl::authorized(const MessageExt::Ptr& message,
 
 std::shared_ptr<MessageExt> TgBotApiImpl::prepareCommand(
     const std::string& command, const AuthContext::AccessLevel authflags,
-    CommandModule* module, Message::Ptr message) {
+    CommandModule* module, Message::Ptr message, bool applyRateLimit) {
     if (module == nullptr || !module->isLoaded()) {
         LOG(INFO) << "Command module is unavailable: " << command;
         return {};
@@ -178,12 +178,14 @@ std::shared_ptr<MessageExt> TgBotApiImpl::prepareCommand(
         return {};
     }
 
-    const auto rlUser = ext->get<MessageAttrs::User>();
-    const std::int64_t rlKey =
-        rlUser ? rlUser->id : ext->get<MessageAttrs::Chat>()->id;
-    if (!_rateLimiter.check(rlKey)) {
-        LOG(INFO) << fmt::format("Ratelimiting key {}", rlKey);
-        return {};
+    if (applyRateLimit) {
+        const auto rlUser = ext->get<MessageAttrs::User>();
+        const std::int64_t rlKey =
+            rlUser ? rlUser->id : ext->get<MessageAttrs::Chat>()->id;
+        if (!_rateLimiter.check(rlKey)) {
+            LOG(INFO) << fmt::format("Ratelimiting key {}", rlKey);
+            return {};
+        }
     }
     return ext;
 }
@@ -229,6 +231,18 @@ bool TgBotApiImpl::reloadCommand(const std::string& command) {
     DLOG(INFO) << "Done notifying";
     // Reload the command to the loader.
     return kModuleLoader->load(command);
+}
+
+bool TgBotApiImpl::invokeCommand(const std::string& command,
+                                 Message::Ptr message,
+                                 std::string payload) {
+    if (!payload.empty()) {
+        auto forwarded = std::make_shared<Message>(*message);
+        forwarded->text = std::move(payload);
+        forwarded->entities.reset();
+        message = std::move(forwarded);
+    }
+    return kModuleLoader && kModuleLoader->invoke(command, std::move(message));
 }
 
 void TgBotApiImpl::onAnyMessage(const AnyMessageCallback& callback) {

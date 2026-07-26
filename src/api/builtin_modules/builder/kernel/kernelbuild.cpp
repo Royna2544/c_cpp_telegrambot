@@ -1,4 +1,5 @@
 #include <absl/strings/str_cat.h>
+#include <absl/strings/match.h>
 #include <absl/strings/str_replace.h>
 #include <absl/strings/str_split.h>
 #include <absl/strings/strip.h>
@@ -16,9 +17,12 @@
 
 #include <api/CommandModule.hpp>
 #include <api/MessageExt.hpp>
+#include <nlohmann/json.hpp>
+#include <algorithm>
 #include <chrono>
 #include <cstdlib>
 #include <filesystem>
+#include <iterator>
 #include <system_error>
 #include <unordered_map>
 #include <utility>
@@ -140,6 +144,8 @@ class KernelBuildHandler {
         KernelConfig* current{};
         std::string device;
         std::unordered_map<std::string, bool> fragment_preference;
+        int clone_depth{1};
+        bool fail_on_fetch{false};
         std::chrono::system_clock::time_point start_time;
         std::atomic_int build_id{0};
 
@@ -149,6 +155,8 @@ class KernelBuildHandler {
                 current = other.current;
                 device = std::move(other.device);
                 fragment_preference = std::move(other.fragment_preference);
+                clone_depth = other.clone_depth;
+                fail_on_fetch = other.fail_on_fetch;
                 start_time = other.start_time;
                 build_id.store(other.build_id.load());
             }
@@ -272,7 +280,8 @@ class KernelBuildHandler {
 
         std::error_code ec;
         for (const auto it : std::filesystem::directory_iterator(jsonDir, ec)) {
-            if (it.path().extension() == ".json") {
+            if (it.path().extension() == ".json" &&
+                it.path().filename() != "builder_config.json") {
                 try {
                     configs.emplace_back(it.path());
                 } catch (const std::exception& ex) {
@@ -290,6 +299,126 @@ class KernelBuildHandler {
    public:
     constexpr static std::string_view kBuildPrefix = "build_";
     constexpr static std::string_view kSelectPrefix = "select_";
+    constexpr static std::string_view kAbortPrefix = "abort";
+
+    bool stage(const Message::Ptr& message, const nlohmann::json& plan) {
+        std::lock_guard<std::recursive_mutex> lock(intermidiates_mutex_);
+        intermidiates = {};
+
+        const auto kernelName = plan.at("kernel").get<std::string>();
+        const auto configIt =
+            std::ranges::find_if(configs, [&](const auto& config) {
+                return absl::EqualsIgnoreCase(config.name, kernelName);
+            });
+        if (configIt == configs.end()) {
+            std::vector<std::string> available;
+            std::ranges::transform(configs, std::back_inserter(available),
+                                   [](const auto& config) {
+                                       return config.name;
+                                   });
+            _api->sendReplyMessage(
+                message,
+                fmt::format("Unknown kernel configuration '{}'. Available: {}",
+                            kernelName, fmt::join(available, ", ")));
+            return false;
+        }
+        intermidiates.current = &*configIt;
+
+        const auto requestedDevice = plan.at("device").get<std::string>();
+        const auto deviceIt = std::ranges::find_if(
+            intermidiates.current->defconfig.devices,
+            [&](const auto& device) {
+                return absl::EqualsIgnoreCase(device, requestedDevice);
+            });
+        if (deviceIt == intermidiates.current->defconfig.devices.end()) {
+            _api->sendReplyMessage(
+                message,
+                fmt::format(
+                    "Device '{}' is not supported by {}. Available: {}",
+                    requestedDevice, intermidiates.current->name,
+                    fmt::join(intermidiates.current->defconfig.devices, ", ")));
+            intermidiates = {};
+            return false;
+        }
+        intermidiates.device = *deviceIt;
+
+        for (const auto& [name, fragment] :
+             intermidiates.current->fragments) {
+            intermidiates.fragment_preference[name] =
+                fragment.default_enabled;
+        }
+
+        const auto applyFragments =
+            [&](std::string_view field, bool enabled) -> bool {
+            const auto values = plan.find(field);
+            if (values == plan.end()) {
+                return true;
+            }
+            for (const auto& value : *values) {
+                const auto requested = value.get<std::string>();
+                const auto fragmentIt = std::ranges::find_if(
+                    intermidiates.current->fragments,
+                    [&](const auto& pair) {
+                        return absl::EqualsIgnoreCase(pair.second.name,
+                                                      requested);
+                    });
+                if (fragmentIt == intermidiates.current->fragments.end()) {
+                    std::vector<std::string> available;
+                    for (const auto& [unused, fragment] :
+                         intermidiates.current->fragments) {
+                        available.push_back(fragment.name);
+                    }
+                    _api->sendReplyMessage(
+                        message,
+                        fmt::format("Unknown fragment '{}' for {}. Available: "
+                                    "{}",
+                                    requested, intermidiates.current->name,
+                                    fmt::join(available, ", ")));
+                    return false;
+                }
+                intermidiates
+                    .fragment_preference[fragmentIt->second.name] = enabled;
+            }
+            return true;
+        };
+        if (!applyFragments("enable_fragments", true) ||
+            !applyFragments("disable_fragments", false)) {
+            intermidiates = {};
+            return false;
+        }
+
+        intermidiates.clone_depth = plan.value("clone_depth", 1);
+        intermidiates.fail_on_fetch =
+            plan.value("fail_on_fetch", false);
+
+        std::vector<std::string> enabledFragments;
+        for (const auto& [fragment, enabled] :
+             intermidiates.fragment_preference) {
+            if (enabled) {
+                enabledFragments.push_back(fragment);
+            }
+        }
+
+        KeyboardBuilder keyboard;
+        keyboard.addKeyboard(
+            {{"Confirm build",
+              absl::StrCat(kCallbackQueryPrefix, kContinuePrefix)},
+             {"Cancel", absl::StrCat(kCallbackQueryPrefix, kAbortPrefix)}});
+        _api->sendReplyMessage(
+            message,
+            fmt::format(
+                "Review kernel build request:\nKernel: {}\nDevice: {}\nEnabled "
+                "fragments: {}\nClone depth: {}\nFail on fetch: {}\n\nNo build "
+                "will start until you confirm.",
+                intermidiates.current->name, intermidiates.device,
+                enabledFragments.empty()
+                    ? std::string("(none)")
+                    : fmt::format("{}", fmt::join(enabledFragments, ", ")),
+                intermidiates.clone_depth, intermidiates.fail_on_fetch),
+            keyboard.get());
+        return true;
+    }
+
     void start(const Message::Ptr& message) {
         std::lock_guard<std::recursive_mutex> lock(intermidiates_mutex_);
         intermidiates = {};
@@ -439,6 +568,13 @@ class KernelBuildHandler {
         _api->answerCallbackQuery(query->id, "Build cancelled!");
     }
 
+    void handle_abort(const TgBot::CallbackQuery::Ptr& query) {
+        std::lock_guard<std::recursive_mutex> lock(intermidiates_mutex_);
+        intermidiates = {};
+        editQueryMessage(query, "Kernel build request cancelled.");
+        _api->answerCallbackQuery(query->id, "Build request cancelled.");
+    }
+
     void handleCallbackQuery(const TgBot::CallbackQuery::Ptr& query) {
         std::string_view data = query->data;
 
@@ -464,6 +600,8 @@ class KernelBuildHandler {
         } else if (absl::ConsumePrefix(&data, "cancel_")) {
             // Call the corresponding function
             handle_cancel(query);
+        } else if (absl::ConsumePrefix(&data, kAbortPrefix)) {
+            handle_abort(query);
         } else {
             LOG(WARNING) << "Unknown query: " << query->data;
         }
@@ -474,7 +612,14 @@ void KernelBuildHandler::handle_continue(
     const TgBot::CallbackQuery::Ptr& query) {
     using namespace ::tgbot::builder::linuxkernel;
 
+    if (intermidiates.current == nullptr || intermidiates.device.empty()) {
+        editQueryMessage(query, "Kernel build plan is no longer available.");
+        _api->answerCallbackQuery(query->id, "Build plan expired.", true);
+        return;
+    }
+
     // Start the build process
+    _api->answerCallbackQuery(query->id, "Starting build...");
     editQueryMessage(query, "Starting build...");
     intermidiates.start_time = std::chrono::system_clock::now();
 
@@ -488,10 +633,10 @@ void KernelBuildHandler::handle_continue(
             *request.add_config_fragments() = fragment;
         }
     }
-    request.set_clone_depth(1);
+    request.set_clone_depth(intermidiates.clone_depth);
     // A failed fetch of an existing checkout shouldn't abort the build;
     // the builder falls back to the sources already on disk.
-    request.set_fail_on_fetch(false);
+    request.set_fail_on_fetch(intermidiates.fail_on_fetch);
     if (gitToken) {
         request.set_github_token(*gitToken);
     }
@@ -612,6 +757,24 @@ DECLARE_COMMAND_HANDLER(kernelbuild) {
 
     std::lock_guard<std::mutex> lock(handler_mutex);
     if (handler) {
+        if (message->has<MessageAttrs::ExtraText>()) {
+            const auto extra = absl::StripAsciiWhitespace(
+                message->get<MessageAttrs::ExtraText>());
+            if (!extra.empty() && extra.front() == '{') {
+                try {
+                    const auto plan = nlohmann::json::parse(extra);
+                    if (plan.value("source", "") == "llm") {
+                        handler->stage(message->message(), plan);
+                        return;
+                    }
+                } catch (const std::exception& ex) {
+                    api->sendReplyMessage(
+                        message->message(),
+                        fmt::format("Invalid kernel build plan: {}", ex.what()));
+                    return;
+                }
+            }
+        }
         handler->start(message->message());
     }
 }

@@ -463,9 +463,12 @@ class TgBotApiImpl : public TgBotApi {
 
     bool unloadCommand(const std::string& command) override;
     bool reloadCommand(const std::string& command) override;
+    bool invokeCommand(const std::string& command, Message::Ptr message,
+                       std::string payload = {}) override;
     [[nodiscard]] std::shared_ptr<MessageExt> prepareCommand(
         const std::string& command, AuthContext::AccessLevel authflags,
-        CommandModule* module, Message::Ptr message);
+        CommandModule* module, Message::Ptr message,
+        bool applyRateLimit = true);
     void commandHandler(const std::string& command, CommandModule* module,
                         const std::shared_ptr<MessageExt>& message);
     bool validateValidArgs(const CommandModule::Info* module,

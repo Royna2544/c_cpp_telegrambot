@@ -1,5 +1,6 @@
 #include <absl/log/check.h>
 #include <absl/log/log.h>
+#include <absl/strings/ascii.h>
 #include <absl/strings/match.h>
 #include <absl/strings/str_split.h>
 #include <absl/strings/strip.h>
@@ -18,7 +19,9 @@
 #include <algorithm>
 #include <api/CommandModule.hpp>
 #include <api/TgBotApi.hpp>
+#include <nlohmann/json.hpp>
 #include <chrono>
+#include <cmath>
 #include <cstdint>
 #include <cstdlib>
 #include <filesystem>
@@ -59,6 +62,10 @@ class ROMBuildQueryHandler {
     std::optional<android::UploadMethod> upload_method;
     bool didpin = false;
     bool do_use_rbe = false;
+    std::optional<bool> do_clean_build;
+    std::optional<bool> use_ccache;
+    std::optional<int32_t> parallel_jobs;
+    std::optional<bool> force_checkout;
 
     constexpr static std::string_view kBuildDirectory = "rom_build/";
     constexpr static std::string_view kOutDirectory = "out/";
@@ -104,6 +111,7 @@ class ROMBuildQueryHandler {
 
     void updateSentMessage(Message::Ptr message);
     void start(Message::Ptr userMessage);
+    bool stage(Message::Ptr userMessage, const nlohmann::json& plan);
     bool pinned() const { return didpin; }
     auto builddata() const { return per_build; }
 
@@ -358,6 +366,218 @@ void ROMBuildQueryHandler::start(Message::Ptr userMessage) {
     if (didpin)
         _api->pinMessage(sentMessage);
     per_build.reset();
+    do_clean_build.reset();
+    use_ccache.reset();
+    parallel_jobs.reset();
+    force_checkout.reset();
+}
+
+bool ROMBuildQueryHandler::stage(Message::Ptr userMessage,
+                                 const nlohmann::json& plan) {
+    if (build.running()) {
+        _api->sendReplyMessage(userMessage,
+                               "A ROM build is already running.");
+        return false;
+    }
+
+    const auto requestedDevice = plan.at("device").get<std::string>();
+    const auto requestedRom = plan.at("rom").get<std::string>();
+    const auto requestedVersion = plan.at("android_version").get<float>();
+    const auto requestedVariant = plan.at("variant").get<std::string>();
+    const auto requestedManifest =
+        plan.contains("manifest")
+            ? std::optional(plan.at("manifest").get<std::string>())
+            : std::nullopt;
+
+    std::vector<ConfigParser::LocalManifest::Ptr> matches;
+    for (const auto& manifest : parser.manifests()) {
+        if (!manifest || !manifest->rom || !manifest->rom->romInfo ||
+            !manifest->rom->androidVersion) {
+            continue;
+        }
+        const bool hasDevice = std::ranges::any_of(
+            manifest->devices, [&](const auto& device) {
+                return device &&
+                       absl::EqualsIgnoreCase(device->codename,
+                                              requestedDevice);
+            });
+        if (!hasDevice ||
+            !absl::EqualsIgnoreCase(manifest->rom->romInfo->name,
+                                    requestedRom) ||
+            std::abs(manifest->rom->androidVersion->version -
+                     requestedVersion) > 0.001F ||
+            (requestedManifest &&
+             !absl::EqualsIgnoreCase(manifest->name,
+                                     *requestedManifest))) {
+            continue;
+        }
+        matches.push_back(manifest);
+    }
+
+    if (matches.empty()) {
+        std::vector<std::string> available;
+        for (const auto& manifest : parser.manifests()) {
+            if (!manifest || !manifest->rom || !manifest->rom->romInfo ||
+                !manifest->rom->androidVersion) {
+                continue;
+            }
+            for (const auto& device : manifest->devices) {
+                if (device &&
+                    absl::EqualsIgnoreCase(device->codename,
+                                           requestedDevice)) {
+                    available.push_back(fmt::format(
+                        "{} Android {} ({})", manifest->rom->romInfo->name,
+                        manifest->rom->androidVersion->version,
+                        manifest->name));
+                }
+            }
+        }
+        std::ranges::sort(available);
+        available.erase(std::unique(available.begin(), available.end()),
+                        available.end());
+        _api->sendReplyMessage(
+            userMessage,
+            fmt::format(
+                "No compatible ROM plan found for device '{}', ROM '{}', "
+                "Android {}{}. Compatible choices for this device: {}",
+                requestedDevice, requestedRom, requestedVersion,
+                requestedManifest
+                    ? fmt::format(", manifest '{}'", *requestedManifest)
+                    : std::string{},
+                available.empty() ? std::string("(none configured)")
+                                  : fmt::format("{}", fmt::join(available, "; "))));
+        return false;
+    }
+
+    // Duplicate config rows that resolve to the same manifest are harmless.
+    // Different manifest names require an explicit disambiguation.
+    const auto firstManifestName = matches.front()->name;
+    const bool ambiguous = std::ranges::any_of(
+        matches, [&](const auto& manifest) {
+            return !absl::EqualsIgnoreCase(manifest->name,
+                                           firstManifestName);
+        });
+    if (ambiguous) {
+        std::vector<std::string> names;
+        std::ranges::transform(matches, std::back_inserter(names),
+                               [](const auto& manifest) {
+                                   return manifest->name;
+                               });
+        std::ranges::sort(names);
+        names.erase(std::unique(names.begin(), names.end()), names.end());
+        _api->sendReplyMessage(
+            userMessage,
+            fmt::format(
+                "More than one local manifest matches. Specify manifest as "
+                "one of: {}",
+                fmt::join(names, ", ")));
+        return false;
+    }
+
+    per_build.reset();
+    per_build.localManifest = matches.front();
+    const auto deviceIt = std::ranges::find_if(
+        per_build.localManifest->devices, [&](const auto& device) {
+            return device &&
+                   absl::EqualsIgnoreCase(device->codename,
+                                          requestedDevice);
+        });
+    if (deviceIt == per_build.localManifest->devices.end()) {
+        _api->sendReplyMessage(userMessage,
+                               "The selected manifest lost its device entry.");
+        return false;
+    }
+    per_build.device = *deviceIt;
+
+    if (absl::EqualsIgnoreCase(requestedVariant, "user")) {
+        per_build.variant = PerBuildData::Variant::kUser;
+    } else if (absl::EqualsIgnoreCase(requestedVariant, "userdebug")) {
+        per_build.variant = PerBuildData::Variant::kUserDebug;
+    } else if (absl::EqualsIgnoreCase(requestedVariant, "eng")) {
+        per_build.variant = PerBuildData::Variant::kEng;
+    } else {
+        _api->sendReplyMessage(
+            userMessage,
+            "Unknown build variant. Choose user, userdebug, or eng.");
+        per_build.reset();
+        return false;
+    }
+
+    do_repo_sync = plan.value("repo_sync", true);
+    do_use_rbe = plan.value("use_rbe", false);
+    if (do_use_rbe &&
+        !_config->get(ConfigManager::Configs::BUILDBUDDY_API_KEY)) {
+        _api->sendReplyMessage(
+            userMessage,
+            "RBE was requested but no BuildBuddy API key is configured.");
+        per_build.reset();
+        return false;
+    }
+    do_clean_build =
+        plan.contains("clean_build")
+            ? std::optional(plan.at("clean_build").get<bool>())
+            : std::nullopt;
+    use_ccache =
+        plan.contains("use_ccache")
+            ? std::optional(plan.at("use_ccache").get<bool>())
+            : std::nullopt;
+    parallel_jobs =
+        plan.contains("parallel_jobs")
+            ? std::optional(plan.at("parallel_jobs").get<int32_t>())
+            : std::nullopt;
+    force_checkout =
+        plan.contains("force_checkout")
+            ? std::optional(plan.at("force_checkout").get<bool>())
+            : std::nullopt;
+
+    upload_method.reset();
+    const auto upload = plan.value("upload", std::string("none"));
+    if (absl::EqualsIgnoreCase(upload, "local")) {
+        upload_method = android::UploadMethod::LocalFile;
+    } else if (absl::EqualsIgnoreCase(upload, "stream")) {
+        upload_method = android::UploadMethod::Stream;
+    } else if (absl::EqualsIgnoreCase(upload, "gofile")) {
+        upload_method = android::UploadMethod::GoFile;
+    } else if (!absl::EqualsIgnoreCase(upload, "none")) {
+        _api->sendReplyMessage(
+            userMessage,
+            "Unknown upload method. Choose none, local, stream, or gofile.");
+        per_build.reset();
+        return false;
+    }
+
+    _userMessage = std::move(userMessage);
+    if (sentMessage) {
+        try {
+            _api->deleteMessage(sentMessage);
+        } catch (...) {
+            // A stale menu should not prevent staging the new plan.
+        }
+    }
+
+    const auto variantName =
+        absl::AsciiStrToLower(requestedVariant);
+    const auto summary = fmt::format(
+        "Review Android build request:\nDevice: {} ({})\nROM: {}\nAndroid: "
+        "{}\nVariant: {}\nManifest: {}\nRepo sync: {}\nClean build: {}\n"
+        "ccache: {}\nRBE: {}\nUpload: {}\nParallel jobs: {}\nForce checkout: "
+        "{}{}\n\nNo build will start until you confirm.",
+        per_build.device->marketName, per_build.device->codename,
+        per_build.localManifest->rom->romInfo->name,
+        per_build.localManifest->rom->androidVersion->version, variantName,
+        per_build.localManifest->name, describe(do_repo_sync),
+        do_clean_build ? describe(*do_clean_build) : "Server default",
+        use_ccache ? describe(*use_ccache) : "Server default",
+        describe(do_use_rbe), describe(upload_method),
+        parallel_jobs ? std::to_string(*parallel_jobs) : "Server default",
+        force_checkout ? describe(*force_checkout) : "Disabled",
+        force_checkout.value_or(false)
+            ? "\nWARNING: force checkout may overwrite remote source changes."
+            : "");
+    sentMessage = _api->sendReplyMessage(
+        _userMessage, summary,
+        createKeyboardWith<Buttons::confirm, Buttons::cancel>(2));
+    return true;
 }
 
 void ROMBuildQueryHandler::updateSentMessage(Message::Ptr message) {
@@ -470,6 +690,10 @@ void ROMBuildQueryHandler::handle_pin_message(const Query& query) {
 void ROMBuildQueryHandler::handle_back(const Query& /*query*/) {
     _api->editMessage(sentMessage, "Will build ROM", mainKeyboard);
     per_build.reset();
+    do_clean_build.reset();
+    use_ccache.reset();
+    parallel_jobs.reset();
+    force_checkout.reset();
     lookup._localManifest.clear();
     lookup.codename.clear();
 }
@@ -682,6 +906,12 @@ void ROMBuildQueryHandler::handle_confirm(const Query& query) {
     settings.set_do_repo_sync(do_repo_sync);
     settings.set_do_upload(upload_method.has_value());
     settings.set_use_rbe_service(do_use_rbe);
+    if (do_clean_build) {
+        settings.set_do_clean_build(*do_clean_build);
+    }
+    if (use_ccache) {
+        settings.set_use_ccache(*use_ccache);
+    }
     if (do_use_rbe) {
         settings.set_rbe_api_token(
             *_config->get(ConfigManager::Configs::BUILDBUDDY_API_KEY));
@@ -702,6 +932,12 @@ void ROMBuildQueryHandler::handle_confirm(const Query& query) {
     }
     if (upload_method.has_value()) {
         request.set_upload_method(*upload_method);
+    }
+    if (parallel_jobs) {
+        request.set_parallel_jobs(*parallel_jobs);
+    }
+    if (force_checkout) {
+        request.set_force_checkout(*force_checkout);
     }
 
     std::string_view variant;
@@ -1241,6 +1477,24 @@ DECLARE_COMMAND_HANDLER(rombuild) {
 
     std::lock_guard<std::mutex> lock(handler_mutex);
     if (handler) {
+        if (message->has<MessageAttrs::ExtraText>()) {
+            const auto extra = absl::StripAsciiWhitespace(
+                message->get<MessageAttrs::ExtraText>());
+            if (!extra.empty() && extra.front() == '{') {
+                try {
+                    const auto plan = nlohmann::json::parse(extra);
+                    if (plan.value("source", "") == "llm") {
+                        handler->stage(message->message(), plan);
+                        return;
+                    }
+                } catch (const std::exception& ex) {
+                    api->sendReplyMessage(
+                        message->message(),
+                        fmt::format("Invalid ROM build plan: {}", ex.what()));
+                    return;
+                }
+            }
+        }
         handler->start(message->message());
     }
 }

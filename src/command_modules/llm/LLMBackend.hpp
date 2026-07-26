@@ -1,11 +1,10 @@
 #pragma once
 
-#include <nlohmann/json.hpp>
-
 #include <cctype>
 #include <cstdint>
 #include <functional>
 #include <memory>
+#include <nlohmann/json.hpp>
 #include <optional>
 #include <string>
 #include <string_view>
@@ -78,6 +77,14 @@ struct LLMBackend {
                                             const std::string& systemPrompt,
                                             const std::string& userInput,
                                             std::int64_t chatId) = 0;
+
+    // Runs a stateless, non-conversational inference. Capability routing uses
+    // this so classification does not become part of the user's chat history.
+    virtual std::optional<std::string> classify(const std::string& model,
+                                                const std::string& systemPrompt,
+                                                const std::string& userInput) {
+        return chat(model, systemPrompt, userInput, 0);
+    }
 
     // Same as above, but offers `tools` to the model and dispatches any tool
     // calls through `exec`, looping until the model returns a final answer.

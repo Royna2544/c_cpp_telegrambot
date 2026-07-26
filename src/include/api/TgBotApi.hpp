@@ -820,6 +820,26 @@ class TgBotApi {
     virtual bool reloadCommand(const std::string& command) {
         return false;  // Dummy implementation
     }
+    /**
+     * @brief Dispatches a loaded command using an existing Telegram message as
+     *        its authenticated user/chat context.
+     *
+     * Internal callers can use this to hand work from one command module to
+     * another without forging a Telegram update. Implementations must apply
+     * the target command's normal authorization checks. When @p payload is
+     * non-empty, it replaces the forwarded message text so the target can
+     * consume structured internal input without inheriting the source
+     * command's arguments. The default implementation is unsupported so mocks
+     * and alternative front-ends stay source-compatible.
+     */
+    virtual bool invokeCommand(const std::string& command,
+                               Message::Ptr message,
+                               std::string payload = {}) {
+        (void)command;
+        (void)message;
+        (void)payload;
+        return false;
+    }
 
     enum class AnyMessageResult {
         // Handled, keep giving me callbacks

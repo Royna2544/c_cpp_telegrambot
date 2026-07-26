@@ -4,6 +4,8 @@ tgbot_exe(
     TestMain.cpp
     AuthorizationTest.cpp
     AskConfirmToolTest.cpp
+    BuilderLaunchToolTest.cpp
+    ToolRouterTest.cpp
     commands/CommandModulesTest.cpp
     commands/AliveCmdTest.cpp
     commands/CmdCmdTest.cpp

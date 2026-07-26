@@ -22,7 +22,9 @@
 #include <vector>
 
 #include "AskConfirmTool.hpp"
+#include "BuilderLaunchTool.hpp"
 #include "ModelPickerTool.hpp"
+#include "ToolRouter.hpp"
 #include "llm/AnthropicApi.hpp"
 #include "llm/LLMBackend.hpp"
 #include "llm/LMStudioBackend.hpp"
@@ -68,7 +70,7 @@ const llm::Tool kSendMessageTool{
 
 llm::ToolExecutor makeSendMessageExecutor(TgBotApi::Ptr api) {
     return [api](const std::string& /*name*/, const nlohmann::json& input,
-                bool& isError) -> std::string {
+                 bool& isError) -> std::string {
         isError = false;
         try {
             const auto userId = input.at("user_id").get<std::int64_t>();
@@ -99,8 +101,8 @@ const llm::Tool kGetChatIdTool{
     "look up, retrieve, or check an ID - never to create or change a "
     "registration. Returns a not-found message if the name is unknown.",
     nlohmann::json{{"type", "object"},
-                  {"properties", {{"name", {{"type", "string"}}}}},
-                  {"required", {"name"}}}};
+                   {"properties", {{"name", {{"type", "string"}}}}},
+                   {"required", {"name"}}}};
 
 llm::ToolExecutor makeGetChatIdExecutor(const Providers* provider) {
     return [provider](const std::string& /*name*/, const nlohmann::json& input,
@@ -111,7 +113,7 @@ llm::ToolExecutor makeGetChatIdExecutor(const Providers* provider) {
             const auto id = provider->database->getChatId(name);
             if (!id) {
                 return fmt::format("No chat/user id found for name \"{}\".",
-                                  name);
+                                   name);
             }
             return fmt::format("{}", *id);
         } catch (const std::exception& ex) {
@@ -128,8 +130,8 @@ const llm::Tool kGetChatNameTool{
     "or check a name - never to create or change a registration. Returns a "
     "not-found message if the ID is unregistered.",
     nlohmann::json{{"type", "object"},
-                  {"properties", {{"chat_id", {{"type", "integer"}}}}},
-                  {"required", {"chat_id"}}}};
+                   {"properties", {{"chat_id", {{"type", "integer"}}}}},
+                   {"required", {"chat_id"}}}};
 
 llm::ToolExecutor makeGetChatNameExecutor(const Providers* provider) {
     return [provider](const std::string& /*name*/, const nlohmann::json& input,
@@ -140,7 +142,7 @@ llm::ToolExecutor makeGetChatNameExecutor(const Providers* provider) {
             const auto name = provider->database->getChatName(chatId);
             if (!name) {
                 return fmt::format("No name registered for chat/user id {}.",
-                                  chatId);
+                                   chatId);
             }
             return *name;
         } catch (const std::exception& ex) {
@@ -164,6 +166,34 @@ const llm::Tool kSaveChatInfoTool{
          {{"chat_id", {{"type", "integer"}}}, {"name", {{"type", "string"}}}}},
         {"required", {"chat_id", "name"}}}};
 
+std::vector<llm::Tool> toolsForDomain(llm::tool_router::Domain domain) {
+    using llm::tool_router::Domain;
+    switch (domain) {
+        case Domain::Chat:
+            return {};
+        case Domain::KernelBuild:
+            return {llm::builder_launch::kKernelBuildTool};
+        case Domain::RomBuild:
+            return {llm::builder_launch::kRomBuildTool};
+        case Domain::Build:
+            return {llm::builder_launch::kKernelBuildTool,
+                    llm::builder_launch::kRomBuildTool};
+        case Domain::Telegram:
+            return {kSendMessageTool, kGetChatIdTool, kGetChatNameTool};
+        case Domain::ChatRegistry:
+            return {kGetChatIdTool, kGetChatNameTool, kSaveChatInfoTool};
+        case Domain::Confirmation:
+            return {llm::ask_confirm::kAskConfirmTool};
+    }
+    return {};
+}
+
+bool isBuilderDomain(llm::tool_router::Domain domain) {
+    using llm::tool_router::Domain;
+    return domain == Domain::KernelBuild || domain == Domain::RomBuild ||
+           domain == Domain::Build;
+}
+
 llm::ToolExecutor makeSaveChatInfoExecutor(const Providers* provider) {
     return [provider](const std::string& /*name*/, const nlohmann::json& input,
                       bool& isError) -> std::string {
@@ -174,7 +204,7 @@ llm::ToolExecutor makeSaveChatInfoExecutor(const Providers* provider) {
             switch (provider->database->addChatInfo(chatId, chatName)) {
                 case DatabaseBase::AddResult::OK:
                     return fmt::format("Saved: {} -> \"{}\".", chatId,
-                                      chatName);
+                                       chatName);
                 case DatabaseBase::AddResult::ALREADY_EXISTS:
                     isError = true;
                     return fmt::format(
@@ -198,16 +228,19 @@ llm::ToolExecutor makeSaveChatInfoExecutor(const Providers* provider) {
 // underlying executor already ignores the `name` parameter it's handed.
 llm::ToolExecutor makeCombinedExecutor(TgBotApi::Ptr api, ChatId chatId,
                                        UserId initiatingUserId,
-                                       const Providers* provider) {
+                                       const Providers* provider,
+                                       Message::Ptr sourceMessage) {
     auto sendMsg = makeSendMessageExecutor(api);
     auto askConfirm = llm::ask_confirm::makeAskConfirmExecutor(
         api, chatId, initiatingUserId, provider->auth.get());
     auto getChatId = makeGetChatIdExecutor(provider);
     auto getChatName = makeGetChatNameExecutor(provider);
     auto saveChatInfo = makeSaveChatInfoExecutor(provider);
-    return [sendMsg, askConfirm, getChatId, getChatName, saveChatInfo](
-               const std::string& name, const nlohmann::json& input,
-               bool& isError) -> std::string {
+    auto launchBuilder =
+        llm::builder_launch::makeExecutor(api, std::move(sourceMessage));
+    return [sendMsg, askConfirm, getChatId, getChatName, saveChatInfo,
+            launchBuilder](const std::string& name, const nlohmann::json& input,
+                           bool& isError) -> std::string {
         if (name == "send_message") {
             return sendMsg(name, input, isError);
         }
@@ -222,6 +255,10 @@ llm::ToolExecutor makeCombinedExecutor(TgBotApi::Ptr api, ChatId chatId,
         }
         if (name == "save_chat_info") {
             return saveChatInfo(name, input, isError);
+        }
+        if (name == llm::builder_launch::kKernelBuildTool.name ||
+            name == llm::builder_launch::kRomBuildTool.name) {
+            return launchBuilder(name, input, isError);
         }
         isError = true;
         return fmt::format("Unknown tool: {}", name);
@@ -249,10 +286,9 @@ DECLARE_COMMAND_HANDLER(ask) {
 
     const ChatId chatId = message->get<MessageAttrs::Chat>()->id;
 
-    const std::string text =
-        message->has<MessageAttrs::ExtraText>()
-            ? message->get<MessageAttrs::ExtraText>()
-            : std::string{};
+    const std::string text = message->has<MessageAttrs::ExtraText>()
+                                 ? message->get<MessageAttrs::ExtraText>()
+                                 : std::string{};
     const std::string_view trimmed = absl::StripAsciiWhitespace(text);
     if (trimmed.empty()) {
         api->sendReplyMessage(message->message(),
@@ -319,7 +355,8 @@ DECLARE_COMMAND_HANDLER(ask) {
         setSelectedModel(chatId, wanted);
         api->sendReplyMessage(
             message->message(),
-            fmt::format(fmt::runtime(res->get(Strings::LLM_MODEL_SET)), wanted));
+            fmt::format(fmt::runtime(res->get(Strings::LLM_MODEL_SET)),
+                        wanted));
         return;
     }
 
@@ -340,16 +377,54 @@ DECLARE_COMMAND_HANDLER(ask) {
                           res->get(Strings::LLM_PROCESSING_QUERY));
     const bool isAdmin = provider->auth->isAuthorized(
         message->message(), AuthContext::AccessLevel::AdminUser);
+    const auto userId = message->get<MessageAttrs::User>()->id;
+    auto toolDomain = llm::tool_router::Domain::Chat;
+    std::vector<llm::Tool> tools;
+    if (isAdmin) {
+        const auto pending = llm::builder_launch::pendingBuilds(chatId, userId);
+        const llm::tool_router::PendingBuilds pendingRoute{
+            .kernel = pending.kernel,
+            .rom = pending.rom,
+        };
+        if (const auto deterministic =
+                llm::tool_router::deterministicRoute(query, pendingRoute)) {
+            toolDomain = *deterministic;
+        } else if (const auto classified = backend->classify(
+                       model, std::string(llm::tool_router::kClassifierPrompt),
+                       query)) {
+            toolDomain = llm::tool_router::parseClassifierResult(*classified)
+                             .value_or(llm::tool_router::Domain::Chat);
+        }
+        tools = toolsForDomain(toolDomain);
+        LOG(INFO) << "LLM tool route: " << llm::tool_router::name(toolDomain)
+                  << " (" << tools.size() << " exposed tools)";
+    }
+
+    std::string systemPrompt = SYSTEM_PROMPT;
+    if (isAdmin && isBuilderDomain(toolDomain)) {
+        systemPrompt += R"(
+
+### Admin build orchestration
+- When the admin expresses any intent to build, prepare, or compile a Linux
+  kernel or Android ROM/recovery, you MUST call kernelbuild or rombuild before
+  replying. This applies even when the request is incomplete.
+- Never ask for a missing build field from your own reasoning. First call the
+  builder tool with every field the admin supplied; its result tells you which
+  fields to ask for.
+- A short reply to a pending build question (for example "a30") is the value
+  for that plan's missing field. Call the same builder tool to update the plan;
+  do not ask what the admin wants to do with that value.
+- Do not invent build fields. Omit fields the admin did not specify so server
+  defaults and compatibility validation remain authoritative.
+)";
+        systemPrompt += llm::builder_launch::pendingContext(chatId, userId);
+    }
     const auto answer =
-        isAdmin ? backend->chat(model, SYSTEM_PROMPT, query, chatId,
-                                {kSendMessageTool, llm::ask_confirm::kAskConfirmTool,
-                                 kGetChatIdTool, kGetChatNameTool,
-                                 kSaveChatInfoTool},
-                                makeCombinedExecutor(
-                                    api, chatId,
-                                    message->get<MessageAttrs::User>()->id,
-                                    provider))
-                : backend->chat(model, SYSTEM_PROMPT, query, chatId);
+        isAdmin && !tools.empty()
+            ? backend->chat(model, systemPrompt, query, chatId, tools,
+                            makeCombinedExecutor(api, chatId, userId, provider,
+                                                 message->message()))
+            : backend->chat(model, systemPrompt, query, chatId);
     if (!answer) {
         api->sendReplyMessage(message->message(),
                               res->get(Strings::LLM_RESPONSE_FAILED));

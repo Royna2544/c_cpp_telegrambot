@@ -21,6 +21,8 @@ class TgBotApiImpl::ModulesManagement {
     bool load(const std::string& name);
     // Unload module by `name' from the management modules.
     bool unload(const std::string& name);
+    // Dispatch a loaded module using an existing authenticated message.
+    bool invoke(const std::string& name, Message::Ptr message);
     // Load all modules from the directory.
     bool loadAll(const std::filesystem::path& directory);
 

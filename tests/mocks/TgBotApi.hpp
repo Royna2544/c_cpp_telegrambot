@@ -134,6 +134,10 @@ class MockTgBotApi : public TgBotApi {
     // Non-TgBotApi methods
     MOCK_METHOD(bool, reloadCommand, (const std::string& cmd), (override));
     MOCK_METHOD(bool, unloadCommand, (const std::string& cmd), (override));
+    MOCK_METHOD(bool, invokeCommand,
+                (const std::string& cmd, Message::Ptr message,
+                 std::string payload),
+                (override));
     MOCK_METHOD(void, onAnyMessage, (const AnyMessageCallback& callback),
                 (override));
 };
