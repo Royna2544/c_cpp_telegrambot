@@ -40,7 +40,7 @@ endif()
 
 if(SQLite3_FOUND)
   set(SQLITE_SRCS SQLiteDatabase.cpp)
-  list(APPEND DATABASE_LIBS SQLite::SQLite3 ${cpptrace_libs})
+  list(APPEND DATABASE_LIBS SQLite3::SQLite3 ${cpptrace_libs})
   list(APPEND DATABASE_DEFS DATABASE_HAVE_SQLITE ${cpptrace_def})
 endif()
 
