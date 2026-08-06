@@ -127,11 +127,11 @@ User::Ptr CommandModulesTest::createDefaultUser(long id_offset) {
 
 bool CommandModulesTest::isReplyToThisMsg(const ReplyParametersExt::Ptr& rhs,
                                           const Message::Ptr& message) {
-    if (!rhs) {
+    if (!rhs || !message || !rhs->messageId) {
         LOG(INFO) << "ReplyParameters is nullptr";
         return false;
     }
-    MessageId lMessageId = rhs->messageId;
+    MessageId lMessageId = *rhs->messageId;
     MessageId rMessageId = message->messageId;
     if (lMessageId != rMessageId) {
         LOG(INFO) << "ReplyToThisMsg false: " << lMessageId << " vs "
