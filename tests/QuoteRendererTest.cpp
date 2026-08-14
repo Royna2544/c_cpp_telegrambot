@@ -17,6 +17,10 @@
 
 namespace {
 
+[[nodiscard]] std::filesystem::path testFontDirectory() {
+    return QUOTE_TEST_FONT_DIR;
+}
+
 // A valid one-pixel PNG. Real media dimensions/crop behavior is covered by the
 // renderer's decoded-size validation; the command tests exercise Telegram file
 // extraction separately.
@@ -144,13 +148,21 @@ std::uint32_t hammingDistance(const std::array<std::uint64_t, 4>& left,
     return result;
 }
 
+TEST(QuoteRenderer, RejectsMissingExplicitFontDirectory) {
+    quote::QuoteRenderer renderer(testFontDirectory() / "missing");
+    auto result = renderer.render(baseRequest());
+
+    ASSERT_FALSE(result.has_value());
+    EXPECT_EQ(result.error().code, quote::QuoteErrorCode::AssetUnavailable);
+}
+
 TEST(QuoteRenderer, ProducesTelegramCompliantWebPSticker) {
     auto request = baseRequest();
     request.telegramSticker = true;
     request.background = "linear-gradient(#12263a, #274060)";
     request.maximumEncodedBytes = 512U * 1024U;
 
-    quote::QuoteRenderer renderer;
+    quote::QuoteRenderer renderer(testFontDirectory());
     auto result = renderer.render(request);
 
     ASSERT_TRUE(result.has_value()) << result.error().message;
@@ -169,7 +181,7 @@ TEST(QuoteRenderer, ProducesTelegramCompliantWebPSticker) {
 
 TEST(QuoteRenderer, RendersInternationalTextEntitiesReplyMediaVoiceAndEmoji) {
     TestResolver resolver;
-    quote::QuoteRenderer renderer(&resolver);
+    quote::QuoteRenderer renderer(testFontDirectory(), &resolver);
     quote::QuoteRenderRequest request;
     request.type = quote::QuoteOutputType::Image;
     request.format = quote::QuoteOutputFormat::Png;
@@ -229,7 +241,7 @@ TEST(QuoteRenderer, RendersInternationalTextEntitiesReplyMediaVoiceAndEmoji) {
 }
 
 TEST(QuoteRenderer, SupportsQuoteImageAndStoriesDefaults) {
-    quote::QuoteRenderer renderer;
+    quote::QuoteRenderer renderer(testFontDirectory());
     for (const auto type :
          {quote::QuoteOutputType::Quote, quote::QuoteOutputType::Image,
           quote::QuoteOutputType::Stories}) {
@@ -255,7 +267,7 @@ TEST(QuoteRenderer, LongQuoteIsScaledIntoStickerBounds) {
     request.messages.front().text =
         std::string(3000, 'a') + " 한국어 😀 العربية";
 
-    quote::QuoteRenderer renderer;
+    quote::QuoteRenderer renderer(testFontDirectory());
     auto result = renderer.render(request);
 
     ASSERT_TRUE(result.has_value()) << result.error().message;
@@ -266,7 +278,7 @@ TEST(QuoteRenderer, LongQuoteIsScaledIntoStickerBounds) {
 
 TEST(QuoteRenderer, RejectsInvalidCropAndOversizedSourceBudget) {
     TestResolver resolver;
-    quote::QuoteRenderer renderer(&resolver);
+    quote::QuoteRenderer renderer(testFontDirectory(), &resolver);
     auto request = baseRequest();
     request.messages.front().media.push_back(quote::QuoteMedia{
         .type = quote::QuoteMediaType::Photo,
@@ -287,7 +299,7 @@ TEST(QuoteRenderer, RejectsInvalidCropAndOversizedSourceBudget) {
 
 TEST(QuoteRenderer, ConcurrentRendersDoNotShareMutableState) {
     TestResolver resolver;
-    quote::QuoteRenderer renderer(&resolver);
+    quote::QuoteRenderer renderer(testFontDirectory(), &resolver);
     std::vector<std::future<bool>> futures;
     for (int i = 0; i < 8; ++i) {
         futures.push_back(std::async(std::launch::async, [&renderer, i] {
@@ -306,7 +318,7 @@ TEST(QuoteRenderer, ConcurrentRendersDoNotShareMutableState) {
 }
 
 TEST(QuoteRenderer, RejectsMalformedUtf8EntityRangesAndTinyCanvas) {
-    quote::QuoteRenderer renderer;
+    quote::QuoteRenderer renderer(testFontDirectory());
     auto request = baseRequest();
     request.messages.front().text = std::string("bad\xff", 4);
     auto invalidUtf8 = renderer.render(request);
@@ -333,7 +345,7 @@ TEST(QuoteRenderer, RejectsMalformedUtf8EntityRangesAndTinyCanvas) {
 
 TEST(QuoteRenderer, EnforcesEncodeLimitAndDeadlineAndFallsBackForAvatar) {
     TestResolver resolver;
-    quote::QuoteRenderer renderer(&resolver);
+    quote::QuoteRenderer renderer(testFontDirectory(), &resolver);
     auto request = baseRequest();
     request.format = quote::QuoteOutputFormat::Png;
     request.maximumEncodedBytes = 1;
@@ -359,7 +371,7 @@ TEST(QuoteRenderer, EnforcesEncodeLimitAndDeadlineAndFallsBackForAvatar) {
             };
         }
     } slowResolver;
-    quote::QuoteRenderer slowRenderer(&slowResolver);
+    quote::QuoteRenderer slowRenderer(testFontDirectory(), &slowResolver);
     request = baseRequest();
     request.deadline = std::chrono::milliseconds(1);
     request.messages.front().media.push_back(quote::QuoteMedia{
@@ -372,7 +384,7 @@ TEST(QuoteRenderer, EnforcesEncodeLimitAndDeadlineAndFallsBackForAvatar) {
 }
 
 TEST(QuoteRenderer, MatchesBundledFontPerceptualGoldenAndMapsEmojiBrands) {
-    quote::QuoteRenderer renderer;
+    quote::QuoteRenderer renderer(testFontDirectory());
     auto request = baseRequest();
     request.type = quote::QuoteOutputType::Image;
     request.format = quote::QuoteOutputFormat::Png;

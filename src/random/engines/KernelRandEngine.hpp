@@ -2,21 +2,26 @@
 
 #if defined __APPLE__ || defined __linux__
 
-#include <absl/log/check.h>
-#include <absl/log/log.h>
-
 #include <array>
 #include <cerrno>
+#include <cstddef>
 #include <cstdint>
-#include <fstream>
-#include <iomanip>
 #include <limits>
-#include <mutex>
+
+#ifdef __APPLE__
+#include <stdlib.h>
+#elif defined __linux__
+#include <fcntl.h>
+#include <sys/random.h>
+#include <unistd.h>
+#endif
 
 #define KERNELRAND_MAYBE_SUPPORTED
 
+// Bounded access to the platform CSPRNG. This engine is used only to seed a
+// thread-local PRNG; generate() and shuffle() never invoke it directly.
 struct kernel_rand_engine {
-    using result_type = uint32_t;
+    using result_type = std::uint32_t;
 
     static constexpr result_type min() {
         return std::numeric_limits<result_type>::min();
@@ -25,51 +30,77 @@ struct kernel_rand_engine {
         return std::numeric_limits<result_type>::max();
     }
 
-    result_type operator()() const noexcept { return read().value_or(0); }
-
-    kernel_rand_engine() { isSupported(); }
-
-    bool isSupported() {
-        static bool kSupported = [this] {
-            for (const auto& n : nodes) {
-                rng.open(n.data(), std::ios::in | std::ios::binary);
-                if (rng) {
-                    if (read()) {
-                        LOG(INFO) << "Device ready, Node: " << std::quoted(n);
-                        return true;
-                    }
-                } else {
-                    PLOG(ERROR)
-                        << "Opening node " << std::quoted(n) << " failed";
-                }
-            }
-            return false;
+    static bool supported() noexcept {
+        static const bool kSupported = [] {
+            result_type probe = 0;
+            return fill(&probe, 1);
         }();
         return kSupported;
     }
 
-   private:
-    std::optional<result_type> read() const noexcept {
-        result_type val;
-
-        if (rng.read(reinterpret_cast<char*>(&val), sizeof(val)); !rng) {
-            PLOG(ERROR) << "Failed to read data from HWRNG device";
-            rng.clear();
-            return std::nullopt;
+    static bool fill(result_type* output, const std::size_t count) noexcept {
+        if (output == nullptr || count == 0) {
+            return count == 0;
         }
-        return val;
-    }
+        if (count >
+            std::numeric_limits<std::size_t>::max() / sizeof(result_type)) {
+            return false;
+        }
 
-    static const inline std::array<std::string_view, 2> nodes = {
-#ifdef __linux__
-        // Linux 4.16 or below
-        "/dev/hw_random",
-        // Linux 4.17 or above
-        "/dev/hwrng",
-#elif defined __APPLE__
-        "/dev/random", "/dev/urandom"
+#ifdef __APPLE__
+        arc4random_buf(output, count * sizeof(result_type));
+        return true;
+#elif defined __linux__
+        auto* bytes = reinterpret_cast<unsigned char*>(output);
+        const std::size_t size = count * sizeof(result_type);
+        std::size_t offset = 0;
+        unsigned int attempts = 0;
+        constexpr unsigned int kMaxAttempts = 8;
+
+        while (offset < size && attempts++ < kMaxAttempts) {
+            const auto readCount =
+                ::getrandom(bytes + offset, size - offset, GRND_NONBLOCK);
+            if (readCount > 0) {
+                offset += static_cast<std::size_t>(readCount);
+                continue;
+            }
+            if (readCount < 0 && errno == EINTR) {
+                continue;
+            }
+            break;
+        }
+        if (offset == size) {
+            return true;
+        }
+
+        // getrandom can be unavailable on an old kernel, or return EAGAIN
+        // during very early boot. /dev/urandom is the non-blocking OS CSPRNG
+        // fallback; raw hardware RNG device nodes are deliberately not used.
+        int flags = O_RDONLY | O_NONBLOCK;
+#ifdef O_CLOEXEC
+        flags |= O_CLOEXEC;
 #endif
-    };
-    mutable std::ifstream rng;
+        const int fd = ::open("/dev/urandom", flags);
+        if (fd < 0) {
+            return false;
+        }
+
+        offset = 0;
+        attempts = 0;
+        while (offset < size && attempts++ < kMaxAttempts) {
+            const auto readCount = ::read(fd, bytes + offset, size - offset);
+            if (readCount > 0) {
+                offset += static_cast<std::size_t>(readCount);
+                continue;
+            }
+            if (readCount < 0 && errno == EINTR) {
+                continue;
+            }
+            break;
+        }
+        ::close(fd);
+        return offset == size;
+#endif
+    }
 };
 #endif

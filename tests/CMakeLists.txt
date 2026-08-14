@@ -238,6 +238,10 @@ find_package(PNG REQUIRED)
 target_link_libraries(test_quoterenderer PRIVATE GTest::gtest PNG::PNG
                                                     QuoteRenderer)
 target_include_directories(test_quoterenderer PRIVATE ${CMAKE_SOURCE_DIR}/src/include)
+file(TO_CMAKE_PATH "${CMAKE_SOURCE_DIR}/resources/quote/fonts"
+     QUOTE_TEST_FONT_DIR)
+target_compile_definitions(test_quoterenderer
+                           PRIVATE QUOTE_TEST_FONT_DIR="${QUOTE_TEST_FONT_DIR}")
 
 tgbot_exe(
   NAME qcommand

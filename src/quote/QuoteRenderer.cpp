@@ -12,7 +12,6 @@
 #include <cmath>
 #include <cstddef>
 #include <cstdint>
-#include <cstdlib>
 #include <cstring>
 #include <exception>
 #include <filesystem>
@@ -32,10 +31,6 @@
 
 #if defined(_WIN32)
 #include <windows.h>
-#elif defined(__APPLE__)
-#include <mach-o/dyld.h>
-#elif defined(__linux__)
-#include <unistd.h>
 #endif
 
 namespace quote {
@@ -102,44 +97,6 @@ struct MessageMetrics {
     std::vector<double> mediaHeights;
 };
 
-[[nodiscard]] std::optional<std::filesystem::path> executablePath() {
-#if defined(_WIN32)
-    std::wstring buffer(32768, L'\0');
-    const DWORD length = GetModuleFileNameW(nullptr, buffer.data(),
-                                            static_cast<DWORD>(buffer.size()));
-    if (length == 0 || length >= buffer.size())
-        return std::nullopt;
-    buffer.resize(length);
-    return std::filesystem::path(buffer);
-#elif defined(__APPLE__)
-    std::uint32_t size = 0;
-    (void)_NSGetExecutablePath(nullptr, &size);
-    if (size == 0)
-        return std::nullopt;
-    std::vector<char> buffer(size);
-    if (_NSGetExecutablePath(buffer.data(), &size) != 0)
-        return std::nullopt;
-    return std::filesystem::path(buffer.data());
-#elif defined(__linux__)
-    std::vector<char> buffer(4096);
-    for (;;) {
-        const auto length =
-            readlink("/proc/self/exe", buffer.data(), buffer.size());
-        if (length < 0)
-            return std::nullopt;
-        if (static_cast<std::size_t>(length) < buffer.size()) {
-            return std::filesystem::path(
-                std::string(buffer.data(), static_cast<std::size_t>(length)));
-        }
-        if (buffer.size() >= 1024U * 1024U)
-            return std::nullopt;
-        buffer.resize(buffer.size() * 2U);
-    }
-#else
-    return std::nullopt;
-#endif
-}
-
 [[nodiscard]] bool containsBundledFonts(
     const std::filesystem::path& directory) {
     std::error_code error;
@@ -154,33 +111,6 @@ struct MessageMetrics {
     return true;
 }
 
-[[nodiscard]] std::optional<std::filesystem::path> bundledFontDirectory() {
-    std::vector<std::filesystem::path> candidates;
-    if (const char* root = std::getenv("GLIDER_ROOT");
-        root != nullptr && *root != '\0') {
-        candidates.emplace_back(std::filesystem::path(root) / "share" /
-                                "Glider" / "quote" / "fonts");
-    }
-    if (const auto executable = executablePath()) {
-        candidates.emplace_back(executable->parent_path().parent_path() /
-                                "share" / "Glider" / "quote" / "fonts");
-    }
-    std::error_code error;
-    const auto current = std::filesystem::current_path(error);
-    if (!error) {
-        candidates.emplace_back(current / "share" / "Glider" / "quote" /
-                                "fonts");
-    }
-#ifdef QUOTE_SOURCE_FONT_DIR
-    candidates.emplace_back(QUOTE_SOURCE_FONT_DIR);
-#endif
-    for (const auto& candidate : candidates) {
-        if (containsBundledFonts(candidate))
-            return candidate;
-    }
-    return std::nullopt;
-}
-
 [[nodiscard]] std::string pangoFontPath(const std::filesystem::path& path) {
 #if defined(_WIN32)
     const auto encoded = path.u8string();
@@ -192,39 +122,37 @@ struct MessageMetrics {
 
 [[nodiscard]] bool pinDynamicPangoRuntime() noexcept {
 #ifdef _WIN32
-    // GObject keeps registered type metadata for the life of the process.
-    // Unloading and reloading a *dynamic* Pango DLL would therefore attempt to
-    // register the same types again. This happens when /q is the last Pango
-    // consumer and its command module is reloaded. Pin only the external Pango
-    // DLL; when Pango is statically linked into this library both addresses are
-    // in the same image and the command module remains normally unloadable.
-    constexpr DWORD inspectFlags = GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS |
-                                   GET_MODULE_HANDLE_EX_FLAG_UNCHANGED_REFCOUNT;
-    HMODULE pangoModule = nullptr;
-    HMODULE rendererModule = nullptr;
-    if (!GetModuleHandleExW(
-            inspectFlags,
-            reinterpret_cast<LPCWSTR>(&pango_cairo_font_map_get_default),
-            &pangoModule) ||
-        !GetModuleHandleExW(inspectFlags,
-                            reinterpret_cast<LPCWSTR>(&pinDynamicPangoRuntime),
-                            &rendererModule)) {
-        return false;
+    // GObject keeps registered Pango type metadata for the life of the
+    // process. If /q is the last consumer, unloading Pango and loading it again
+    // attempts to register those names twice. Taking the address of an imported
+    // function is not sufficient here: some toolchains return the command
+    // module's IAT thunk rather than the address inside the Pango DLL. Resolve
+    // the export from the loaded DLL, then pin the module containing that exact
+    // address.
+    constexpr std::array moduleNames = {L"pangocairo-1.0-0.dll",
+                                        L"libpangocairo-1.0-0.dll"};
+    for (const auto* moduleName : moduleNames) {
+        const HMODULE module = GetModuleHandleW(moduleName);
+        if (module == nullptr)
+            continue;
+        const auto function =
+            GetProcAddress(module, "pango_cairo_font_map_get_default");
+        if (function == nullptr)
+            continue;
+        HMODULE pinnedModule = nullptr;
+        return GetModuleHandleExW(GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS |
+                                      GET_MODULE_HANDLE_EX_FLAG_PIN,
+                                  reinterpret_cast<LPCWSTR>(function),
+                                  &pinnedModule) != FALSE;
     }
-    if (pangoModule == rendererModule)
-        return true;
-    HMODULE pinnedModule = nullptr;
-    return GetModuleHandleExW(
-               GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS |
-                   GET_MODULE_HANDLE_EX_FLAG_PIN,
-               reinterpret_cast<LPCWSTR>(&pango_cairo_font_map_get_default),
-               &pinnedModule) != FALSE;
+    return false;
 #else
     return true;
 #endif
 }
 
-[[nodiscard]] std::optional<QuoteError> registerBundledFonts() {
+[[nodiscard]] std::optional<QuoteError> registerBundledFonts(
+    const std::filesystem::path& directory) {
     // Pango's default Cairo font map is per-thread. Force the portable
     // FreeType/fontconfig backend so the same bundled outline fonts are used
     // on Windows, macOS, Linux, and ARM, then mark that thread-owned map after
@@ -232,6 +160,10 @@ struct MessageMetrics {
     // module, avoiding unsafe thread_local destructors across module reloads.
     constexpr char registrationKey[] =
         "glider-quote-fonts-352f6b7d9d6cc4fa9e242b931291d31b21a6dc84";
+    if (!containsBundledFonts(directory)) {
+        return QuoteError{.code = QuoteErrorCode::AssetUnavailable,
+                          .message = "bundled quote fonts are unavailable"};
+    }
     if (!pinDynamicPangoRuntime()) {
         return QuoteError{.code = QuoteErrorCode::Internal,
                           .message = "failed to retain the Pango runtime"};
@@ -261,13 +193,8 @@ struct MessageMetrics {
     if (g_object_get_data(G_OBJECT(fontMap), registrationKey) != nullptr)
         return std::nullopt;
 
-    const auto directory = bundledFontDirectory();
-    if (!directory) {
-        return QuoteError{.code = QuoteErrorCode::AssetUnavailable,
-                          .message = "bundled quote fonts are unavailable"};
-    }
     for (const auto file : kBundledFontFiles) {
-        const auto path = pangoFontPath(*directory / file);
+        const auto path = pangoFontPath(directory / file);
         GError* error = nullptr;
         if (pango_font_map_add_font_file(fontMap, path.c_str(), &error) ==
             FALSE) {
@@ -1653,8 +1580,9 @@ encodeWebP(cairo_surface_t* surface, int width, int height, std::size_t limit,
 
 }  // namespace
 
-QuoteRenderer::QuoteRenderer(QuoteAssetResolver* resolver)
-    : resolver_(resolver) {}
+QuoteRenderer::QuoteRenderer(std::filesystem::path fontDirectory,
+                             QuoteAssetResolver* resolver)
+    : fontDirectory_(std::move(fontDirectory)), resolver_(resolver) {}
 
 compat::expected<QuoteRenderResult, QuoteError> QuoteRenderer::render(
     const QuoteRenderRequest& request) const {
@@ -1664,7 +1592,7 @@ compat::expected<QuoteRenderResult, QuoteError> QuoteRenderer::render(
 
     try {
         const auto started = std::chrono::steady_clock::now();
-        if (const auto error = registerBundledFonts()) {
+        if (const auto error = registerBundledFonts(fontDirectory_)) {
             return compat::unexpected<QuoteError>(*error);
         }
         RenderState state{.request = request,

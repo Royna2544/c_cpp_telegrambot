@@ -5,11 +5,11 @@
 
 #include <algorithm>
 #include <memory>
+#include <random>
 #include <string>
 #include <trivial_helpers/fruit_inject.hpp>
 #include <type_traits>
 #include <vector>
-#include <random>
 
 class RandomBase {
    public:
@@ -35,9 +35,7 @@ class RandomBase {
      * @throws std::runtime_error if min >= max
      * @return Generated number
      */
-    ret_type generate(const ret_type max) const {
-        return generate(0, max);
-    }
+    ret_type generate(const ret_type max) const { return generate(0, max); }
 
     /**
      * Specialization of shuffle for std::string type.
@@ -56,6 +54,13 @@ class RandomBase {
 
 class RANDOM_EXPORT Random : public RandomBase {
    public:
+    enum class Backend {
+        Auto,
+        RDRand,
+        KernelRand,
+        StdCpp,
+    };
+
     /**
      * @brief      Base class for random number generators.
      *
@@ -157,6 +162,16 @@ class RANDOM_EXPORT Random : public RandomBase {
     // Choose from default lists
     APPLE_INJECT(Random());
 
+    // Select a specific entropy source when it is available. Unsupported
+    // explicit selections safely fall back to StdCpp.
+    explicit Random(Backend requestedBackend);
+
+    [[nodiscard]] Backend selectedBackend() const noexcept {
+        return selectedBackend_;
+    }
+
+    [[nodiscard]] static bool isBackendSupported(Backend backend) noexcept;
+
     /**
      * generate - Generate random number given a range.
      * Conditionally uses platform-specific RNG.
@@ -184,4 +199,5 @@ class RANDOM_EXPORT Random : public RandomBase {
 
    private:
     std::unique_ptr<ImplBase> impl_;
+    Backend selectedBackend_ = Backend::StdCpp;
 };

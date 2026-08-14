@@ -6,6 +6,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <expected_cpp20>
+#include <filesystem>
 #include <optional>
 #include <string>
 #include <string_view>
@@ -166,12 +167,14 @@ struct QuoteRenderResult {
 
 class QUOTERENDERER_EXPORT QuoteRenderer {
    public:
-    explicit QuoteRenderer(QuoteAssetResolver* resolver = nullptr);
+    explicit QuoteRenderer(std::filesystem::path fontDirectory,
+                           QuoteAssetResolver* resolver = nullptr);
 
     [[nodiscard]] compat::expected<QuoteRenderResult, QuoteError> render(
         const QuoteRenderRequest& request) const;
 
    private:
+    std::filesystem::path fontDirectory_;
     QuoteAssetResolver* resolver_;
 };
 

@@ -506,12 +506,14 @@ DECLARE_COMMAND_HANDLER(q) {
     request.messages.push_back(std::move(nativeMessage));
 
     const ChatId chatId = message->get<MessageAttrs::Chat>()->id;
+    const auto fontDirectory =
+        provider->cmdline->getPath(FS::PathType::RESOURCES) / "quote" / "fonts";
     const std::string failureText(res->get(Strings::QUOTE_GENERATE_FAILED));
     const std::string invalidIdText(res->get(Strings::QUOTE_INVALID_ID));
     const auto job = api->submitCommandWork(
         "q", TgBotApi::WorkClass::Media,
         [api, chatId, request = std::move(request), senderOverride, failureText,
-         invalidIdText](std::stop_token stop) mutable {
+         invalidIdText, fontDirectory](std::stop_token stop) mutable {
             if (stop.stop_requested())
                 return;
             if (senderOverride) {
@@ -549,7 +551,7 @@ DECLARE_COMMAND_HANDLER(q) {
             if (stop.stop_requested())
                 return;
             TelegramQuoteAssetResolver resolver(api);
-            quote::QuoteRenderer renderer(&resolver);
+            quote::QuoteRenderer renderer(fontDirectory, &resolver);
             auto rendered = renderer.render(request);
             if (stop.stop_requested())
                 return;

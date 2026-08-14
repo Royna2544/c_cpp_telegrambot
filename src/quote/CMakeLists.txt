@@ -32,13 +32,6 @@ target_link_libraries(QuoteRenderer
     WebP::webp
 )
 
-# Keep a source-tree fallback for direct library/test execution. Installed and
-# packaged builds resolve the same files relative to the executable first.
-file(TO_CMAKE_PATH "${CMAKE_SOURCE_DIR}/resources/quote/fonts" QUOTE_SOURCE_FONT_DIR)
-target_compile_definitions(
-  QuoteRenderer PRIVATE QUOTE_SOURCE_FONT_DIR="${QUOTE_SOURCE_FONT_DIR}"
-)
-
 if(OpenCV_FOUND)
   target_compile_definitions(QuoteRenderer PRIVATE QUOTE_HAVE_OPENCV)
   target_link_libraries(QuoteRenderer PRIVATE ${OpenCV_LIBS})

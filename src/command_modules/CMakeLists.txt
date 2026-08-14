@@ -212,7 +212,7 @@ command_module(NAME log SRCS log.cpp)
 command_module(
   NAME q
   SRCS q.cpp
-  LIBS QuoteRenderer $<$<PLATFORM_ID:Windows>:advapi32>)
+  LIBS QuoteRenderer Utils $<$<PLATFORM_ID:Windows>:advapi32>)
 
 command_module(NAME ask SRCS ask.cpp LIBS CurlDownload Utils AuthApi)
 
