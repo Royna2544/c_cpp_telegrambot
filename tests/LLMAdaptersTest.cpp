@@ -7,6 +7,12 @@
 #include <vector>
 
 #include "llm/AnthropicApi.hpp"
+
+// Match the production include order: AskConfirmTool instantiates the JSON
+// serializer for optional<json> before the LM Studio adapter is included.
+static_assert(
+    sizeof(nlohmann::adl_serializer<std::optional<nlohmann::json>>) > 0);
+
 #include "llm/LMStudioApi.hpp"
 #include "llm/OpenAIApi.hpp"
 #include "llm/TelegramOutput.hpp"
