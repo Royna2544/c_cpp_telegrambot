@@ -908,10 +908,10 @@ class TgBotApi {
     // command workers. The owner must be the submitting command's module name;
     // implementations retain its execution lease and cancel/drain work before
     // dlclose. A missing result means the bounded lane rejected the job.
-    virtual std::optional<WorkId> submitCommandWork(std::string_view owner,
-                                                    WorkClass workClass,
-                                                    CancellableWork work,
-                                                    WorkOptions options = {}) {
+    virtual std::optional<WorkId> submitCommandWork(
+        std::string_view owner, WorkClass workClass, CancellableWork work,
+        WorkOptions options = {std::chrono::milliseconds::zero(),
+                               std::chrono::milliseconds::zero()}) {
         (void)owner;
         (void)workClass;
         (void)work;
