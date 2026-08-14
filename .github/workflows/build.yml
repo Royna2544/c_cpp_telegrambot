@@ -62,7 +62,10 @@ jobs:
             real_cxx: g++
             flags: '-DCMAKE_C_FLAGS=-fsanitize=thread -DCMAKE_CXX_FLAGS=-fsanitize=thread -DCMAKE_EXE_LINKER_FLAGS=-fsanitize=thread -DCMAKE_SHARED_LINKER_FLAGS=-fsanitize=thread'
             str: (TSan)
-            tsan_options: halt_on_error=1
+            # vcpkg dependencies are not built with this target's sanitizer
+            # flags.  Keep the one documented Pango/GLib queue handoff
+            # suppression narrow while continuing to halt on every other race.
+            tsan_options: halt_on_error=1:suppressions=tsan-pango.supp
           - os: ubuntu-latest
             cc: GCC-ARMHF
             real_cc: arm-linux-gnueabihf-gcc

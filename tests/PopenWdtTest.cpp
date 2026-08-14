@@ -315,8 +315,15 @@ TEST(PopenWdtTest, CancelEscalatesIgnoredTermToKill) {
     popen_watchdog_data_t* data = nullptr;
     ASSERT_TRUE(popen_watchdog_init(&data));
     data->watchdog_enabled = false;
-    data->command = "trap '' TERM; while :; do sleep 1; done";
+    // Cancellation can race the shell startup.  Wait for a byte written after
+    // the trap is installed so this test exercises TERM -> KILL escalation,
+    // rather than occasionally terminating the shell before it ignores TERM.
+    data->command = "trap '' TERM; printf R; while :; do sleep 1; done";
     ASSERT_TRUE(popen_watchdog_start(&data));
+
+    char ready = '\0';
+    ASSERT_EQ(popen_watchdog_read(&data, &ready, sizeof(ready)), 1);
+    ASSERT_EQ(ready, 'R');
     EXPECT_TRUE(popen_watchdog_cancel(&data));
     const auto result = popen_watchdog_destroy(&data);
     EXPECT_TRUE(result.signal);

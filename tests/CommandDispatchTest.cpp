@@ -223,6 +223,10 @@ TEST(CommandDispatchTest, ReentrantOwnerCancellationDoesNotDeadlock) {
         ASSERT_TRUE(
             changed.wait_for(lock, 2s, [&] { return cancellationReturned; }));
     }
+    // The predicate can become true after the worker releases mutex but
+    // before its following notify_all() returns.  Drain the worker invocation
+    // before the stack-owned condition variable is destroyed.
+    executor.drain("self");
     EXPECT_FALSE(queuedRan.load());
 }
 

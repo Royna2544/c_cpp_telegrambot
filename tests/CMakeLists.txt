@@ -35,6 +35,8 @@ if(UNIX)
   target_compile_definitions(test_main PRIVATE TEST_HAVE_CMD_IBASH)
 endif()
 
+configure_file(tsan-pango.supp tsan-pango.supp COPYONLY)
+
 tgbot_exe(
   NAME random
   SRCS
