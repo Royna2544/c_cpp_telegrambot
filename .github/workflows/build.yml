@@ -126,7 +126,7 @@ jobs:
           sudo apt install -y autoconf autoconf-archive automake libtool libxrandr-dev \
             libx11-dev libxft-dev libxext-dev libltdl-dev libxi-dev libxtst-dev \
             x11-xserver-utils gi-docgen nasm mono-complete gcc-arm-linux-gnueabihf \
-            g++-arm-linux-gnueabihf
+            g++-arm-linux-gnueabihf libc6-dev-armhf-cross
 
       - name: Select vcpkg binary cache sources
         shell: bash
