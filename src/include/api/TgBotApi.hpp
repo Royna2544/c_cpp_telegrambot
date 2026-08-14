@@ -13,8 +13,11 @@
 #include <cstdint>
 #include <filesystem>
 #include <memory>
+#include <optional>
+#include <stop_token>
 #include <string>
 #include <string_view>
+#include <system_error>
 #include <trivial_helpers/fruit_inject.hpp>
 #include <utility>
 #include <variant>
@@ -366,6 +369,32 @@ class TgBotApi {
                                    const std::string_view fileId) const = 0;
 
     /**
+     * Download with a hard byte limit. Implementations may override
+     * this to
+     * reject server-declared oversized files before allocating
+     * the response.
+     * The default keeps test/custom implementations
+     * source-compatible and
+     * enforces the limit on the completed file.
+
+     */
+    virtual bool downloadFileWithinLimit_impl(
+        const std::filesystem::path& destFilename,
+        const std::string_view fileId, std::uintmax_t maxBytes) const {
+        if (!downloadFile_impl(destFilename, fileId)) {
+            return false;
+        }
+        std::error_code ec;
+        const auto bytes = std::filesystem::file_size(destFilename, ec);
+        if (!ec && bytes <= maxBytes) {
+            return true;
+        }
+        ec.clear();
+        (void)std::filesystem::remove(destFilename, ec);
+        return false;
+    }
+
+    /**
      * @brief Gets the bot user.
      *
      * This function retrieves the bot user.
@@ -475,10 +504,13 @@ class TgBotApi {
     /**
      * @brief Retrieves a user's profile photos.
      * 
-     * @param userId The unique identifier of the user whose profile photos are
+     * @param
+     * userId The unique identifier of the user whose profile photos are
+     *
      * retrieved.
      * 
-     * @return A shared pointer to a UserProfilePhotos object containing the
+     * @return A shared pointer to a UserProfilePhotos
+     * object containing the
      * profile photos of the specified user.
     */
     virtual TgBot::UserProfilePhotos::Ptr getUserProfilePhotos_impl(
@@ -490,7 +522,8 @@ class TgBotApi {
      * @param chatId The unique identifier of the chat to retrieve information
      * about.
      *
-     * @return A shared pointer to a Chat object containing the information about
+     * @return A shared pointer to a Chat object containing the information
+     * about
      * the specified chat.
      */
     virtual Chat::Ptr getChat_impl(ChatId chatId) const = 0;
@@ -744,6 +777,12 @@ class TgBotApi {
         return downloadFile_impl(path, fileid);
     }
 
+    [[nodiscard]] inline bool downloadFileWithinLimit(
+        const std::filesystem::path& path, const std::string_view fileid,
+        std::uintmax_t maxBytes) const {
+        return downloadFileWithinLimit_impl(path, fileid, maxBytes);
+    }
+
     [[nodiscard]] inline User::Ptr getBotUser() const {
         return getBotUser_impl();
     }
@@ -790,7 +829,8 @@ class TgBotApi {
         return getChatMember_impl(chat, user);
     }
 
-    inline void setDescriptions(const std::optional<std::string_view> description,
+    inline void setDescriptions(
+        const std::optional<std::string_view> description,
         const std::optional<std::string_view> shortDescription) {
         setDescriptions_impl(description, shortDescription);
     }
@@ -821,23 +861,67 @@ class TgBotApi {
         return false;  // Dummy implementation
     }
     /**
-     * @brief Dispatches a loaded command using an existing Telegram message as
+     * @brief Dispatches a loaded command using an existing Telegram
+     * message as
      *        its authenticated user/chat context.
      *
-     * Internal callers can use this to hand work from one command module to
-     * another without forging a Telegram update. Implementations must apply
-     * the target command's normal authorization checks. When @p payload is
-     * non-empty, it replaces the forwarded message text so the target can
-     * consume structured internal input without inheriting the source
+
+     * * Internal callers can use this to hand work from one command module to
+
+     * * another without forging a Telegram update. Implementations must apply
+
+     * * the target command's normal authorization checks. When @p payload is
+
+     * * non-empty, it replaces the forwarded message text so the target can
+
+     * * consume structured internal input without inheriting the source
+     *
      * command's arguments. The default implementation is unsupported so mocks
-     * and alternative front-ends stay source-compatible.
+
+     * * and alternative front-ends stay source-compatible.
      */
-    virtual bool invokeCommand(const std::string& command,
-                               Message::Ptr message,
+    virtual bool invokeCommand(const std::string& command, Message::Ptr message,
                                std::string payload = {}) {
         (void)command;
         (void)message;
         (void)payload;
+        return false;
+    }
+
+    enum class WorkClass {
+        Llm,
+        Media,
+        Process,
+        Outbound,
+        UnboundedProcess,
+    };
+    using WorkId = std::uint64_t;
+    using CancellableWork = std::function<void(std::stop_token)>;
+    struct WorkOptions {
+        std::chrono::milliseconds delay{};
+        // Zero selects the lane default. UnboundedProcess has no default
+        // deadline, but remains explicitly cancellable.
+        std::chrono::milliseconds deadline{};
+    };
+
+    // Submit long-running or delayed work without occupying the two fast
+    // command workers. The owner must be the submitting command's module name;
+    // implementations retain its execution lease and cancel/drain work before
+    // dlclose. A missing result means the bounded lane rejected the job.
+    virtual std::optional<WorkId> submitCommandWork(std::string_view owner,
+                                                    WorkClass workClass,
+                                                    CancellableWork work,
+                                                    WorkOptions options = {}) {
+        (void)owner;
+        (void)workClass;
+        (void)work;
+        (void)options;
+        return std::nullopt;
+    }
+
+    virtual bool cancelCommandWork(std::string_view owner, WorkId id) {
+        (void)owner;
+        (void)id;
         return false;
     }
 
@@ -851,8 +935,47 @@ class TgBotApi {
     using AnyMessageCallback =
         std::function<AnyMessageResult(TgBotApi::CPtr, const Message::Ptr&)>;
 
+    class CallbackSubscription {
+       public:
+        using Ptr = std::unique_ptr<CallbackSubscription>;
+
+        CallbackSubscription() = default;
+        virtual ~CallbackSubscription() = default;
+
+        CallbackSubscription(const CallbackSubscription&) = delete;
+        CallbackSubscription& operator=(const CallbackSubscription&) = delete;
+
+        // Prevent new entries into the callback and wait for every invocation
+        // already in progress to release its copy of the user closure.
+        virtual void cancelAndDrain() noexcept = 0;
+    };
+
     virtual void onAnyMessage(const AnyMessageCallback& callback) {
         // Dummy implementation
+    }
+
+    // Global components which capture object state should retain the returned
+    // token and destroy it before that state. Implementations predating this
+    // API still receive the callback through onAnyMessage(), but cannot offer
+    // an independently cancellable subscription and therefore return null.
+    virtual CallbackSubscription::Ptr subscribeAnyMessage(
+        const AnyMessageCallback& callback) {
+        onAnyMessage(callback);
+        return {};
+    }
+
+    // Command modules that retain a callback beyond their command handler must
+    // associate it with the owning module. The implementation removes and
+    // drains these callbacks before unloading that module's shared library.
+    virtual void onAnyMessageForCommand(const std::string_view command,
+                                        const AnyMessageCallback& callback) {
+        (void)command;
+        onAnyMessage(callback);
+    }
+
+    virtual void removeAnyMessageCallbacksForCommand(
+        const std::string_view command) {
+        (void)command;
     }
 
     virtual void onCallbackQuery(
@@ -864,6 +987,12 @@ class TgBotApi {
     virtual void onEditedMessage(
         TgBot::EventBroadcaster::MessageListener listener) {
         // Dummy implementation
+    }
+
+    virtual CallbackSubscription::Ptr subscribeEditedMessage(
+        TgBot::EventBroadcaster::MessageListener listener) {
+        onEditedMessage(std::move(listener));
+        return {};
     }
 
     struct InlineQuery {

@@ -5,6 +5,7 @@
 #include <fmt/format.h>
 
 #include <StructF.hpp>
+#include <cstdint>
 #include <libos/libsighandler.hpp>
 #include <string>
 #include <utility>
@@ -13,10 +14,6 @@
 #include "utils/libfs.hpp"
 
 namespace {
-
-// Upper bound for responses buffered fully in memory (model lists, JSON
-// replies). Prevents a malicious/compromised server from exhausting RAM.
-constexpr size_t kMaxInMemoryResponse = 64ULL * 1024 * 1024;  // 64 MiB
 
 static CURL* CURL_setup_common(const std::string_view url,
                                CurlUtils::CancelChecker& cancel_checker,
@@ -36,6 +33,9 @@ static CURL* CURL_setup_common(const std::string_view url,
     curl_easy_setopt(curl, CURLOPT_MAXREDIRS, 5L);
     // Enable 302 redirects
     curl_easy_setopt(curl, CURLOPT_FOLLOWLOCATION, 1L);
+    // Curl handles timeouts without process-wide signals. This is required
+    // when requests run concurrently on command worker threads.
+    curl_easy_setopt(curl, CURLOPT_NOSIGNAL, 1L);
 
     constexpr auto megabyte = 1024L * 1024L;
 
@@ -82,11 +82,33 @@ static CURL* CURL_setup_common(const std::string_view url,
     return curl;
 }
 
+void CURL_apply_interactive_timeouts(CURL* curl) {
+    curl_easy_setopt(curl, CURLOPT_CONNECTTIMEOUT,
+                     CurlUtils::kInteractiveConnectTimeoutSeconds);
+    curl_easy_setopt(curl, CURLOPT_TIMEOUT,
+                     CurlUtils::kInteractiveTotalTimeoutSeconds);
+    curl_easy_setopt(curl, CURLOPT_LOW_SPEED_LIMIT, 1024L);
+    curl_easy_setopt(curl, CURLOPT_LOW_SPEED_TIME,
+                     CurlUtils::kInteractiveIdleTimeoutSeconds);
+}
+
 bool CURL_perform_common(CURL* curl) {
     CURLcode res = curl_easy_perform(curl);
+    long http_code = 0;
+    if (res == CURLE_OK) {
+        curl_easy_getinfo(curl, CURLINFO_RESPONSE_CODE, &http_code);
+    }
     curl_easy_cleanup(curl);
     if (res != CURLE_OK) {
         LOG(ERROR) << "Cannot download file: " << curl_easy_strerror(res);
+        return false;
+    }
+    // A successful transport-level transfer can still carry an HTTP error
+    // (e.g. 4xx/5xx with an empty or error body). Treat those as failures too,
+    // otherwise callers happily consume the error body as if it were the
+    // requested payload.
+    if (http_code >= 400) {
+        LOG(ERROR) << "Request failed with HTTP status " << http_code;
         return false;
     }
     return true;
@@ -146,6 +168,7 @@ std::optional<std::string> download_memory(
         LOG(ERROR) << "Cannot setup curl";
         return std::nullopt;
     }
+    CURL_apply_interactive_timeouts(curl);
 
     // Set request headers if provided
     struct curl_slist* hdrlist = nullptr;
@@ -161,10 +184,14 @@ std::optional<std::string> download_memory(
         curl, CURLOPT_WRITEFUNCTION,
         +[](void* contents, size_t size, size_t nmemb, void* userp) -> size_t {
             auto* out = static_cast<std::string*>(userp);
+            if (size != 0 && nmemb > SIZE_MAX / size) {
+                return 0;
+            }
             const size_t incoming = size * nmemb;
-            if (out->size() + incoming > kMaxInMemoryResponse) {
+            if (incoming > CurlUtils::kMaxInMemoryResponseBytes - out->size()) {
                 LOG(ERROR) << "Response exceeded in-memory limit of "
-                           << kMaxInMemoryResponse << " bytes, aborting";
+                           << CurlUtils::kMaxInMemoryResponseBytes
+                           << " bytes, aborting";
                 return 0;  // short count aborts the transfer
             }
             out->append(static_cast<char*>(contents), incoming);
@@ -199,22 +226,25 @@ std::optional<std::string> download_memory(
 
 std::optional<std::string> send_json_get_reply(
     const std::string_view url, std::string json,
-    const std::vector<std::string>& headers) {
+    const std::vector<std::string>& headers,
+    CurlUtils::CancelChecker cancel_checker) {
     std::string result;
 
     LOG(INFO) << "Sending JSON to " << url;
+    if (json.size() > kMaxJsonRequestBytes) {
+        LOG(ERROR) << "JSON request exceeded in-memory limit of "
+                   << kMaxJsonRequestBytes << " bytes";
+        return {};
+    }
 
     // Common CURL setup
-    CurlUtils::CancelChecker cancel_checker = nullptr;
-    // Disable timeout for LLM.
-    CURL* curl = CURL_setup_common(url, cancel_checker, false);
+    CURL* curl = CURL_setup_common(url, cancel_checker);
     if (curl == nullptr) {
         LOG(ERROR) << "Cannot setup curl";
         return {};
     }
 
-    // Set timeout for connection, lower than default
-    curl_easy_setopt(curl, CURLOPT_CONNECTTIMEOUT, 15L);
+    CURL_apply_interactive_timeouts(curl);
 
     struct curl_slist* hdrlist = nullptr;
     hdrlist = curl_slist_append(hdrlist, "Content-Type: application/json");
@@ -232,10 +262,14 @@ std::optional<std::string> send_json_get_reply(
         curl, CURLOPT_WRITEFUNCTION,
         +[](void* contents, size_t size, size_t nmemb, void* userp) -> size_t {
             auto* out = static_cast<std::string*>(userp);
+            if (size != 0 && nmemb > SIZE_MAX / size) {
+                return 0;
+            }
             const size_t incoming = size * nmemb;
-            if (out->size() + incoming > kMaxInMemoryResponse) {
+            if (incoming > CurlUtils::kMaxInMemoryResponseBytes - out->size()) {
                 LOG(ERROR) << "Reply exceeded in-memory limit of "
-                           << kMaxInMemoryResponse << " bytes, aborting";
+                           << CurlUtils::kMaxInMemoryResponseBytes
+                           << " bytes, aborting";
                 return 0;  // short count aborts the transfer
             }
             out->append(static_cast<char*>(contents), incoming);
@@ -249,20 +283,26 @@ std::optional<std::string> send_json_get_reply(
     bool exec_result = CURL_perform_common(curl);
     curl_slist_free_all(hdrlist);
     LOG_IF(INFO, exec_result) << "Request succeeded";
-    if (exec_result)
-        return result;
-    else
+    if (!exec_result) {
         return {};
+    }
+    if (result.empty()) {
+        LOG(ERROR) << "Received empty reply body from " << url;
+        return {};
+    }
+    return result;
 }
 
 std::optional<std::string> send_json_get_reply(const std::string_view url,
                                                std::string json,
-                                               const std::string_view authkey) {
+                                               const std::string_view authkey,
+                                               CancelChecker cancel_checker) {
     std::vector<std::string> headers;
     if (!authkey.empty()) {
         headers.emplace_back("Authorization: Bearer " + std::string(authkey));
     }
-    return send_json_get_reply(url, std::move(json), headers);
+    return send_json_get_reply(url, std::move(json), headers,
+                               std::move(cancel_checker));
 }
 
 }  // namespace CurlUtils

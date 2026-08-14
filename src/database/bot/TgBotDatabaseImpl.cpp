@@ -63,15 +63,22 @@ bool TgBotDatabaseImpl::load(std::filesystem::path filepath) {
 
 bool TgBotDatabaseImpl::unload() {
     if (loaded) {
-        loaded = false;
-        return _databaseImpl->unload();
+        if (_databaseImpl->unload()) {
+            loaded = false;
+            return true;
+        }
+        LOG(ERROR) << "Database backend failed to unload; keeping it marked "
+                      "loaded so persistence can be retried";
+        return false;
     } else {
         LOG(WARNING) << "No database to unload.";
     }
     return false;
 }
 
-bool TgBotDatabaseImpl::isLoaded() const { return loaded; }
+bool TgBotDatabaseImpl::isLoaded() const {
+    return loaded;
+}
 
 DatabaseBase::ListResult TgBotDatabaseImpl::addUserToList(
     DatabaseBase::ListType type, UserId user) const {
@@ -184,14 +191,20 @@ std::ostream& TgBotDatabaseImpl::dump(std::ostream& ofs) const {
 }
 
 void TgBotDatabaseImpl::setOwnerUserId(const UserId user) const {
+    (void)claimOwnerUserId(user);
+}
+
+DatabaseBase::OwnerClaimResult TgBotDatabaseImpl::claimOwnerUserId(
+    const UserId user) const {
     if (!isLoaded()) {
         LOG(ERROR) << __func__ << ": No-op due to missing database";
-        return;
+        return OwnerClaimResult::BACKEND_ERROR;
     }
     try {
-        _databaseImpl->setOwnerUserId(user);
+        return _databaseImpl->claimOwnerUserId(user);
     } catch (const exception& e) {
         LOG(ERROR) << "Failed to set owner user ID: " << e.what();
+        return OwnerClaimResult::BACKEND_ERROR;
     }
 }
 

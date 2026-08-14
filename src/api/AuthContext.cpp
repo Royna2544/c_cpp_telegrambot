@@ -82,12 +82,15 @@ AuthContext::Result AuthContext::isAuthorized(const User::Ptr& user,
     bool isOwner = *id == _impl->getOwnerUserId();
     switch (flags) {
         case AccessLevel::User: {
-            return {!isInBlacklist, Result::Reason::ForbiddenUser};
+            return {isOwner || !isInBlacklist, Result::Reason::ForbiddenUser};
         }
         case AccessLevel::AdminUser: {
-            return {!isInBlacklist && (isInWhitelist || isOwner),
+            return {isOwner || (!isInBlacklist && isInWhitelist),
                     isInBlacklist ? Result::Reason::ForbiddenUser
                                   : Result::Reason::PermissionDenied};
+        }
+        case AccessLevel::Owner: {
+            return {isOwner, Result::Reason::PermissionDenied};
         }
         case AccessLevel::Unprotected: {
             return {!!id, Result::Reason::UserIsBot};

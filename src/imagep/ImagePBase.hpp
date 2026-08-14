@@ -3,7 +3,10 @@
 #include <absl/log/log.h>
 
 #include <TinyStatus.hpp>
+#include <chrono>
+#include <cstdint>
 #include <filesystem>
+#include <stop_token>
 #include <string>
 #include <trivial_helpers/generic_opt.hpp>
 
@@ -16,8 +19,11 @@ class RangeRestricted {
 
    public:
     RangeRestricted(int value) : _value(value) {
-        if (_value < Min || _value > Max) {
-            _value %= Max - Min;
+        constexpr int range = Max - Min;
+        static_assert(range > 0, "RangeRestricted requires a non-empty range");
+        if (_value < Min || _value >= Max) {
+            const auto offset = static_cast<std::int64_t>(_value) - Min;
+            _value = static_cast<int>(((offset % range) + range) % range + Min);
         }
     }
     operator int() const { return _value; }
@@ -53,6 +59,17 @@ struct PhotoBase {
         Option<bool> greyscale;
         Option<bool> invert_color;
     } options;
+
+    struct ProcessingControl {
+        std::stop_token stop;
+        std::chrono::steady_clock::time_point deadline =
+            std::chrono::steady_clock::time_point::max();
+
+        [[nodiscard]] bool shouldStop() const noexcept {
+            return stop.stop_requested() ||
+                   std::chrono::steady_clock::now() >= deadline;
+        }
+    } processingControl;
 
     /**
      * @brief Reads an image from the specified file.

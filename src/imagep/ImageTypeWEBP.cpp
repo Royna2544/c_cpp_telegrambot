@@ -1,5 +1,4 @@
 #include "ImageTypeWEBP.hpp"
-#include "WebPValidation.hpp"
 
 #include <absl/log/check.h>
 #include <absl/log/log.h>
@@ -12,6 +11,9 @@
 #include <cstdint>
 #include <memory>
 
+#include "MediaLimits.hpp"
+#include "WebPValidation.hpp"
+
 PhotoBase::TinyStatus WebPImage::read(const std::filesystem::path& filename,
                                       const Target target) {
     int width = 0;
@@ -22,6 +24,10 @@ PhotoBase::TinyStatus WebPImage::read(const std::filesystem::path& filename,
     if (target != Target::kPhoto) {
         return {PhotoBase::Status::kInvalidArgument,
                 "Invalid target for WebP image"};
+    }
+    if (processingControl.shouldStop()) {
+        return {PhotoBase::Status::kProcessingError,
+                "WebP processing cancelled or deadline exceeded"};
     }
 
     // Open the file for reading in binary mode
@@ -36,9 +42,7 @@ PhotoBase::TinyStatus WebPImage::read(const std::filesystem::path& filename,
         return {PhotoBase::Status::kReadError, "Failed to determine file size"};
     }
 
-    // Check if file size is reasonable (e.g., not larger than 100 MB)
-    constexpr size_t kMaxFileSize = 100 * 1024 * 1024;  // 100 MB
-    if (*file_size > kMaxFileSize) {
+    if (*file_size > imagep::limits::kMaxCompressedInputBytes) {
         return {PhotoBase::Status::kInvalidArgument, "Image too large"};
     }
 
@@ -52,7 +56,8 @@ PhotoBase::TinyStatus WebPImage::read(const std::filesystem::path& filename,
         return {PhotoBase::Status::kInternalError,
                 "Couldn't decode image data"};
     }
-    constexpr std::size_t kMaxDecodedBytes = 100 * 1024 * 1024;
+    constexpr std::size_t kMaxDecodedBytes =
+        imagep::limits::kMaxImagePixels * 4;
     const auto bufferSize =
         imagep::webp::decodedByteSize(width, height, kMaxDecodedBytes);
     if (!bufferSize) {
@@ -61,10 +66,18 @@ PhotoBase::TinyStatus WebPImage::read(const std::filesystem::path& filename,
     }
     auto decoded = std::make_unique_for_overwrite<uint8_t[]>(*bufferSize);
     const auto stride = static_cast<int>(static_cast<std::size_t>(width) * 4);
+    if (processingControl.shouldStop()) {
+        return {PhotoBase::Status::kProcessingError,
+                "WebP processing cancelled or deadline exceeded"};
+    }
     if (WebPDecodeRGBAInto(data.get(), *file_size, decoded.get(), *bufferSize,
-                          stride) == nullptr) {
+                           stride) == nullptr) {
         return {PhotoBase::Status::kInternalError,
                 "Couldn't decode image data"};
+    }
+    if (processingControl.shouldStop()) {
+        return {PhotoBase::Status::kProcessingError,
+                "WebP processing cancelled or deadline exceeded"};
     }
     width_ = width;
     height_ = height;
@@ -170,6 +183,10 @@ PhotoBase::TinyStatus WebPImage::processAndWrite(
     if (data_ == nullptr) {
         return {PhotoBase::Status::kInvalidArgument, "No image data to write"};
     }
+    if (processingControl.shouldStop()) {
+        return {PhotoBase::Status::kProcessingError,
+                "WebP processing cancelled or deadline exceeded"};
+    }
 
     if (options.greyscale.get()) {
         greyscale();
@@ -180,6 +197,11 @@ PhotoBase::TinyStatus WebPImage::processAndWrite(
     }
     if (options.invert_color.get()) {
         invert();
+    }
+
+    if (processingControl.shouldStop()) {
+        return {PhotoBase::Status::kProcessingError,
+                "WebP processing cancelled or deadline exceeded"};
     }
 
     F file;
@@ -199,7 +221,14 @@ PhotoBase::TinyStatus WebPImage::processAndWrite(
                 "Failed to encode WebP image"};
     }
 
+    if (processingControl.shouldStop()) {
+        WebPFree(output);
+        return {PhotoBase::Status::kProcessingError,
+                "WebP processing cancelled or deadline exceeded"};
+    }
+
     if (!file.write(output, 1, output_size)) {
+        WebPFree(output);
         return {PhotoBase::Status::kWriteError, "Failed to write to file"};
     }
     file.close();

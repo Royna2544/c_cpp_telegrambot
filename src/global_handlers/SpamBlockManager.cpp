@@ -52,6 +52,10 @@ void SpamBlockManager::onDetected(ChatId chat, UserId user,
                     std::chrono::system_clock::now() + kMuteDuration);
             } catch (const TgBot::TgException& e) {
                 LOG(WARNING) << fmt::format("Cannot mute: {}", e.what());
+            } catch (const std::exception& e) {
+                LOG(WARNING) << fmt::format("Cannot mute: {}", e.what());
+            } catch (...) {
+                LOG(WARNING) << "Cannot mute: unknown exception";
             }
             [[fallthrough]];
         case Config::PURGE: {
@@ -59,6 +63,10 @@ void SpamBlockManager::onDetected(ChatId chat, UserId user,
                 _api->deleteMessages(chat, messageIds);
             } catch (const TgBot::TgException& e) {
                 DLOG(INFO) << "Error deleting messages: " << e.what();
+            } catch (const std::exception& e) {
+                LOG(WARNING) << "Error deleting messages: " << e.what();
+            } catch (...) {
+                LOG(WARNING) << "Error deleting messages: unknown exception";
             }
             [[fallthrough]];
         }
@@ -95,9 +103,14 @@ bool SpamBlockManager::shouldBeSkipped(const Message::Ptr& message) const {
 
 SpamBlockManager::SpamBlockManager(TgBotApi::Ptr api, AuthContext* auth)
     : _api(api), _auth(auth) {
-    api->onAnyMessage([this](TgBotApi::CPtr, const Message::Ptr& message) {
-        addMessage(message);
-        return TgBotApi::AnyMessageResult::Handled;
-    });
+    anyMessageSubscription_ = api->subscribeAnyMessage(
+        [this](TgBotApi::CPtr, const Message::Ptr& message) {
+            addMessage(message);
+            return TgBotApi::AnyMessageResult::Handled;
+        });
     run();
+}
+
+SpamBlockManager::~SpamBlockManager() {
+    anyMessageSubscription_.reset();
 }

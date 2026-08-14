@@ -152,26 +152,24 @@ TEST_P(AuthContextTest, expectedForMessagesInTime) {
     }
 }
 
-TEST_F(AuthContextTest, BlacklistDeniesOwnerAdminAccess) {
+TEST_F(AuthContextTest, ConfiguredOwnerCannotBeLockedOutByBlacklistEntry) {
     auto user = std::make_shared<TgBot::User>();
     user->id = FAKE_BLACKLISTED_OWNER_ID;
 
     EXPECT_CALL(*database, getOwnerUserId)
         .WillOnce(Return(FAKE_BLACKLISTED_OWNER_ID));
-    EXPECT_CALL(*database,
-                checkUserInList(DatabaseBase::ListType::BLACKLIST,
-                                FAKE_BLACKLISTED_OWNER_ID))
+    EXPECT_CALL(*database, checkUserInList(DatabaseBase::ListType::BLACKLIST,
+                                           FAKE_BLACKLISTED_OWNER_ID))
         .WillOnce(Return(DatabaseBase::ListResult::OK));
-    EXPECT_CALL(*database,
-                checkUserInList(DatabaseBase::ListType::WHITELIST,
-                                FAKE_BLACKLISTED_OWNER_ID))
+    EXPECT_CALL(*database, checkUserInList(DatabaseBase::ListType::WHITELIST,
+                                           FAKE_BLACKLISTED_OWNER_ID))
         .WillOnce(Return(DatabaseBase::ListResult::ALREADY_IN_OTHER_LIST));
 
     const auto result =
         auth->isAuthorized(user, AuthContext::AccessLevel::AdminUser);
 
-    EXPECT_FALSE(result);
-    EXPECT_EQ(result.result.second, AuthContext::Result::Reason::ForbiddenUser);
+    EXPECT_TRUE(result);
+    EXPECT_EQ(result.result.second, AuthContext::Result::Reason::Ok);
 }
 
 INSTANTIATE_TEST_SUITE_P(
@@ -181,6 +179,14 @@ INSTANTIATE_TEST_SUITE_P(
         AuthParam{FAKE_OWNER_ID,
                   AuthContext::AccessLevel::AdminUser,
                   {true, AuthContext::Result::Reason::Ok}},
+
+        // Only the configured owner receives #Owner access.
+        AuthParam{FAKE_OWNER_ID,
+                  AuthContext::AccessLevel::Owner,
+                  {true, AuthContext::Result::Reason::Ok}},
+        AuthParam{FAKE_WHITELISTED_ID,
+                  AuthContext::AccessLevel::Owner,
+                  {false, AuthContext::Result::Reason::PermissionDenied}},
 
         // RandomUser access #User
         AuthParam{FAKE_RANDOM_ID,

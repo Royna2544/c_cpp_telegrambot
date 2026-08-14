@@ -28,6 +28,8 @@ struct DBIMPL_EXPORT DatabaseBase {
         BACKEND_ERROR
     };
 
+    enum class OwnerClaimResult : uint8_t { OK, ALREADY_SET, BACKEND_ERROR };
+
     enum class MediaType : uint8_t {
         UNKNOWN,
         PHOTO,
@@ -113,7 +115,14 @@ struct DBIMPL_EXPORT DatabaseBase {
      *
      * This may be called once. Subsequent calls will be rejected
      */
-    virtual void setOwnerUserId(UserId userId) const = 0;
+    [[nodiscard]] virtual OwnerClaimResult claimOwnerUserId(
+        UserId userId) const = 0;
+
+    // Compatibility wrapper for non-interactive callers. New code that needs
+    // to report success must use claimOwnerUserId() and inspect its result.
+    virtual void setOwnerUserId(UserId userId) const {
+        (void)claimOwnerUserId(userId);
+    }
 
     /**
      * @brief Query the database for media info

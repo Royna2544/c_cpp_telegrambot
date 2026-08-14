@@ -9,6 +9,8 @@
 #include <filesystem>
 #include <string>
 
+#include "MediaLimits.hpp"
+
 #if (PNG_LIBPNG_VER < 10500)
 #define png_longjmp_fn(png, val) longjmp(png->jmpbuf, val);
 #else
@@ -40,6 +42,10 @@ PhotoBase::TinyStatus PngImage::read(const std::filesystem::path& filename,
 
     if (contains_data) {
         return {PhotoBase::Status::kInvalidArgument, "Already contains data"};
+    }
+    if (processingControl.shouldStop()) {
+        return {PhotoBase::Status::kProcessingError,
+                "PNG processing cancelled or deadline exceeded"};
     }
 
     if (!fp.open(filename, F::Mode::ReadBinary)) {
@@ -79,10 +85,7 @@ PhotoBase::TinyStatus PngImage::read(const std::filesystem::path& filename,
     // Bound dimensions before allocating per-row buffers: libpng allows huge
     // declared dimensions, which would drive unbounded allocation
     // (decompression-bomb DoS) and overflow the int loop counters used below.
-    constexpr png_uint_32 kMaxDimension = 16384;
-    constexpr png_uint_32 kMaxPixels = 64U * 1024 * 1024;  // 64 MP
-    if (width == 0 || height == 0 || width > kMaxDimension ||
-        height > kMaxDimension || width > kMaxPixels / height) {
+    if (!imagep::limits::imageDimensionsAllowed(width, height)) {
         LOG(ERROR) << "PNG dimensions out of allowed range: " << width << "x"
                    << height;
         png_destroy_read_struct(&png, &info, nullptr);
@@ -119,7 +122,14 @@ PhotoBase::TinyStatus PngImage::read(const std::filesystem::path& filename,
         refmem.add(png_get_rowbytes(png, info));
     }
 
-    png_read_image(png, refmem.data());
+    for (png_uint_32 row = 0; row < height; ++row) {
+        if (processingControl.shouldStop()) {
+            png_destroy_read_struct(&png, &info, nullptr);
+            return {PhotoBase::Status::kProcessingError,
+                    "PNG processing cancelled or deadline exceeded"};
+        }
+        png_read_row(png, refmem[row], nullptr);
+    }
 
     png_destroy_read_struct(&png, &info, nullptr);
 
@@ -241,6 +251,10 @@ PhotoBase::TinyStatus PngImage::processAndWrite(
     if (!contains_data) {
         return {PhotoBase::Status::kInvalidArgument, "No image data to write"};
     }
+    if (processingControl.shouldStop()) {
+        return {PhotoBase::Status::kProcessingError,
+                "PNG processing cancelled or deadline exceeded"};
+    }
 
     if (options.greyscale.get()) {
         greyscale();
@@ -251,6 +265,11 @@ PhotoBase::TinyStatus PngImage::processAndWrite(
     }
     if (options.invert_color.get()) {
         invert();
+    }
+
+    if (processingControl.shouldStop()) {
+        return {PhotoBase::Status::kProcessingError,
+                "PNG processing cancelled or deadline exceeded"};
     }
 
     if (!fp.open(filename, F::Mode::WriteBinary)) {
@@ -293,7 +312,14 @@ PhotoBase::TinyStatus PngImage::processAndWrite(
         return {PhotoBase::Status::kWriteError, "Error during writing bytes"};
     }
 
-    png_write_image(png, refmem.data());
+    for (png_uint_32 row = 0; row < height; ++row) {
+        if (processingControl.shouldStop()) {
+            png_destroy_write_struct(&png, &info);
+            return {PhotoBase::Status::kProcessingError,
+                    "PNG processing cancelled or deadline exceeded"};
+        }
+        png_write_row(png, refmem[row]);
+    }
 
     if (setjmp(png_jmpbuf(png))) {
         png_destroy_write_struct(&png, &info);

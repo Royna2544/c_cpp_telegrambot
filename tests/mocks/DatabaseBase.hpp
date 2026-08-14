@@ -31,6 +31,8 @@ class MockDatabase : public DatabaseBase {
     MOCK_METHOD(std::ostream&, dump, (std::ostream & ofs), (const, override));
 
     MOCK_METHOD(void, setOwnerUserId, (UserId userid), (const, override));
+    MOCK_METHOD(DatabaseBase::OwnerClaimResult, claimOwnerUserId,
+                (UserId userid), (const, override));
 
     MOCK_METHOD(MockDatabase::AddResult, addChatInfo,
                 (const ChatId chatid, const std::string_view name),

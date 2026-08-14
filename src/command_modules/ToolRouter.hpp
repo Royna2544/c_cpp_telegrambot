@@ -19,6 +19,11 @@ enum class Domain {
     Telegram,
     ChatRegistry,
     Confirmation,
+    // Not a classifier label: the fallback used when routing could not be
+    // decided (classifier unreachable or unparsable output). Exposes every
+    // tool and lets the model pick, rather than silently degrading a genuine
+    // tool request into a plain chat answer.
+    All,
 };
 
 struct PendingBuilds {
@@ -60,6 +65,8 @@ inline std::string_view name(Domain domain) {
             return "chat_registry";
         case Domain::Confirmation:
             return "confirmation";
+        case Domain::All:
+            return "all";
     }
     return "chat";
 }
@@ -104,12 +111,19 @@ inline bool containsAny(std::string_view value, Terms... terms) {
 inline std::optional<Domain> deterministicRoute(std::string_view query,
                                                 PendingBuilds pending = {}) {
     const auto value = detail::normalized(query);
-    const bool discussion =
+    const bool discussionPrefix =
         value.starts_with(" how ") || value.starts_with(" what ") ||
         value.starts_with(" why ") || value.starts_with(" when ") ||
         value.starts_with(" where ") || value.starts_with(" who ") ||
         value.starts_with(" explain ") || value.starts_with(" describe ") ||
         value.starts_with(" compare ") || value.starts_with(" tell me about ");
+    const bool discussion =
+        discussionPrefix ||
+        detail::containsAny(value, "explain", "explanation", "describe",
+                            "description", "compare", "comparison",
+                            "difference", "meaning") ||
+        value.find(" tell me about ") != std::string::npos ||
+        query.find('?') != std::string_view::npos;
     const bool buildAction =
         detail::containsAny(value, "build", "compile", "prepare", "rebuild",
                             "make", "want", "need", "run", "start", "launch");
@@ -131,15 +145,25 @@ inline std::optional<Domain> deterministicRoute(std::string_view query,
     }
 
     // Explicit new build intent above overrides an unrelated pending plan.
-    // Otherwise a short reply belongs to the plan already being collected.
-    if (pending.kernel && pending.rom) {
-        return Domain::Build;
-    }
-    if (pending.kernel) {
-        return Domain::KernelBuild;
-    }
-    if (pending.rom) {
-        return Domain::RomBuild;
+    // Only field-like or genuinely short follow-ups inherit pending state;
+    // an unrelated request must still reach the capability classifier.
+    if (pending.kernel || pending.rom) {
+        const bool anotherCapability = detail::containsAny(
+            value, "send", "message", "telegram", "dm", "email", "save",
+            "remember", "lookup", "contact");
+        const bool buildField = detail::containsAny(
+            value, "device", "branch", "repo", "repository", "compiler",
+            "defconfig", "variant", "target", "clean", "clang", "gcc",
+            "toolchain", "jobs", "userdebug", "eng");
+        const auto wordCount = static_cast<std::size_t>(
+            std::count(value.begin(), value.end(), ' ') - 1);
+        const bool shortReply = wordCount <= 12 && query.size() <= 160;
+        if (!discussion && !anotherCapability && (shortReply || buildField)) {
+            if (pending.kernel && pending.rom) {
+                return Domain::Build;
+            }
+            return pending.kernel ? Domain::KernelBuild : Domain::RomBuild;
+        }
     }
     return std::nullopt;
 }
@@ -183,6 +207,11 @@ inline std::optional<Domain> parseClassifierResult(std::string_view result) {
     return parsed;
 }
 
+// A failed classification is not evidence that no tool is wanted, so it must
+// not collapse to Domain::Chat - that would answer a real build/telegram
+// request as plain chat with no way for the model to act and no error shown.
+// Both failure paths (no response, unparsable response) fall back to Domain::
+// All. A classifier that explicitly answers "chat" is still honoured.
 template <typename Classify>
 inline Domain selectDomain(std::string_view query, PendingBuilds pending,
                            Classify&& classify) {
@@ -191,22 +220,30 @@ inline Domain selectDomain(std::string_view query, PendingBuilds pending,
     }
     if (const auto result =
             std::forward<Classify>(classify)(kClassifierPrompt, query)) {
-        return parseClassifierResult(*result).value_or(Domain::Chat);
+        return parseClassifierResult(*result).value_or(Domain::All);
     }
-    return Domain::Chat;
+    return Domain::All;
 }
 
+// Every domain whose tools act without a confirmation step of their own also
+// gets "ask", so the model can confirm and then act within one turn. The
+// builder domains deliberately do not: kernelbuild/rombuild stage a final
+// Telegram review of their own, and the build system prompt tells the model
+// not to ask questions it could answer by calling the builder tool.
 inline std::span<const std::string_view> toolNamesForDomain(Domain domain) {
     static constexpr std::array<std::string_view, 1> kKernelBuild{
         "kernelbuild"};
     static constexpr std::array<std::string_view, 1> kRomBuild{"rombuild"};
     static constexpr std::array<std::string_view, 2> kBuild{"kernelbuild",
                                                             "rombuild"};
-    static constexpr std::array<std::string_view, 3> kTelegram{
-        "send_message", "get_chat_id", "get_chat_name"};
-    static constexpr std::array<std::string_view, 3> kChatRegistry{
-        "get_chat_id", "get_chat_name", "save_chat_info"};
+    static constexpr std::array<std::string_view, 4> kTelegram{
+        "send_message", "get_chat_id", "get_chat_name", "ask"};
+    static constexpr std::array<std::string_view, 4> kChatRegistry{
+        "get_chat_id", "get_chat_name", "save_chat_info", "ask"};
     static constexpr std::array<std::string_view, 1> kConfirmation{"ask"};
+    static constexpr std::array<std::string_view, 7> kAll{
+        "kernelbuild",   "rombuild",       "send_message", "get_chat_id",
+        "get_chat_name", "save_chat_info", "ask"};
 
     switch (domain) {
         case Domain::Chat:
@@ -223,6 +260,8 @@ inline std::span<const std::string_view> toolNamesForDomain(Domain domain) {
             return kChatRegistry;
         case Domain::Confirmation:
             return kConfirmation;
+        case Domain::All:
+            return kAll;
     }
     return {};
 }

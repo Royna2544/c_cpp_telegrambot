@@ -2,14 +2,15 @@
 
 #include <absl/log/log.h>
 #include <fmt/format.h>
-#include <nlohmann/json.hpp>
 
+#include <nlohmann/json.hpp>
 #include <optional>
 #include <string>
 #include <vector>
 
 #include "CurlUtils.hpp"
 #include "LLMBackend.hpp"
+#include "ToolSafety.hpp"
 
 // OpenAI-compatible Chat Completions backend. Also serves any server that
 // implements `/v1/chat/completions` + `/v1/models` (llama-server, vLLM, etc.).
@@ -81,7 +82,8 @@ NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE_WITH_DEFAULT(ErrorResponse, error)
 // surface it to the LLMBackend caller without changing the interface, and
 // `/ask` is not admin-gated, so this stays server-side rather than being
 // echoed back into the chat reply). Returns true if `parsed` was an error.
-inline bool logIfApiError(const nlohmann::json& parsed, std::string_view endpoint) {
+inline bool logIfApiError(const nlohmann::json& parsed,
+                          std::string_view endpoint) {
     if (!parsed.contains("error") || !parsed["error"].is_object()) {
         return false;
     }
@@ -95,12 +97,15 @@ inline bool logIfApiError(const nlohmann::json& parsed, std::string_view endpoin
 
 class OpenAIBackend : public LLMBackend {
    public:
-    OpenAIBackend(std::string url, std::string authkey)
-        : url_(std::move(url)), authkey_(std::move(authkey)) {}
+    OpenAIBackend(std::string url, std::string authkey,
+                  CurlUtils::CancelChecker cancelled = {})
+        : url_(std::move(url)),
+          authkey_(std::move(authkey)),
+          cancelled_(std::move(cancelled)) {}
 
     std::vector<LLMModel> listModels() override {
-        auto raw = CurlUtils::download_memory(url_ + kModelsEndpoint, nullptr,
-                                              std::string_view{authkey_});
+        auto raw = CurlUtils::download_memory(
+            url_ + kModelsEndpoint, cancelled_, std::string_view{authkey_});
         if (!raw) {
             return {};
         }
@@ -130,7 +135,8 @@ class OpenAIBackend : public LLMBackend {
         nlohmann::json payload = req;
 
         auto raw = CurlUtils::send_json_get_reply(
-            url_ + kChatEndpoint, payload.dump(), std::string_view{authkey_});
+            url_ + kChatEndpoint, payload.dump(), std::string_view{authkey_},
+            cancelled_);
         if (!raw) {
             return std::nullopt;
         }
@@ -173,15 +179,15 @@ class OpenAIBackend : public LLMBackend {
 
         nlohmann::json toolsJson = nlohmann::json::array();
         for (const auto& tool : tools) {
-            toolsJson.push_back(
-                {{"type", "function"},
-                 {"function",
-                  {{"name", tool.name},
-                   {"description", tool.description},
-                   {"parameters", tool.inputSchema}}}});
+            toolsJson.push_back({{"type", "function"},
+                                 {"function",
+                                  {{"name", tool.name},
+                                   {"description", tool.description},
+                                   {"parameters", tool.inputSchema}}}});
         }
 
         std::optional<std::string> lastText;
+        tool_safety::ToolCallBudget toolCallBudget;
         for (int iteration = 0; iteration < kMaxToolIterations; ++iteration) {
             nlohmann::json payload{{"model", model},
                                    {"messages", messages},
@@ -191,7 +197,8 @@ class OpenAIBackend : public LLMBackend {
             }
 
             auto raw = CurlUtils::send_json_get_reply(
-                url_ + kChatEndpoint, payload.dump(), std::string_view{authkey_});
+                url_ + kChatEndpoint, payload.dump(),
+                std::string_view{authkey_}, cancelled_);
             if (!raw) {
                 return std::nullopt;
             }
@@ -209,7 +216,8 @@ class OpenAIBackend : public LLMBackend {
                 return std::nullopt;
             }
 
-            const nlohmann::json& choiceMessage = respJson["choices"][0]["message"];
+            const nlohmann::json& choiceMessage =
+                respJson["choices"][0]["message"];
             if (auto text = extractText(choiceMessage)) {
                 lastText = text;
             }
@@ -219,6 +227,22 @@ class OpenAIBackend : public LLMBackend {
                                       !choiceMessage["tool_calls"].empty();
             if (!hasToolCalls) {
                 return lastText;
+            }
+
+            std::vector<std::string> callIds;
+            try {
+                callIds.reserve(choiceMessage["tool_calls"].size());
+                for (const auto& call : choiceMessage["tool_calls"]) {
+                    callIds.push_back(call.at("id").get<std::string>());
+                    (void)call.at("function").at("name").get<std::string>();
+                }
+            } catch (const std::exception& ex) {
+                return std::string(
+                           "Tool-call batch rejected: malformed call: ") +
+                       ex.what();
+            }
+            if (const auto rejected = toolCallBudget.acceptBatch(callIds)) {
+                return "Tool-call batch rejected: " + *rejected + ".";
             }
 
             messages.push_back(choiceMessage);
@@ -240,8 +264,10 @@ class OpenAIBackend : public LLMBackend {
                 try {
                     result = exec(toolName, toolInput, isError);
                 } catch (const std::exception& ex) {
+                    isError = true;
                     result = std::string("Tool execution failed: ") + ex.what();
                 }
+                result = tool_safety::boundedToolResult(std::move(result));
 
                 messages.push_back({{"role", "tool"},
                                     {"tool_call_id", toolCallId},
@@ -258,6 +284,7 @@ class OpenAIBackend : public LLMBackend {
    private:
     std::string url_;
     std::string authkey_;
+    CurlUtils::CancelChecker cancelled_;
 };
 
 }  // namespace llm::openai

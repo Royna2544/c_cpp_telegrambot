@@ -30,14 +30,17 @@ class IntervalRateLimiter {
 class KeyedIntervalRateLimiter {
    public:
     using clock = IntervalRateLimiter::clock;
+    enum class CheckResult { Allowed, Limited, StillLimited, Recovered };
 
     KeyedIntervalRateLimiter(uint32_t maxPerInterval, clock::duration interval);
     bool check(std::int64_t key);
+    CheckResult checkWithStatus(std::int64_t key);
 
    private:
     struct Entry {
         std::unique_ptr<IntervalRateLimiter> limiter;
         clock::time_point lastAccess;
+        bool wasLimited{};
     };
 
     void pruneIfNeeded(clock::time_point now);  // called under mutex_

@@ -1,5 +1,6 @@
 #include <gtest/gtest.h>
 
+#include <algorithm>
 #include <string_view>
 #include <vector>
 
@@ -30,6 +31,8 @@ TEST(ToolRouterTest, LeavesDiscussionForClassifier) {
         "How do I build an Android kernel?"));
     EXPECT_FALSE(
         llm::tool_router::deterministicRoute("What is the Eureka Kernel?"));
+    EXPECT_FALSE(llm::tool_router::deterministicRoute(
+        "I need an explanation of the kernel build system"));
 }
 
 TEST(ToolRouterTest, LeavesUnrelatedBuildForClassifier) {
@@ -44,6 +47,20 @@ TEST(ToolRouterTest, PendingPlanRoutesShortFollowUp) {
     EXPECT_EQ(llm::tool_router::deterministicRoute("userdebug",
                                                    PendingBuilds{.rom = true}),
               Domain::RomBuild);
+}
+
+TEST(ToolRouterTest, PendingPlanDoesNotHijackAnotherCapability) {
+    EXPECT_FALSE(llm::tool_router::deterministicRoute(
+        "send Bob a message saying hello", PendingBuilds{.kernel = true}));
+    EXPECT_FALSE(llm::tool_router::deterministicRoute(
+        "Can you explain what this build plan will do?",
+        PendingBuilds{.rom = true}));
+
+    EXPECT_EQ(llm::tool_router::deterministicRoute(
+                  "device a30, branch android-4.14, compiler clang 18, "
+                  "defconfig vendor_a30_defconfig, and clean build",
+                  PendingBuilds{.kernel = true}),
+              Domain::KernelBuild);
 }
 
 TEST(ToolRouterTest, ExplicitNewBuildOverridesPendingPlan) {
@@ -105,19 +122,30 @@ TEST(ToolRouterTest, AmbiguousRequestUsesClassifier) {
     EXPECT_EQ(receivedQuery, "Message the release manager");
 }
 
-TEST(ToolRouterTest, ClassifierFailureFailsClosedToChat) {
+TEST(ToolRouterTest, ClassifierFailureFallsBackToAllTools) {
+    // An unreachable or incoherent classifier must not silently answer a real
+    // tool request as plain chat; both failure modes expose every tool.
     EXPECT_EQ(llm::tool_router::selectDomain(
                   "Do something ambiguous", {},
                   [](std::string_view, std::string_view)
                       -> std::optional<std::string> { return std::nullopt; }),
-              Domain::Chat);
+              Domain::All);
     EXPECT_EQ(llm::tool_router::selectDomain(
                   "Do something ambiguous", {},
                   [](std::string_view,
                      std::string_view) -> std::optional<std::string> {
                       return "kernel_build or telegram";
                   }),
+              Domain::All);
+}
+
+TEST(ToolRouterTest, ExplicitChatLabelIsStillHonoured) {
+    EXPECT_EQ(llm::tool_router::selectDomain(
+                  "Do something ambiguous", {},
+                  [](std::string_view, std::string_view)
+                      -> std::optional<std::string> { return "chat"; }),
               Domain::Chat);
+    EXPECT_TRUE(llm::tool_router::toolNamesForDomain(Domain::Chat).empty());
 }
 
 TEST(ToolRouterTest, ExposesOnlyToolsForSelectedCapability) {
@@ -135,12 +163,33 @@ TEST(ToolRouterTest, ExposesOnlyToolsForSelectedCapability) {
               (std::vector<std::string_view>{"kernelbuild", "rombuild"}));
     EXPECT_EQ(names(Domain::Telegram),
               (std::vector<std::string_view>{"send_message", "get_chat_id",
-                                             "get_chat_name"}));
+                                             "get_chat_name", "ask"}));
     EXPECT_EQ(names(Domain::ChatRegistry),
               (std::vector<std::string_view>{"get_chat_id", "get_chat_name",
-                                             "save_chat_info"}));
+                                             "save_chat_info", "ask"}));
     EXPECT_EQ(names(Domain::Confirmation),
               std::vector<std::string_view>{"ask"});
+    EXPECT_EQ(names(Domain::All),
+              (std::vector<std::string_view>{
+                  "kernelbuild", "rombuild", "send_message", "get_chat_id",
+                  "get_chat_name", "save_chat_info", "ask"}));
+}
+
+TEST(ToolRouterTest, ActingDomainsCanConfirmBeforeActing) {
+    // send_message and save_chat_info have no confirmation step of their own,
+    // so "ask" must travel with them; the builder domains stage their own
+    // Telegram review and deliberately keep it out.
+    const auto has = [](Domain domain, std::string_view tool) {
+        const auto names = llm::tool_router::toolNamesForDomain(domain);
+        return std::ranges::find(names, tool) != names.end();
+    };
+
+    EXPECT_TRUE(has(Domain::Telegram, "ask"));
+    EXPECT_TRUE(has(Domain::ChatRegistry, "ask"));
+    EXPECT_TRUE(has(Domain::All, "ask"));
+    EXPECT_FALSE(has(Domain::KernelBuild, "ask"));
+    EXPECT_FALSE(has(Domain::RomBuild, "ask"));
+    EXPECT_FALSE(has(Domain::Build, "ask"));
 }
 
 }  // namespace

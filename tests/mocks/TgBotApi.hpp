@@ -138,6 +138,17 @@ class MockTgBotApi : public TgBotApi {
                 (const std::string& cmd, Message::Ptr message,
                  std::string payload),
                 (override));
+    MOCK_METHOD(std::optional<WorkId>, submitCommandWork,
+                (std::string_view owner, WorkClass workClass,
+                 CancellableWork work, WorkOptions options),
+                (override));
+    MOCK_METHOD(bool, cancelCommandWork, (std::string_view owner, WorkId id),
+                (override));
     MOCK_METHOD(void, onAnyMessage, (const AnyMessageCallback& callback),
                 (override));
+    MOCK_METHOD(void, onAnyMessageForCommand,
+                (std::string_view command, const AnyMessageCallback& callback),
+                (override));
+    MOCK_METHOD(void, removeAnyMessageCallbacksForCommand,
+                (std::string_view command), (override));
 };

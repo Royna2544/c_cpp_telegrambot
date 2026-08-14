@@ -2,9 +2,9 @@
 
 #include <fmt/format.h>
 
-#include <libfs.hpp>
 #include <chrono>
 #include <future>
+#include <libfs.hpp>
 #include <memory>
 
 #include "../GetCommandLine.hpp"
@@ -37,6 +37,14 @@ void CommandModulesTest::SetUp() {
     random = provideInject.get<MockRandom*>();
     resource = provideInject.get<MockResource*>();
     botApi = provideInject.get<MockTgBotApi*>();
+    ON_CALL(*botApi,
+            submitCommandWork(testing::_, testing::_, testing::_, testing::_))
+        .WillByDefault(testing::Invoke([](std::string_view, TgBotApi::WorkClass,
+                                          TgBotApi::CancellableWork work,
+                                          TgBotApi::WorkOptions) {
+            work(std::stop_token{});
+            return std::optional<TgBotApi::WorkId>{1};
+        }));
 }
 
 void CommandModulesTest::TearDown() {
@@ -92,14 +100,27 @@ TEST_F(CommandModulesTest, DynamicUnloadWaitsForExecutionLease) {
     ASSERT_NE(module, nullptr);
     auto lease = module->acquireExecutionLease();
 
-    auto unload = std::async(std::launch::async,
-                             [&] { return module->unload(); });
+    auto unload =
+        std::async(std::launch::async, [&] { return module->unload(); });
     EXPECT_EQ(unload.wait_for(100ms), std::future_status::timeout);
 
     ASSERT_TRUE(lease.has_value());
     lease->unlock();
     EXPECT_EQ(unload.wait_for(2s), std::future_status::ready);
     EXPECT_TRUE(unload.get());
+}
+
+TEST_F(CommandModulesTest, DynamicReloadCandidatePreflightsSeparateImage) {
+    auto module = loadModule("alive");
+    ASSERT_NE(module, nullptr);
+    auto* dynamic = dynamic_cast<DynCommandModule*>(module.get());
+    ASSERT_NE(dynamic, nullptr);
+
+    auto replacement = dynamic->makeReloadCandidate();
+    ASSERT_NE(replacement, nullptr);
+    EXPECT_TRUE(replacement->isLoaded());
+    EXPECT_EQ(replacement->info.name, "alive");
+    EXPECT_TRUE(replacement->unload());
 }
 
 Message::Ptr CommandModulesTest::createDefaultMessage() {

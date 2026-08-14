@@ -85,6 +85,8 @@ struct DBIMPL_EXPORT TgBotDatabaseImpl : DatabaseBase {
         const override;
     std::ostream& dump(std::ostream& ofs) const override;
     void setOwnerUserId(UserId userid) const override;
+    [[nodiscard]] OwnerClaimResult claimOwnerUserId(
+        UserId userid) const override;
     [[nodiscard]] AddResult addChatInfo(
         const ChatId chatid, const std::string_view name) const override;
     [[nodiscard]] std::optional<ChatId> getChatId(

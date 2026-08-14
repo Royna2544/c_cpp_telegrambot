@@ -1,5 +1,28 @@
-#include <api/components/OnCallbackQuery.hpp>
+#include <api/components/ModuleExecutionContext.hpp>
 #include <api/components/ModuleManagement.hpp>
+#include <api/components/OnCallbackQuery.hpp>
+
+namespace {
+struct CallbackInvocation {
+    std::string owner;
+    std::shared_ptr<RefLock::SharedLease> moduleLease;
+    TgBot::EventBroadcaster::CallbackQueryListener callback;
+    TgBot::CallbackQuery::Ptr query;
+
+    ~CallbackInvocation() {
+        // The std::function manager may be implemented in the command DSO.
+        // Destroy it before releasing the lease which permits dlclose.
+        callback = {};
+        query.reset();
+        moduleLease.reset();
+    }
+
+    void operator()() const {
+        module_execution::Scope scope(owner);
+        callback(query);
+    }
+};
+}  // namespace
 
 void TgBotApiImpl::OnCallbackQueryImpl::onCallbackQueryFunction(
     TgBot::CallbackQuery::Ptr query) {
@@ -8,21 +31,20 @@ void TgBotApiImpl::OnCallbackQueryImpl::onCallbackQueryFunction(
         return;
     }
     for (const auto& [command, callback] : listeners) {
-        auto* module = (*_api->kModuleLoader)[command];
-        if (module == nullptr) {
+        if (!_api->kModuleLoader) {
             continue;
         }
-        auto lease = module->acquireExecutionLease();
-        if (!lease) {
+        auto leaseHolder = _api->kModuleLoader->acquireExecutionLease(command);
+        if (!leaseHolder) {
             continue;
         }
-        auto leaseHolder = std::make_shared<RefLock::SharedLease>(
-            std::move(*lease));
-        if (!queryAsync.emplaceTask(
-                command, [callback, query,
-                          leaseHolder = std::move(leaseHolder)] {
-                    callback(query);
-                })) {
+        auto invocation = std::make_shared<CallbackInvocation>();
+        invocation->owner = command;
+        invocation->moduleLease = std::move(leaseHolder);
+        invocation->callback = callback;
+        invocation->query = query;
+        if (!queryAsync.emplaceTask(command,
+                                    [invocation] { (*invocation)(); })) {
             LOG(WARNING) << "Callback-query queue is full; rejecting "
                          << command;
         }

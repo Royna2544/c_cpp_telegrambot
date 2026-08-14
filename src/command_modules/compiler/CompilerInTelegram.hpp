@@ -6,6 +6,7 @@
 #include <filesystem>
 #include <memory>
 #include <sstream>
+#include <stop_token>
 #include <string>
 #include <utility>
 
@@ -108,7 +109,7 @@ struct CompilerInTg {
      * If set to false, the function will not time out the command.
      */
     void runCommand(std::string cmd, std::stringstream& res,
-                    bool use_wdt = true);
+                    bool use_wdt = true, std::stop_token stop = {});
 
     constexpr static char SPACE = ' ';
     constexpr static std::string_view EMPTY = "(empty)";
@@ -125,6 +126,7 @@ struct CompilerInTgForBash : CompilerInTg {
         : CompilerInTg(std::move(callback), _loader), allowhang(allowhang) {}
     ~CompilerInTgForBash() override = default;
     void run(MessageExt::Ptr message) override;
+    void run(MessageExt::Ptr message, std::stop_token stop);
 
    private:
     bool allowhang;
@@ -148,6 +150,7 @@ struct CompilerInTgForGeneric : CompilerInTg {
                           std::string& extraargs);
     ~CompilerInTgForGeneric() override = default;
     void run(MessageExt::Ptr message) override;
+    void run(MessageExt::Ptr message, std::stop_token stop);
 };
 
 struct CompilerInTgForCCpp : CompilerInTgForGeneric {
@@ -155,6 +158,7 @@ struct CompilerInTgForCCpp : CompilerInTgForGeneric {
     using CompilerInTgForGeneric::Params;
     ~CompilerInTgForCCpp() override = default;
     void run(MessageExt::Ptr message) override;
+    void run(MessageExt::Ptr message, std::stop_token stop);
 };
 
 // Read buffer size, max allowed buffer size

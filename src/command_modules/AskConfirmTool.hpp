@@ -2,26 +2,29 @@
 
 #include <absl/log/log.h>
 #include <absl/strings/strip.h>
+#include <api/typedefs.h>
 #include <fmt/format.h>
 #include <tgbot/TgException.h>
 
 #include <api/AuthContext.hpp>
 #include <api/TgBotApi.hpp>
-#include <api/typedefs.h>
-
 #include <atomic>
 #include <chrono>
 #include <condition_variable>
 #include <cstdint>
+#include <functional>
 #include <memory>
 #include <mutex>
 #include <optional>
+#include <stdexcept>
+#include <stop_token>
 #include <string>
 #include <string_view>
 #include <unordered_map>
 #include <utility>
 
 #include "llm/LLMBackend.hpp"
+#include "llm/OutboundDispatch.hpp"
 #include "support/KeyBoardBuilder.hpp"
 
 // An LLM tool ("ask") that posts a Yes/No/Cancel inline keyboard and blocks
@@ -40,11 +43,26 @@ struct ConfirmationAnswer {
 
 struct PendingConfirmation {
     std::mutex mtx;
-    std::condition_variable cv;
+    std::condition_variable_any cv;
     std::optional<ConfirmationAnswer> result;
+    bool closed{};
     UserId initiatingUserId{};
     const AuthContext* auth{};
 };
+
+inline void queueCallbackAnswer(TgBotApi::Ptr api, std::string callbackId,
+                                std::string text = {}, bool alert = false) {
+    if (!llm::outbound::post(
+            api, [api, callbackId = std::move(callbackId),
+                  text = std::move(text), alert](std::stop_token stop) {
+                if (!stop.stop_requested()) {
+                    api->answerCallbackQuery(callbackId, text, alert);
+                }
+            })) {
+        LOG(ERROR) << "Outbound lane rejected an /ask confirmation callback "
+                      "answer";
+    }
+}
 
 // Same first-name(+last-name) display-name convention used in q.cpp.
 inline std::string displayName(const TgBot::User::Ptr& user) {
@@ -55,9 +73,9 @@ inline std::string displayName(const TgBot::User::Ptr& user) {
 }
 
 // Meyer's-singleton accessor, same idiom as ask.cpp's selectedModelStore().
-inline std::pair<std::mutex&,
-                 std::unordered_map<std::string,
-                                   std::shared_ptr<PendingConfirmation>>&>
+inline std::pair<
+    std::mutex&,
+    std::unordered_map<std::string, std::shared_ptr<PendingConfirmation>>&>
 confirmationRegistry() {
     static std::mutex mtx;
     static std::unordered_map<std::string, std::shared_ptr<PendingConfirmation>>
@@ -94,29 +112,45 @@ inline void handleCallback(TgBotApi::Ptr api,
         }
     }
     if (!pending) {
-        api->answerCallbackQuery(query->id,
-                                 "This confirmation has expired.", true);
+        queueCallbackAnswer(api, query->id, "This confirmation has expired.",
+                            true);
         return;
     }
     const bool isInitiator =
         query->from && query->from->id == pending->initiatingUserId;
     const bool remainsAuthorized =
-        !pending->auth ||
-        pending->auth->isAuthorized(query->from,
-                                    AuthContext::AccessLevel::AdminUser);
+        !pending->auth || pending->auth->isAuthorized(
+                              query->from, AuthContext::AccessLevel::AdminUser);
     if (!isInitiator || !remainsAuthorized) {
-        api->answerCallbackQuery(
-            query->id,
+        queueCallbackAnswer(
+            api, query->id,
             "Only the initiating admin can answer this confirmation.", true);
         return;
     }
+    if (choice != "y" && choice != "n" && choice != "c") {
+        queueCallbackAnswer(api, query->id, "Invalid confirmation choice.",
+                            true);
+        return;
+    }
+    bool recorded = false;
     {
         const std::lock_guard lock(pending->mtx);
-        pending->result =
-            ConfirmationAnswer{choice, displayName(query->from)};
+        if (!pending->closed && !pending->result) {
+            pending->result =
+                ConfirmationAnswer{choice, displayName(query->from)};
+            pending->closed = true;
+            recorded = true;
+        }
     }
-    pending->cv.notify_all();
-    api->answerCallbackQuery(query->id, "Recorded.");
+    if (recorded) {
+        pending->cv.notify_all();
+        queueCallbackAnswer(api, query->id, "Recorded.");
+    } else {
+        queueCallbackAnswer(api, query->id,
+                            "This confirmation was already answered or has "
+                            "expired.",
+                            true);
+    }
 }
 
 inline void ensureListenerRegistered(TgBotApi::Ptr api) {
@@ -131,25 +165,57 @@ inline void ensureListenerRegistered(TgBotApi::Ptr api) {
 inline const llm::Tool kAskConfirmTool{
     "ask",
     "Ask the admin a yes/no/cancel confirmation question via a Telegram "
-    "inline keyboard, and wait for their response before proceeding. Use "
-    "this before taking any action that should require explicit human "
-    "confirmation. Returns \"yes\", \"no\", \"cancel\", or a no_response "
-    "message if nobody answered in time.",
-    nlohmann::json{{"type", "object"},
-                  {"properties", {{"question", {{"type", "string"}}}}},
-                  {"required", {"question"}}}};
+    "inline keyboard, and wait for their response before proceeding. Before "
+    "send_message or save_chat_info, include action_tool and action_input "
+    "containing the exact tool name and arguments you will use. Approval is "
+    "bound to those exact arguments and consumed once; a different action "
+    "will be rejected. Returns \"yes\", \"no\", \"cancel\", or a "
+    "no_response message if nobody answered in time.",
+    nlohmann::json{
+        {"type", "object"},
+        {"properties",
+         {{"question", {{"type", "string"}}},
+          {"action_tool",
+           {{"type", "string"}, {"enum", {"send_message", "save_chat_info"}}}},
+          {"action_input", {{"type", "object"}}}}},
+        {"required", {"question"}},
+        {"additionalProperties", false}}};
 
-inline llm::ToolExecutor makeAskConfirmExecutor(TgBotApi::Ptr api,
-                                                ChatId chatId,
-                                                UserId initiatingUserId,
-                                                const AuthContext* auth) {
-    return [api, chatId, initiatingUserId, auth](
+using ApprovalRecorder =
+    std::function<bool(const std::string&, const nlohmann::json&)>;
+
+inline llm::ToolExecutor makeAskConfirmExecutor(
+    TgBotApi::Ptr api, ChatId chatId, UserId initiatingUserId,
+    const AuthContext* auth, ApprovalRecorder recordApproval = {},
+    std::stop_token cancellation = {}) {
+    return [api, chatId, initiatingUserId, auth,
+            recordApproval = std::move(recordApproval), cancellation](
                const std::string& /*name*/, const nlohmann::json& input,
                bool& isError) -> std::string {
         isError = false;
         std::string question;
+        std::optional<std::string> actionTool;
+        std::optional<nlohmann::json> actionInput;
         try {
             question = input.at("question").get<std::string>();
+            const bool hasActionTool = input.contains("action_tool");
+            const bool hasActionInput = input.contains("action_input");
+            if (hasActionTool != hasActionInput) {
+                throw std::invalid_argument(
+                    "action_tool and action_input must be supplied together");
+            }
+            if (hasActionTool) {
+                actionTool = input.at("action_tool").get<std::string>();
+                actionInput = input.at("action_input");
+                if (!actionInput->is_object()) {
+                    throw std::invalid_argument(
+                        "action_input must be an object");
+                }
+                if (!recordApproval) {
+                    throw std::invalid_argument(
+                        "this confirmation cannot bind an action");
+                }
+            }
         } catch (const std::exception& ex) {
             isError = true;
             return fmt::format("Invalid tool input: {}", ex.what());
@@ -168,31 +234,53 @@ inline llm::ToolExecutor makeAskConfirmExecutor(TgBotApi::Ptr api,
         KeyboardBuilder builder(3);
         builder.addKeyboard(
             {{"Yes", cbYes}, {"No", cbNo}, {"Cancel", cbCancel}});
-
-        TgBot::Message::Ptr sent;
-        try {
-            sent = api->sendMessage(chatId, question, builder.get());
-        } catch (const TgBot::TgException& ex) {
-            isError = true;
-            return fmt::format("Failed to send confirmation prompt: {}",
-                              ex.what());
-        }
+        auto keyboard = builder.get();
 
         auto pending = std::make_shared<PendingConfirmation>();
         pending->initiatingUserId = initiatingUserId;
         pending->auth = auth;
+        ensureListenerRegistered(api);
         {
             auto [mtx, map] = confirmationRegistry();
             const std::lock_guard lock(mtx);
             map.emplace(token, pending);
         }
-        ensureListenerRegistered(api);
+
+        TgBot::Message::Ptr sent;
+        try {
+            const auto outboundResult = llm::outbound::invoke(
+                api,
+                [api, chatId, question, keyboard] {
+                    return api->sendMessage(chatId, question, keyboard);
+                },
+                cancellation);
+            if (!outboundResult || !*outboundResult) {
+                throw std::runtime_error(
+                    "outbound queue unavailable or timed out");
+            }
+            sent = *outboundResult;
+        } catch (const std::exception& ex) {
+            {
+                const std::lock_guard pendingLock(pending->mtx);
+                pending->closed = true;
+            }
+            auto [mtx, map] = confirmationRegistry();
+            const std::lock_guard lock(mtx);
+            map.erase(token);
+            isError = true;
+            return fmt::format("Failed to send confirmation prompt: {}",
+                               ex.what());
+        }
 
         std::optional<ConfirmationAnswer> resultSnapshot;
         {
             std::unique_lock lock(pending->mtx);
-            pending->cv.wait_for(lock, kAskConfirmTimeout,
-                                [&] { return pending->result.has_value(); });
+            pending->cv.wait_for(lock, cancellation, kAskConfirmTimeout,
+                                 [&] { return pending->result.has_value(); });
+            // Close the token while holding the same lock used by callback
+            // delivery. A callback that already looked it up cannot race a
+            // timeout/cancellation and record a late approval.
+            pending->closed = true;
             resultSnapshot = pending->result;
         }
         {
@@ -206,23 +294,44 @@ inline llm::ToolExecutor makeAskConfirmExecutor(TgBotApi::Ptr api,
         const std::string annotation =
             resultSnapshot
                 ? fmt::format("({}) pressed {}.", resultSnapshot->presser,
-                             resultSnapshot->choice == "y"   ? "Yes"
-                             : resultSnapshot->choice == "n" ? "No"
-                                                             : "Cancel")
+                              resultSnapshot->choice == "y"   ? "Yes"
+                              : resultSnapshot->choice == "n" ? "No"
+                                                              : "Cancel")
+            : cancellation.stop_requested()
+                ? "Confirmation cancelled."
                 : "No response within the time limit.";
-        try {
-            api->editMessage(sent, fmt::format("{}\n\n{}", question, annotation));
-        } catch (const std::exception& ex) {
-            LOG(WARNING) << "Failed to annotate confirmation message: "
-                        << ex.what();
+        const auto annotated = fmt::format("{}\n\n{}", question, annotation);
+        if (!llm::outbound::post(api, [api, sent,
+                                       annotated](std::stop_token stop) {
+                if (stop.stop_requested()) {
+                    return;
+                }
+                try {
+                    api->editMessage(sent, annotated);
+                } catch (const std::exception& ex) {
+                    LOG(WARNING) << "Failed to annotate confirmation message: "
+                                 << ex.what();
+                }
+            })) {
+            LOG(ERROR) << "Outbound lane rejected confirmation annotation";
         }
 
         if (!resultSnapshot) {
+            if (cancellation.stop_requested()) {
+                isError = true;
+                return "confirmation cancelled because the /ask work was "
+                       "cancelled; do not execute the action";
+            }
             return "no_response: the human did not press a button within 90 "
-                  "seconds; treat this as unresolved, not as a decision - "
-                  "ask again or proceed cautiously";
+                   "seconds; treat this as unresolved, not as a decision - "
+                   "ask again or proceed cautiously";
         }
         if (resultSnapshot->choice == "y") {
+            if (actionTool && !recordApproval(*actionTool, *actionInput)) {
+                isError = true;
+                return "yes, but approval could not be bound to that action; "
+                       "do not execute it";
+            }
             return "yes";
         }
         if (resultSnapshot->choice == "n") {

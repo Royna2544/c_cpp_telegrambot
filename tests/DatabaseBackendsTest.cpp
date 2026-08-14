@@ -11,6 +11,7 @@
 #include <database/SQLiteDatabase.hpp>
 #endif
 
+#include <future>
 #include <memory>
 #include <string>
 
@@ -91,8 +92,51 @@ TEST_P(DatabaseBaseTest, SetAndGetOwnerUserId) {
     ASSERT_TRUE(result.has_value());
     EXPECT_EQ(result.value(), ownerId);
 
-    // Trying to set owner ID again should fail or be rejected, depending on
-    // your implementation
+    EXPECT_EQ(db->claimOwnerUserId(ownerId + 1),
+              DatabaseBase::OwnerClaimResult::ALREADY_SET);
+}
+
+TEST_P(DatabaseBaseTest, ConcurrentOwnerClaimHasExactlyOneWinner) {
+    constexpr UserId firstOwner = 2101;
+    constexpr UserId secondOwner = 2102;
+
+    auto first = std::async(std::launch::async, [this] {
+        return db->claimOwnerUserId(firstOwner);
+    });
+    auto second = std::async(std::launch::async, [this] {
+        return db->claimOwnerUserId(secondOwner);
+    });
+
+    const auto firstResult = first.get();
+    const auto secondResult = second.get();
+    EXPECT_TRUE((firstResult == DatabaseBase::OwnerClaimResult::OK &&
+                 secondResult == DatabaseBase::OwnerClaimResult::ALREADY_SET) ||
+                (secondResult == DatabaseBase::OwnerClaimResult::OK &&
+                 firstResult == DatabaseBase::OwnerClaimResult::ALREADY_SET));
+
+    const auto owner = db->getOwnerUserId();
+    ASSERT_TRUE(owner);
+    EXPECT_TRUE(*owner == firstOwner || *owner == secondOwner);
+}
+
+TEST_P(DatabaseBaseTest, OwnerCannotBeBlacklisted) {
+    constexpr UserId owner = 2201;
+
+    ASSERT_EQ(db->claimOwnerUserId(owner), DatabaseBase::OwnerClaimResult::OK);
+    EXPECT_EQ(db->addUserToList(DatabaseBase::ListType::BLACKLIST, owner),
+              DatabaseBase::ListResult::ALREADY_IN_OTHER_LIST);
+    EXPECT_NE(db->checkUserInList(DatabaseBase::ListType::BLACKLIST, owner),
+              DatabaseBase::ListResult::OK);
+}
+
+TEST_P(DatabaseBaseTest, BlacklistedUserCannotBecomeOwner) {
+    constexpr UserId blacklisted = 2202;
+
+    ASSERT_EQ(db->addUserToList(DatabaseBase::ListType::BLACKLIST, blacklisted),
+              DatabaseBase::ListResult::OK);
+    EXPECT_EQ(db->claimOwnerUserId(blacklisted),
+              DatabaseBase::OwnerClaimResult::BACKEND_ERROR);
+    EXPECT_FALSE(db->getOwnerUserId());
 }
 
 // Test media info operations
@@ -137,15 +181,68 @@ TEST(SQLiteDatabaseTest, RejectsUnsupportedFutureSchemaVersion) {
     sqlite3* raw = nullptr;
     const auto pathString = path.string();
     ASSERT_EQ(sqlite3_open(pathString.c_str(), &raw), SQLITE_OK);
-    ASSERT_EQ(sqlite3_exec(raw, "PRAGMA user_version=999", nullptr, nullptr,
-                           nullptr),
-              SQLITE_OK);
+    ASSERT_EQ(
+        sqlite3_exec(raw, "PRAGMA user_version=999", nullptr, nullptr, nullptr),
+        SQLITE_OK);
     ASSERT_EQ(sqlite3_close(raw), SQLITE_OK);
 
     SQLiteDatabase db(getCmdLine().getPath(FS::PathType::RESOURCES_SQL));
     EXPECT_FALSE(db.load(path));
     EXPECT_TRUE(db.load(DatabaseBase::kInMemoryDatabase));
     EXPECT_TRUE(db.unload());
+    std::filesystem::remove(path);
+}
+
+TEST(SQLiteDatabaseTest, MigratesLegacyDuplicateOwnersDeterministically) {
+    const auto path = std::filesystem::temp_directory_path() /
+                      "glider-sqlite-duplicate-owner-test.db";
+    std::filesystem::remove(path);
+    sqlite3* raw = nullptr;
+    const auto pathString = path.string();
+    ASSERT_EQ(sqlite3_open(pathString.c_str(), &raw), SQLITE_OK);
+    ASSERT_EQ(sqlite3_exec(raw,
+                           "CREATE TABLE usermap(userid BIGINT PRIMARY KEY, "
+                           "info INT NOT NULL);"
+                           "INSERT INTO usermap VALUES(1, 0);"
+                           "INSERT INTO usermap VALUES(2, 0);"
+                           "PRAGMA user_version=1;",
+                           nullptr, nullptr, nullptr),
+              SQLITE_OK);
+    ASSERT_EQ(sqlite3_close(raw), SQLITE_OK);
+
+    SQLiteDatabase db(getCmdLine().getPath(FS::PathType::RESOURCES_SQL));
+    ASSERT_TRUE(db.load(path));
+    EXPECT_EQ(db.getOwnerUserId(), 1);
+    EXPECT_EQ(db.checkUserInList(DatabaseBase::ListType::WHITELIST, 2),
+              DatabaseBase::ListResult::OK);
+    EXPECT_EQ(db.claimOwnerUserId(3),
+              DatabaseBase::OwnerClaimResult::ALREADY_SET);
+    EXPECT_TRUE(db.unload());
+    std::filesystem::remove(path);
+}
+#endif
+
+#ifdef DATABASE_HAVE_PROTOBUF
+TEST(ProtoDatabaseTest, MutationIsDurableBeforeUnload) {
+    const auto path = std::filesystem::temp_directory_path() /
+                      "glider-protobuf-immediate-persist-test.db";
+    std::filesystem::remove(path);
+
+    ProtoDatabase writer;
+    ASSERT_TRUE(writer.load(path));
+    ASSERT_EQ(writer.claimOwnerUserId(3101),
+              DatabaseBase::OwnerClaimResult::OK);
+    ASSERT_EQ(writer.addUserToList(DatabaseBase::ListType::WHITELIST, 3102),
+              DatabaseBase::ListResult::OK);
+
+    ProtoDatabase reader;
+    ASSERT_TRUE(reader.load(path));
+    EXPECT_EQ(reader.getOwnerUserId(), 3101);
+    EXPECT_EQ(reader.checkUserInList(DatabaseBase::ListType::WHITELIST, 3102),
+              DatabaseBase::ListResult::OK);
+
+    EXPECT_TRUE(reader.unload());
+    EXPECT_TRUE(writer.unload());
     std::filesystem::remove(path);
 }
 #endif
@@ -195,17 +292,18 @@ INSTANTIATE_TEST_SUITE_P(
     ::testing::Values(
         DBParam{std::make_shared<ProtoDatabase>(), "ProtoDatabase"},
         DBParam{std::make_shared<SQLiteDatabase>(
-            getCmdLine().getPath(FS::PathType::RESOURCES_SQL)),
-        "SQLiteDatabase"}));
-#elif defined DATABASE_HAVE_PROTOBUF 
-INSTANTIATE_TEST_SUITE_P(
-    DatabaseImplementations, DatabaseBaseTest,
-    ::testing::Values(
-        DBParam{std::make_shared<ProtoDatabase>(), "ProtoDatabase"}));
+                    getCmdLine().getPath(FS::PathType::RESOURCES_SQL)),
+                "SQLiteDatabase"}));
+#elif defined DATABASE_HAVE_PROTOBUF
+INSTANTIATE_TEST_SUITE_P(DatabaseImplementations, DatabaseBaseTest,
+                         ::testing::Values(DBParam{
+                             std::make_shared<ProtoDatabase>(),
+                             "ProtoDatabase"}));
 #elif defined DATABASE_HAVE_SQLITE
 INSTANTIATE_TEST_SUITE_P(
     DatabaseImplementations, DatabaseBaseTest,
-    ::testing::Values(DBParam{std::make_shared<SQLiteDatabase>(
+    ::testing::Values(DBParam{
+        std::make_shared<SQLiteDatabase>(
             getCmdLine().getPath(FS::PathType::RESOURCES_SQL)),
         "SQLiteDatabase"}));
 #else

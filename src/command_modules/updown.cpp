@@ -17,8 +17,8 @@ DECLARE_COMMAND_HANDLER(up) {
         api->sendReplyDocument(
             message->message(),
             TgBot::InputFile::fromFile(localFile, "application/octet-stream"),
-            fmt::format(fmt::runtime(res->get(Strings::UPDOWN_FILE_INFO)), localFile,
-                        std::filesystem::file_size(localFile, ec)));
+            fmt::format(fmt::runtime(res->get(Strings::UPDOWN_FILE_INFO)),
+                        localFile, std::filesystem::file_size(localFile, ec)));
     } else {
         LOG(ERROR) << "File does not exist: " << localFile
                    << ", error: " << ec.message();
@@ -49,7 +49,7 @@ DECLARE_COMMAND_HANDLER(down) {
 }
 
 extern "C" DYN_COMMAND_EXPORT const struct DynModule DYN_COMMAND_SYM = {
-    .flags = DynModule::Flags::Enforced,
+    .flags = DynModule::Flags::OwnerOnly,
 #ifdef cmd_up_EXPORTS
     .name = "up",
     .description = "Upload designated file from server",

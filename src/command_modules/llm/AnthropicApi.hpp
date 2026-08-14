@@ -7,6 +7,7 @@
 
 #include "CurlUtils.hpp"
 #include "LLMBackend.hpp"
+#include "ToolSafety.hpp"
 
 // Anthropic Messages API backend. Unlike the OpenAI/LM Studio backends this
 // authenticates with `x-api-key` + `anthropic-version` headers (not a bearer
@@ -60,12 +61,15 @@ NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE_WITH_DEFAULT(ModelList, data)
 
 class AnthropicBackend : public LLMBackend {
    public:
-    AnthropicBackend(std::string url, std::string authkey)
-        : url_(std::move(url)), authkey_(std::move(authkey)) {}
+    AnthropicBackend(std::string url, std::string authkey,
+                     CurlUtils::CancelChecker cancelled = {})
+        : url_(std::move(url)),
+          authkey_(std::move(authkey)),
+          cancelled_(std::move(cancelled)) {}
 
     std::vector<LLMModel> listModels() override {
-        auto raw = CurlUtils::download_memory(url_ + kModelsEndpoint, nullptr,
-                                              headers());
+        auto raw = CurlUtils::download_memory(url_ + kModelsEndpoint,
+                                              cancelled_, headers());
         if (!raw) {
             return {};
         }
@@ -92,8 +96,8 @@ class AnthropicBackend : public LLMBackend {
         req.messages = {{"user", userInput}};
         nlohmann::json payload = req;
 
-        auto raw = CurlUtils::send_json_get_reply(url_ + kMessagesEndpoint,
-                                                  payload.dump(), headers());
+        auto raw = CurlUtils::send_json_get_reply(
+            url_ + kMessagesEndpoint, payload.dump(), headers(), cancelled_);
         if (!raw) {
             return std::nullopt;
         }
@@ -121,8 +125,8 @@ class AnthropicBackend : public LLMBackend {
                                     std::int64_t /*chatId*/,
                                     const std::vector<llm::Tool>& tools,
                                     llm::ToolExecutor exec) override {
-        nlohmann::json messages = nlohmann::json::array(
-            {{{"role", "user"}, {"content", userInput}}});
+        nlohmann::json messages =
+            nlohmann::json::array({{{"role", "user"}, {"content", userInput}}});
 
         nlohmann::json toolsJson = nlohmann::json::array();
         for (const auto& tool : tools) {
@@ -132,6 +136,7 @@ class AnthropicBackend : public LLMBackend {
         }
 
         std::optional<std::string> lastText;
+        tool_safety::ToolCallBudget toolCallBudget;
         for (int iteration = 0; iteration < kMaxToolIterations; ++iteration) {
             nlohmann::json payload{{"model", model},
                                    {"max_tokens", kMaxTokens},
@@ -141,8 +146,9 @@ class AnthropicBackend : public LLMBackend {
                 payload["tools"] = toolsJson;
             }
 
-            auto raw = CurlUtils::send_json_get_reply(
-                url_ + kMessagesEndpoint, payload.dump(), headers());
+            auto raw = CurlUtils::send_json_get_reply(url_ + kMessagesEndpoint,
+                                                      payload.dump(), headers(),
+                                                      cancelled_);
             if (!raw) {
                 return std::nullopt;
             }
@@ -173,14 +179,30 @@ class AnthropicBackend : public LLMBackend {
                 return lastText;
             }
 
+            std::vector<std::string> callIds;
+            try {
+                callIds.reserve(toolUseBlocks.size());
+                for (const auto& block : toolUseBlocks) {
+                    callIds.push_back(block.at("id").get<std::string>());
+                    (void)block.at("name").get<std::string>();
+                }
+            } catch (const std::exception& ex) {
+                return std::string(
+                           "Tool-call batch rejected: malformed call: ") +
+                       ex.what();
+            }
+            if (const auto rejected = toolCallBudget.acceptBatch(callIds)) {
+                return "Tool-call batch rejected: " + *rejected + ".";
+            }
+
             messages.push_back({{"role", "assistant"}, {"content", content}});
 
             nlohmann::json toolResults = nlohmann::json::array();
             for (const auto& block : toolUseBlocks) {
                 const auto toolUseId = block.at("id").get<std::string>();
                 const auto toolName = block.at("name").get<std::string>();
-                const auto toolInput = block.value(
-                    "input", nlohmann::json::object());
+                const auto toolInput =
+                    block.value("input", nlohmann::json::object());
 
                 bool isError = false;
                 std::string result;
@@ -190,6 +212,7 @@ class AnthropicBackend : public LLMBackend {
                     isError = true;
                     result = std::string("Tool execution failed: ") + ex.what();
                 }
+                result = tool_safety::boundedToolResult(std::move(result));
 
                 toolResults.push_back({{"type", "tool_result"},
                                        {"tool_use_id", toolUseId},
@@ -216,6 +239,7 @@ class AnthropicBackend : public LLMBackend {
 
     std::string url_;
     std::string authkey_;
+    CurlUtils::CancelChecker cancelled_;
 };
 
 }  // namespace llm::anthropic

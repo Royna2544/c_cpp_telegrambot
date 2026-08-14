@@ -8,6 +8,10 @@
 #include "CompilerInTelegram.hpp"
 
 void CompilerInTgForCCpp::run(MessageExt::Ptr message) {
+    run(message, {});
+}
+
+void CompilerInTgForCCpp::run(MessageExt::Ptr message, std::stop_token stop) {
     std::string extraargs;
     std::stringstream resultbuf;
     auto aoutname = params.outfile;
@@ -24,13 +28,13 @@ void CompilerInTgForCCpp::run(MessageExt::Ptr message) {
 
         resultbuf << fmt::format("{}: {}\n", _locale->get(Strings::COMMAND_IS),
                                  cmd);
-        runCommand(cmd, resultbuf);
+        runCommand(cmd, resultbuf, true, stop);
         resultbuf << "\n";
 
         std::error_code ec;
-        if (std::filesystem::exists(aoutname, ec)) {
+        if (!stop.stop_requested() && std::filesystem::exists(aoutname, ec)) {
             resultbuf << _locale->get(Strings::RUN_TIME) << ":\n";
-            runCommand(aoutname.string(), resultbuf);
+            runCommand(aoutname.string(), resultbuf, true, stop);
             std::filesystem::remove(aoutname);
         }
         std::filesystem::remove(params.outfile);

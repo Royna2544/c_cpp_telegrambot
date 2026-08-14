@@ -56,7 +56,7 @@ struct SpamBlockBase {
     // Set the SpamBlock config. Based on SpamBlockBase::Config.
     virtual void setConfig(Config config);
     // Get the SpamBlock config. Based on SpamBlockBase::Config.
-    Config getConfig() const { return _config; }
+    Config getConfig() const { return _config.load(std::memory_order_acquire); }
 
     // Function called when the SpamBlock framework detects spamming user.
     // Arguments passed: ChatId, UserId, Offending messageIds
@@ -73,7 +73,7 @@ struct SpamBlockBase {
     std::atomic<size_t> chat_messages_count{0};
 
    private:
-    Config _config = Config::PURGE;
+    std::atomic<Config> _config{Config::PURGE};
 
     std::unordered_map<ChatId, UserMessagesMap> chat_messages_data;
 

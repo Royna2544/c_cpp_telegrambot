@@ -5,7 +5,9 @@
 #include <api/components/ModuleManagement.hpp>
 #include <api/components/OnAnyMessage.hpp>
 #include <api/components/OnCallbackQuery.hpp>
+#include <api/components/ReactionsProvider.hpp>
 #include <api/components/Restart.hpp>
+#include <cstdlib>
 #include <iomanip>
 #include <restartfmt_parser.hpp>
 
@@ -22,7 +24,7 @@ TgBotApiImpl::RestartCommand::RestartCommand(TgBotApiImpl::Ptr api)
 
 void TgBotApiImpl::RestartCommand::commandFunction(MessageExt::Ptr message) {
     if (!_api->authorized(message, "restart",
-                          AuthContext::AccessLevel::AdminUser)) {
+                          AuthContext::AccessLevel::Owner)) {
         return;
     }
     if (!_api->isMyCommand(message)) {
@@ -38,7 +40,8 @@ void TgBotApiImpl::RestartCommand::commandFunction(MessageExt::Ptr message) {
     std::vector<char*> myEnviron;
 
     // Get the size of environment buffer
-    for (; environ[count] != nullptr; ++count);
+    for (; environ[count] != nullptr; ++count)
+        ;
     // Get ready to insert 1 more to the environment buffer
     myEnviron.resize(count + 2);
     // Copy the environment buffer to the new buffer
@@ -82,6 +85,10 @@ void TgBotApiImpl::RestartCommand::commandFunction(MessageExt::Ptr message) {
 
     // Shut down async threads
     DLOG(INFO) << "Stopping async threads...";
+    // Cancel the API-owned global subscription before its dispatcher. Tokens
+    // owned by external components use independent host state and safely
+    // become inert when OnAnyMessageImpl is destroyed below.
+    _api->reactionsProvider.reset();
     _api->onAnyMessageImpl.reset();
     _api->onCallbackQueryImpl.reset();
 
@@ -95,4 +102,11 @@ void TgBotApiImpl::RestartCommand::commandFunction(MessageExt::Ptr message) {
             ->get(Strings::RESTARTING_BOT));
 
     execve(argv[0], argv, myEnviron.data());
+
+    // Every event listener above still lives in EventBroadcaster but its
+    // target component has deliberately been destroyed. Continuing after a
+    // failed exec would run a half-unloaded bot with dangling callbacks.
+    LOG(ERROR) << "execve returned while restarting; terminating the "
+                  "half-unloaded process";
+    std::_Exit(EXIT_FAILURE);
 }

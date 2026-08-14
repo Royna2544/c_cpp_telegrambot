@@ -104,6 +104,7 @@ struct LLMBackend {
 
 // Defined in ask.cpp (the only translation unit that pulls in every backend).
 std::unique_ptr<LLMBackend> makeBackend(LLMApiType type, std::string url,
-                                        std::string authkey);
+                                        std::string authkey,
+                                        std::function<bool()> cancelled = {});
 
 }  // namespace llm

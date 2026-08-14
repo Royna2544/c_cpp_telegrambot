@@ -83,6 +83,12 @@ void KeyedIntervalRateLimiter::pruneIfNeeded(clock::time_point now) {
 }
 
 bool KeyedIntervalRateLimiter::check(std::int64_t key) {
+    const auto result = checkWithStatus(key);
+    return result == CheckResult::Allowed || result == CheckResult::Recovered;
+}
+
+KeyedIntervalRateLimiter::CheckResult KeyedIntervalRateLimiter::checkWithStatus(
+    std::int64_t key) {
     const auto now = clock::now();
     const std::lock_guard<std::mutex> lock(mutex_);
     pruneIfNeeded(now);
@@ -91,9 +97,19 @@ bool KeyedIntervalRateLimiter::check(std::int64_t key) {
         it = limiters_
                  .emplace(key, Entry{std::make_unique<IntervalRateLimiter>(
                                          maxPerInterval_, interval_),
-                                     now})
+                                     now, false})
                  .first;
     }
     it->second.lastAccess = now;
-    return it->second.limiter->check();
+    if (!it->second.limiter->check()) {
+        if (it->second.wasLimited) {
+            return CheckResult::StillLimited;
+        }
+        it->second.wasLimited = true;
+        return CheckResult::Limited;
+    }
+    if (std::exchange(it->second.wasLimited, false)) {
+        return CheckResult::Recovered;
+    }
+    return CheckResult::Allowed;
 }

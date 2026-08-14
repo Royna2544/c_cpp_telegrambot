@@ -12,7 +12,12 @@ DECLARE_COMMAND_HANDLER(cmd) {
     bool valid = false;
 
     std::string result_message;
-    if (action == "reload") {
+    if (command == "cmd" && (action == "unload" || action == "reload")) {
+        // Replacing or unloading the module that owns this handler would wait
+        // for this handler's own execution lease. The manager also enforces
+        // this rule for callbacks and internal callers.
+        valid = true;
+    } else if (action == "reload") {
         ret = api->reloadCommand(command);
         valid = true;
     } else if (action == "unload") {
@@ -37,7 +42,7 @@ DECLARE_COMMAND_HANDLER(cmd) {
 }
 
 extern "C" DYN_COMMAND_EXPORT const struct DynModule DYN_COMMAND_SYM = {
-    .flags = DynModule::Flags::Enforced,
+    .flags = DynModule::Flags::OwnerOnly,
     .name = "cmd",
     .description = "unload/reload a command",
     .function = COMMAND_HANDLER_NAME(cmd),

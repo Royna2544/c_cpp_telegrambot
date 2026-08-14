@@ -12,7 +12,7 @@ void verifyKeyboard(const TgBot::GenericReply::Ptr& reply) {
         std::static_pointer_cast<TgBot::ReplyKeyboardMarkup>(reply);
     ASSERT_TRUE(keyboardReply);
 
-#define EXPECT_OPT_TRUE(opt) EXPECT_TRUE(opt&& opt.value())
+#define EXPECT_OPT_TRUE(opt)  EXPECT_TRUE(opt&& opt.value())
 #define EXPECT_OPT_FALSE(opt) EXPECT_TRUE(!opt || (opt && !opt.value()))
     EXPECT_OPT_TRUE(keyboardReply->resizeKeyboard);
     EXPECT_OPT_TRUE(keyboardReply->oneTimeKeyboard);
@@ -95,7 +95,7 @@ struct DatabaseCommandTest : public CommandTestBase {
                                               TgBotApi::ParseMode::None))
             .WillOnce(DoAll(WithArg<3>(verifyKeyboard), SaveArg<3>(&keyboard),
                             Return(sentMessage)));
-        EXPECT_CALL(*botApi, onAnyMessage(_))
+        EXPECT_CALL(*botApi, onAnyMessageForCommand("database", _))
             .WillOnce(DoAll(
                 Invoke([&]() {
                     recievedMessage->text =
@@ -104,7 +104,7 @@ struct DatabaseCommandTest : public CommandTestBase {
                             ->keyboard[X][Y]
                             ->text;
                 }),
-                InvokeArgument<0>(botApi, recievedMessage), Return()));
+                InvokeArgument<1>(botApi, recievedMessage), Return()));
         execute();
     }
 };
@@ -116,6 +116,61 @@ TEST_F(DatabaseCommandTest, WithoutUser) {
         .WillOnce(Return(something));
     willSendReplyMessage(something);
     execute();
+}
+
+TEST_F(DatabaseCommandTest, ReplyWithoutConcreteUser) {
+    defaultProvidedMessage->replyToMessage = createDefaultMessage();
+    (*defaultProvidedMessage->replyToMessage)->from.reset();
+
+    constexpr std::string_view replyToUser = "reply-to-user";
+    EXPECT_CALL(strings, get(Strings::REPLY_TO_USER_MSG))
+        .WillOnce(Return(replyToUser));
+    willSendReplyMessage(replyToUser);
+
+    execute();
+}
+
+TEST_F(DatabaseCommandTest, PromptRequiresSameChatAndRejectsUnknownAction) {
+    defaultProvidedMessage->replyToMessage = createDefaultMessage();
+    (*defaultProvidedMessage->replyToMessage)->from = createDefaultUser(99);
+
+    EXPECT_CALL(strings, get(Strings::DB_ADD_TO_WHITELIST))
+        .WillRepeatedly(Return(std::string_view{"wl_add"}));
+    EXPECT_CALL(strings, get(Strings::DB_REMOVE_FROM_WHITELIST))
+        .WillRepeatedly(Return(std::string_view{"wl_remove"}));
+    EXPECT_CALL(strings, get(Strings::DB_ADD_TO_BLACKLIST))
+        .WillRepeatedly(Return(std::string_view{"bl_add"}));
+    EXPECT_CALL(strings, get(Strings::DB_REMOVE_FROM_BLACKLIST))
+        .WillRepeatedly(Return(std::string_view{"bl_remove"}));
+    EXPECT_CALL(strings, get(Strings::DB_CHOOSE_USER_ACTION))
+        .WillRepeatedly(Return(std::string_view{"choose"}));
+
+    const auto prompt = createDefaultMessage();
+    EXPECT_CALL(*botApi,
+                sendMessage_impl(TEST_CHAT_ID, _, createMessageReplyMatcher(),
+                                 _, TgBotApi::ParseMode::None))
+        .WillOnce(Return(prompt));
+
+    TgBotApi::AnyMessageCallback callback;
+    EXPECT_CALL(*botApi, onAnyMessageForCommand("database", _))
+        .WillOnce(SaveArg<1>(&callback));
+    execute();
+    ASSERT_TRUE(callback);
+
+    const auto response = createDefaultMessage();
+    response->replyToMessage = prompt;
+    response->from = defaultProvidedMessage->from;
+    response->text = "bogus";
+
+    response->chat->id = TEST_CHAT_ID + 1;
+    EXPECT_EQ(callback(botApi, response), TgBotApi::AnyMessageResult::Handled);
+
+    response->chat->id = TEST_CHAT_ID;
+    EXPECT_CALL(strings, get(Strings::UNKNOWN_ACTION))
+        .WillOnce(Return(std::string_view{"unknown"}));
+    willSendReplyMessageTo("unknown: bogus", response, _);
+    EXPECT_EQ(callback(botApi, response),
+              TgBotApi::AnyMessageResult::Deregister);
 }
 
 TEST_F(DatabaseCommandTest, WithUserAddToWhiteList) {

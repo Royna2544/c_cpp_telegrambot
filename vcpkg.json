@@ -21,11 +21,12 @@
   ],
   "features": {
     "image": {
-      "description": "Basic image processing (PNG/WebP/JPEG)",
+      "description": "Image processing and native quote rendering",
       "dependencies": [
         "libpng",
         "libwebp",
-        "libjpeg-turbo"
+        "libjpeg-turbo",
+        "pango"
       ]
     },
     "image-opencv": {

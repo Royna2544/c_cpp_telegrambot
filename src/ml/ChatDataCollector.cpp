@@ -1,5 +1,4 @@
 #include "ChatDataCollector.hpp"
-#include "Csv.hpp"
 
 #include <absl/log/log.h>
 #include <absl/strings/str_split.h>
@@ -7,6 +6,8 @@
 
 #include <filesystem>
 #include <fstream>
+
+#include "Csv.hpp"
 
 ChatDataCollector::Data::Data(const Message::Ptr& message) {
     if (message->text) {
@@ -29,8 +30,7 @@ ChatDataCollector::Data::Data(const Message::Ptr& message) {
     timestamp = message->date;
     isEdited = message->editDate.has_value();
     isForwarded = message->forwardOrigin != nullptr;
-    replyToUserId = message->replyToMessage &&
-                            (*message->replyToMessage)->from
+    replyToUserId = message->replyToMessage && (*message->replyToMessage)->from
                         ? (*(*message->replyToMessage)->from)->id
                         : 0;
     messageid = message->messageId;
@@ -150,16 +150,21 @@ ChatDataCollector::ChatDataCollector(TgBotApi::Ptr api) {
         }
     }
 
-    api->onAnyMessage(
+    anyMessageSubscription_ = api->subscribeAnyMessage(
         [this](TgBotApi::CPtr /*api*/, const Message::Ptr& message) {
             onMessage(message);
             return TgBotApi::AnyMessageResult::Handled;
         });
-    api->onEditedMessage(
+    editedMessageSubscription_ = api->subscribeEditedMessage(
         [this](const Message::Ptr& message) { onMessage(message); });
 }
 
 ChatDataCollector::~ChatDataCollector() {
+    // Stop both entry points before reading the dictionaries without mutex_ or
+    // closing their backing stream.
+    editedMessageSubscription_.reset();
+    anyMessageSubscription_.reset();
+
     // Write user dict
     std::ofstream userDictFile("user_dict.csv");
     userDictFile << "user_id,first_name,last_name,username,is_premium\n";

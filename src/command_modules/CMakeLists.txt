@@ -187,7 +187,10 @@ command_module(NAME possibility SRCS possibility.cpp LIBS Random)
 
 command_module(NAME randsticker SRCS randsticker.cpp LIBS Random)
 
-command_module(NAME rotatepic SRCS rotatepic.cpp LIBS ImgProc)
+command_module(
+  NAME rotatepic
+  SRCS rotatepic.cpp
+  LIBS ImgProc $<$<PLATFORM_ID:Windows>:advapi32>)
 
 command_module(NAME setowner SRCS setowner.cpp LIBS DBImpl)
 
@@ -206,12 +209,25 @@ multi_command_module(PROVIDES up down SRCS updown.cpp)
 
 command_module(NAME log SRCS log.cpp)
 
-command_module(NAME q SRCS q.cpp LIBS CurlDownload)
+command_module(
+  NAME q
+  SRCS q.cpp
+  LIBS QuoteRenderer $<$<PLATFORM_ID:Windows>:advapi32>)
 
 command_module(NAME ask SRCS ask.cpp LIBS CurlDownload Utils AuthApi)
 
 if (TGBOTCPP_LUA_MODULES)
-  file(GLOB LUA_SCRIPTS "${CMAKE_CURRENT_SOURCE_DIR}/*.lua")
+  file(GLOB LUA_SCRIPTS CONFIGURE_DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/*.lua")
+
+  # delay/setowner already have native modules with the same command names;
+  # installing both makes the winner depend on directory iteration order.
+  # test.lua is a development fixture and must never become a production bot
+  # command.
+  list(REMOVE_ITEM LUA_SCRIPTS
+    "${CMAKE_CURRENT_SOURCE_DIR}/delay.lua"
+    "${CMAKE_CURRENT_SOURCE_DIR}/setowner.lua"
+    "${CMAKE_CURRENT_SOURCE_DIR}/test.lua"
+  )
   
   if(LUA_SCRIPTS)
     message(STATUS "Found Lua scripts: ${LUA_SCRIPTS}")

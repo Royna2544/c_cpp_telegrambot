@@ -1,5 +1,7 @@
 #include <gtest/gtest.h>
 
+#include <chrono>
+#include <future>
 #include <global_handlers/SpamBlock.hpp>
 #include <memory>
 #include <string>
@@ -19,6 +21,20 @@ struct RecordingSpamBlock : SpamBlockBase {
     void onDetected(ChatId chat, UserId user,
                     std::vector<MessageId> /*ids*/) const override {
         detections.push_back({chat, user});
+    }
+};
+
+struct BlockingSpamBlock : SpamBlockBase {
+    mutable std::promise<void> entered;
+    std::shared_future<void> release;
+
+    explicit BlockingSpamBlock(std::shared_future<void> release)
+        : release(std::move(release)) {}
+
+    void onDetected(ChatId, UserId,
+                    std::vector<MessageId> /*ids*/) const override {
+        entered.set_value();
+        release.wait();
     }
 };
 
@@ -77,4 +93,31 @@ TEST(SpamBlock, BelowChatThresholdSkipsScan) {
     }
     sb.consumeAndDetect();
     EXPECT_TRUE(sb.detections.empty());
+}
+
+TEST(SpamBlock, SlowDetectionActionDoesNotBlockIncomingMessages) {
+    using namespace std::chrono_literals;
+    std::promise<void> releasePromise;
+    BlockingSpamBlock sb(releasePromise.get_future().share());
+    sb.setConfig(SpamBlockBase::Config::LOGGING_ONLY);
+    for (int i = 0; i < 5; ++i) {
+        sb.addMessage(makeMessage(999, 77, i + 1, "same"));
+    }
+
+    auto detection =
+        std::async(std::launch::async, [&] { sb.consumeAndDetect(); });
+    const auto enteredStatus = sb.entered.get_future().wait_for(1s);
+    if (enteredStatus != std::future_status::ready) {
+        releasePromise.set_value();
+        detection.wait();
+        FAIL() << "spam detection callback did not start";
+    }
+
+    auto incoming = std::async(std::launch::async, [&] {
+        sb.addMessage(makeMessage(999, 88, 100, "new traffic"));
+    });
+    EXPECT_EQ(incoming.wait_for(200ms), std::future_status::ready);
+
+    releasePromise.set_value();
+    EXPECT_EQ(detection.wait_for(1s), std::future_status::ready);
 }

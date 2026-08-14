@@ -15,6 +15,7 @@
 #include <database/DatabaseBase.hpp>
 #include <memory>
 #include <mutex>
+#include <stop_token>
 #include <string>
 #include <string_view>
 #include <unordered_map>
@@ -29,22 +30,26 @@
 #include "llm/LLMBackend.hpp"
 #include "llm/LMStudioBackend.hpp"
 #include "llm/OpenAIApi.hpp"
+#include "llm/OutboundDispatch.hpp"
 #include "llm/SYSTEM_PROMPT.hpp"
+#include "llm/TelegramOutput.hpp"
+#include "llm/ToolSafety.hpp"
 #include "utils/ConfigManager.hpp"
 
 namespace llm {
 std::unique_ptr<LLMBackend> makeBackend(LLMApiType type, std::string url,
-                                        std::string authkey) {
+                                        std::string authkey,
+                                        std::function<bool()> cancelled) {
     switch (type) {
         case LLMApiType::OpenAI:
-            return std::make_unique<openai::OpenAIBackend>(std::move(url),
-                                                           std::move(authkey));
+            return std::make_unique<openai::OpenAIBackend>(
+                std::move(url), std::move(authkey), cancelled);
         case LLMApiType::LMStudio:
-            return std::make_unique<LMStudioBackend>(std::move(url),
-                                                     std::move(authkey));
+            return std::make_unique<LMStudioBackend>(
+                std::move(url), std::move(authkey), cancelled);
         case LLMApiType::Anthropic:
             return std::make_unique<anthropic::AnthropicBackend>(
-                std::move(url), std::move(authkey));
+                std::move(url), std::move(authkey), cancelled);
     }
     return nullptr;
 }
@@ -54,6 +59,52 @@ namespace {
 
 using llm::model_picker::selectedModel;
 using llm::model_picker::setSelectedModel;
+
+bool queuePlainReply(TgBotApi::Ptr api, Message::Ptr sourceMessage,
+                     std::string_view text,
+                     TgBot::GenericReply::Ptr replyMarkup = nullptr) {
+    std::string ownedText(text);
+    const bool queued = llm::outbound::post(
+        api, [api, sourceMessage = std::move(sourceMessage),
+              text = std::move(ownedText),
+              replyMarkup = std::move(replyMarkup)](std::stop_token stop) {
+            if (!stop.stop_requested()) {
+                api->sendReplyMessage(sourceMessage, text, replyMarkup);
+            }
+        });
+    if (!queued) {
+        LOG(ERROR) << "Outbound lane rejected an /ask reply";
+    }
+    return queued;
+}
+
+bool queueMarkdownReply(TgBotApi::Ptr api, Message::Ptr sourceMessage,
+                        std::string text) {
+    const bool queued = llm::outbound::post(
+        api, [api, sourceMessage = std::move(sourceMessage),
+              text = std::move(text)](std::stop_token stop) {
+            if (stop.stop_requested()) {
+                return;
+            }
+            try {
+                api->sendReplyMessage<TgBotApi::ParseMode::MarkdownV2>(
+                    sourceMessage, tgbot::markdownv2::escape(text));
+            } catch (const TgBot::TgException& ex) {
+                LOG(WARNING)
+                    << "MarkdownV2 send failed, sending plain: " << ex.what();
+                try {
+                    api->sendReplyMessage(sourceMessage, text);
+                } catch (const TgBot::TgException& plainEx) {
+                    LOG(ERROR) << "Plain LLM reply chunk also failed: "
+                               << plainEx.what();
+                }
+            }
+        });
+    if (!queued) {
+        LOG(ERROR) << "Outbound lane rejected an /ask response chunk";
+    }
+    return queued;
+}
 
 // Admin-only tool: lets the model DM an arbitrary Telegram user on its own
 // initiative. Only ever offered to the LLM when the invoking user passes the
@@ -68,14 +119,24 @@ const llm::Tool kSendMessageTool{
          {{"user_id", {{"type", "integer"}}}, {"text", {{"type", "string"}}}}},
         {"required", {"user_id", "text"}}}};
 
-llm::ToolExecutor makeSendMessageExecutor(TgBotApi::Ptr api) {
-    return [api](const std::string& /*name*/, const nlohmann::json& input,
-                 bool& isError) -> std::string {
+llm::ToolExecutor makeSendMessageExecutor(TgBotApi::Ptr api,
+                                          std::stop_token cancellation) {
+    return [api, cancellation](const std::string& /*name*/,
+                               const nlohmann::json& input,
+                               bool& isError) -> std::string {
         isError = false;
         try {
             const auto userId = input.at("user_id").get<std::int64_t>();
             const auto text = input.at("text").get<std::string>();
-            api->sendMessage(userId, text);
+            const auto sent = llm::outbound::invoke(
+                api,
+                [api, userId, text] { return api->sendMessage(userId, text); },
+                cancellation);
+            if (!sent || !*sent) {
+                isError = true;
+                return "Failed to send message: outbound queue unavailable or "
+                       "timed out.";
+            }
             return fmt::format("Message sent successfully to user {}.", userId);
         } catch (const TgBot::TgException& ex) {
             isError = true;
@@ -188,10 +249,13 @@ std::vector<llm::Tool> toolsForDomain(llm::tool_router::Domain domain) {
     return tools;
 }
 
+// True for every route that actually exposes kernelbuild/rombuild, so the
+// build orchestration addendum and pending-plan context accompany the tools
+// the model can see (Domain::All included - it exposes them too).
 bool isBuilderDomain(llm::tool_router::Domain domain) {
     using llm::tool_router::Domain;
     return domain == Domain::KernelBuild || domain == Domain::RomBuild ||
-           domain == Domain::Build;
+           domain == Domain::Build || domain == Domain::All;
 }
 
 llm::ToolExecutor makeSaveChatInfoExecutor(const Providers* provider) {
@@ -226,21 +290,28 @@ llm::ToolExecutor makeSaveChatInfoExecutor(const Providers* provider) {
 
 // Dispatches by tool name to whichever admin tool was actually called; each
 // underlying executor already ignores the `name` parameter it's handed.
-llm::ToolExecutor makeCombinedExecutor(TgBotApi::Ptr api, ChatId chatId,
-                                       UserId initiatingUserId,
-                                       const Providers* provider,
-                                       Message::Ptr sourceMessage) {
-    auto sendMsg = makeSendMessageExecutor(api);
+llm::ToolExecutor makeCombinedExecutor(
+    TgBotApi::Ptr api, ChatId chatId, UserId initiatingUserId,
+    const Providers* provider, Message::Ptr sourceMessage,
+    const std::vector<llm::Tool>& allowedTools, std::stop_token cancellation) {
+    auto policy =
+        std::make_shared<llm::tool_safety::ToolExecutionPolicy>(allowedTools);
+    auto sendMsg = makeSendMessageExecutor(api, cancellation);
     auto askConfirm = llm::ask_confirm::makeAskConfirmExecutor(
-        api, chatId, initiatingUserId, provider->auth.get());
+        api, chatId, initiatingUserId, provider->auth.get(),
+        [policy](const std::string& toolName, const nlohmann::json& input) {
+            return policy->recordApproval(toolName, input);
+        },
+        cancellation);
     auto getChatId = makeGetChatIdExecutor(provider);
     auto getChatName = makeGetChatNameExecutor(provider);
     auto saveChatInfo = makeSaveChatInfoExecutor(provider);
     auto launchBuilder =
         llm::builder_launch::makeExecutor(api, std::move(sourceMessage));
-    return [sendMsg, askConfirm, getChatId, getChatName, saveChatInfo,
-            launchBuilder](const std::string& name, const nlohmann::json& input,
-                           bool& isError) -> std::string {
+    llm::ToolExecutor dispatch =
+        [sendMsg, askConfirm, getChatId, getChatName, saveChatInfo,
+         launchBuilder](const std::string& name, const nlohmann::json& input,
+                        bool& isError) -> std::string {
         if (name == "send_message") {
             return sendMsg(name, input, isError);
         }
@@ -263,36 +334,43 @@ llm::ToolExecutor makeCombinedExecutor(TgBotApi::Ptr api, ChatId chatId,
         isError = true;
         return fmt::format("Unknown tool: {}", name);
     };
+    return [policy, dispatch = std::move(dispatch)](
+               const std::string& name, const nlohmann::json& input,
+               bool& isError) -> std::string {
+        return policy->execute(name, input, dispatch, isError);
+    };
 }
 
-DECLARE_COMMAND_HANDLER(ask) {
+void runAskWork(TgBotApi::Ptr api, Message::Ptr sourceMessage, std::string text,
+                const StringResLoader::PerLocaleMap* res,
+                const Providers* provider, std::stop_token stop) {
+    if (stop.stop_requested()) {
+        return;
+    }
     auto* mgr = provider->config.get();
     const auto urlOpt = mgr->get(ConfigManager::Configs::LLM_URL);
     const auto typeOpt = mgr->get(ConfigManager::Configs::LLM_API_TYPE);
     if (!urlOpt || !typeOpt) {
-        api->sendReplyMessage(message->message(),
-                              res->get(Strings::LLM_NOT_CONFIGURED));
+        queuePlainReply(api, sourceMessage,
+                        res->get(Strings::LLM_NOT_CONFIGURED));
         return;
     }
     const auto apiType = llm::parseApiType(*typeOpt);
     if (!apiType) {
-        api->sendReplyMessage(message->message(),
-                              res->get(Strings::LLM_UNSUPPORTED_TYPE));
+        queuePlainReply(api, sourceMessage,
+                        res->get(Strings::LLM_UNSUPPORTED_TYPE));
         return;
     }
     const std::string authkey =
         mgr->get(ConfigManager::Configs::LLM_AUTHKEY).value_or("");
-    auto backend = llm::makeBackend(*apiType, *urlOpt, authkey);
+    auto backend = llm::makeBackend(*apiType, *urlOpt, authkey,
+                                    [stop] { return stop.stop_requested(); });
 
-    const ChatId chatId = message->get<MessageAttrs::Chat>()->id;
-
-    const std::string text = message->has<MessageAttrs::ExtraText>()
-                                 ? message->get<MessageAttrs::ExtraText>()
-                                 : std::string{};
+    const ChatId chatId = sourceMessage->chat->id;
     const std::string_view trimmed = absl::StripAsciiWhitespace(text);
     if (trimmed.empty()) {
-        api->sendReplyMessage(message->message(),
-                              res->get(Strings::LLM_PROVIDE_QUERY));
+        queuePlainReply(api, sourceMessage,
+                        res->get(Strings::LLM_PROVIDE_QUERY));
         return;
     }
 
@@ -307,9 +385,12 @@ DECLARE_COMMAND_HANDLER(ask) {
 
     if (first == "models") {
         const auto models = backend->listModels();
+        if (stop.stop_requested()) {
+            return;
+        }
         if (models.empty()) {
-            api->sendReplyMessage(message->message(),
-                                  res->get(Strings::LLM_NO_MODELS));
+            queuePlainReply(api, sourceMessage,
+                            res->get(Strings::LLM_NO_MODELS));
             return;
         }
         std::string list;
@@ -324,37 +405,45 @@ DECLARE_COMMAND_HANDLER(ask) {
             list += '\n';
             modelIds.push_back(model.id);
         }
-        auto keyboard =
-            llm::model_picker::startPicker(api, chatId, std::move(modelIds));
-        api->sendReplyMessage(
-            message->message(),
-            fmt::format(fmt::runtime(res->get(Strings::LLM_MODELS_AVAILABLE)),
-                        list),
-            keyboard);
+        auto keyboard = llm::model_picker::startPicker(
+            api, chatId, sourceMessage->from.value()->id, std::move(modelIds));
+        const auto rendered = fmt::format(
+            fmt::runtime(res->get(Strings::LLM_MODELS_AVAILABLE)), list);
+        const auto chunks = llm::telegram_output::splitPlain(rendered);
+        for (std::size_t i = 0; i < chunks.size(); ++i) {
+            if (stop.stop_requested() ||
+                !queuePlainReply(api, sourceMessage, chunks[i],
+                                 i == 0 ? keyboard : nullptr)) {
+                break;
+            }
+        }
         return;
     }
 
     if (first == "model") {
         if (rest.empty()) {
-            api->sendReplyMessage(message->message(),
-                                  res->get(Strings::LLM_PROVIDE_QUERY));
+            queuePlainReply(api, sourceMessage,
+                            res->get(Strings::LLM_PROVIDE_QUERY));
             return;
         }
         const std::string wanted(rest);
         const auto models = backend->listModels();
+        if (stop.stop_requested()) {
+            return;
+        }
         const bool found = std::ranges::any_of(
             models, [&](const llm::LLMModel& m) { return m.id == wanted; });
         if (!found) {
-            api->sendReplyMessage(
-                message->message(),
+            queuePlainReply(
+                api, sourceMessage,
                 fmt::format(
                     fmt::runtime(res->get(Strings::LLM_MODEL_NOT_FOUND)),
                     wanted));
             return;
         }
         setSelectedModel(chatId, wanted);
-        api->sendReplyMessage(
-            message->message(),
+        queuePlainReply(
+            api, sourceMessage,
             fmt::format(fmt::runtime(res->get(Strings::LLM_MODEL_SET)),
                         wanted));
         return;
@@ -365,19 +454,22 @@ DECLARE_COMMAND_HANDLER(ask) {
     std::string model = selectedModel(chatId);
     if (model.empty()) {
         const auto models = backend->listModels();
+        if (stop.stop_requested()) {
+            return;
+        }
         if (models.empty()) {
-            api->sendReplyMessage(message->message(),
-                                  res->get(Strings::LLM_NO_MODELS));
+            queuePlainReply(api, sourceMessage,
+                            res->get(Strings::LLM_NO_MODELS));
             return;
         }
         model = models.front().id;
     }
 
-    api->sendReplyMessage(message->message(),
-                          res->get(Strings::LLM_PROCESSING_QUERY));
+    queuePlainReply(api, sourceMessage,
+                    res->get(Strings::LLM_PROCESSING_QUERY));
     const bool isAdmin = provider->auth->isAuthorized(
-        message->message(), AuthContext::AccessLevel::AdminUser);
-    const auto userId = message->get<MessageAttrs::User>()->id;
+        sourceMessage, AuthContext::AccessLevel::AdminUser);
+    const auto userId = sourceMessage->from.value()->id;
     auto toolDomain = llm::tool_router::Domain::Chat;
     std::vector<llm::Tool> tools;
     if (isAdmin) {
@@ -393,9 +485,19 @@ DECLARE_COMMAND_HANDLER(ask) {
                 return backend->classify(model, std::string(systemPrompt),
                                          std::string(userInput));
             });
+        if (stop.stop_requested()) {
+            return;
+        }
         tools = toolsForDomain(toolDomain);
-        LOG(INFO) << "LLM tool route: " << llm::tool_router::name(toolDomain)
-                  << " (" << tools.size() << " exposed tools)";
+        if (toolDomain == llm::tool_router::Domain::All) {
+            LOG(WARNING) << "LLM capability router could not classify the "
+                            "request; exposing all "
+                         << tools.size() << " tools as a fallback";
+        } else {
+            LOG(INFO) << "LLM tool route: "
+                      << llm::tool_router::name(toolDomain) << " ("
+                      << tools.size() << " exposed tools)";
+        }
     }
 
     std::string systemPrompt = SYSTEM_PROMPT;
@@ -421,19 +523,54 @@ DECLARE_COMMAND_HANDLER(ask) {
         isAdmin && !tools.empty()
             ? backend->chat(model, systemPrompt, query, chatId, tools,
                             makeCombinedExecutor(api, chatId, userId, provider,
-                                                 message->message()))
+                                                 sourceMessage, tools, stop))
             : backend->chat(model, systemPrompt, query, chatId);
-    if (!answer) {
-        api->sendReplyMessage(message->message(),
-                              res->get(Strings::LLM_RESPONSE_FAILED));
+    if (stop.stop_requested()) {
         return;
     }
-    try {
-        api->sendReplyMessage<TgBotApi::ParseMode::MarkdownV2>(
-            message->message(), tgbot::markdownv2::escape(*answer));
-    } catch (const TgBot::TgException& ex) {
-        LOG(WARNING) << "MarkdownV2 send failed, sending plain: " << ex.what();
-        api->sendReplyMessage(message->message(), *answer);
+    if (!answer || answer->empty()) {
+        queuePlainReply(api, sourceMessage,
+                        res->get(Strings::LLM_RESPONSE_FAILED));
+        return;
+    }
+    for (const auto& chunk : llm::telegram_output::splitForMarkdown(*answer)) {
+        if (stop.stop_requested() ||
+            !queueMarkdownReply(api, sourceMessage, chunk)) {
+            break;
+        }
+    }
+}
+
+DECLARE_COMMAND_HANDLER(ask) {
+    const auto sourceMessage = message->message();
+    std::string queryText = message->has<MessageAttrs::ExtraText>()
+                                ? message->get<MessageAttrs::ExtraText>()
+                                : std::string{};
+    const auto workId = api->submitCommandWork(
+        "ask", TgBotApi::WorkClass::Llm,
+        [api, sourceMessage, queryText = std::move(queryText), res,
+         provider](std::stop_token stop) mutable {
+            try {
+                runAskWork(api, sourceMessage, std::move(queryText), res,
+                           provider, stop);
+            } catch (const std::exception& ex) {
+                LOG(ERROR) << "/ask LLM work failed: " << ex.what();
+                if (!stop.stop_requested()) {
+                    queuePlainReply(api, sourceMessage,
+                                    res->get(Strings::LLM_RESPONSE_FAILED));
+                }
+            } catch (...) {
+                LOG(ERROR) << "/ask LLM work failed with an unknown exception";
+                if (!stop.stop_requested()) {
+                    queuePlainReply(api, sourceMessage,
+                                    res->get(Strings::LLM_RESPONSE_FAILED));
+                }
+            }
+        });
+    if (!workId) {
+        LOG(WARNING) << "LLM lane rejected /ask work";
+        queuePlainReply(api, sourceMessage,
+                        res->get(Strings::LLM_RESPONSE_FAILED));
     }
 }
 

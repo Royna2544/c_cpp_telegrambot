@@ -77,8 +77,15 @@ class MessageCountMatcher : public Matcher {
 
 void SpamBlockBase::onDetected(ChatId chat, UserId user,
                                std::vector<MessageId> /*messageIds*/) const {
-    LOG(INFO) << fmt::format("Spam detected for chat {}, by user {}",
-                             chat_map.at(chat), user_map.at(user));
+    const std::lock_guard lock(mutex);
+    const auto chatIt = chat_map.find(chat);
+    const auto userIt = user_map.find(user);
+    LOG(INFO) << fmt::format(
+        "Spam detected for chat {}, by user {}",
+        chatIt != chat_map.end() ? fmt::format("{}", chatIt->second)
+                                 : std::to_string(chat),
+        userIt != user_map.end() ? fmt::format("{}", userIt->second)
+                                 : std::to_string(user));
 }
 
 template <>
@@ -108,22 +115,30 @@ struct fmt::formatter<SpamBlockBase::Config> : formatter<std::string_view> {
 };
 
 void SpamBlockBase::setConfig(Config config) {
-    LOG(INFO) << fmt::format("Config updated. {} => {}", _config, config);
-    _config = config;
+    const auto previous = _config.exchange(config, std::memory_order_acq_rel);
+    LOG(INFO) << fmt::format("Config updated. {} => {}", previous, config);
 }
 
 void SpamBlockBase::consumeAndDetect() {
-    const std::lock_guard<std::mutex> _(mutex);
-    for (const auto& [chat, per_chat_map] : chat_messages_data) {
+    // Move the current batch out under the data lock, then perform matching
+    // and Telegram actions without it. A slow delete/mute request must never
+    // block the polling thread from recording or dispatching new commands.
+    decltype(chat_messages_data) pending;
+    {
+        const std::lock_guard lock(mutex);
+        pending.swap(chat_messages_data);
+        chat_messages_count.store(0, std::memory_order_release);
+    }
+    for (const auto& [chat, per_chat_map] : pending) {
         int count = std::accumulate(
             per_chat_map.begin(), per_chat_map.end(), 0,
             [](const int index, const auto& messages) {
                 return index + static_cast<int>(messages.second.size());
             });
         if (count >= sSpamDetectThreshold) {
-            const auto& chatPtr = chat_map.at(chat);
             LOG(INFO) << fmt::format(
-                "Launching spam detection in {}: Detected {}.", chatPtr, count);
+                "Launching spam detection in chat {}: Detected {}.", chat,
+                count);
             // Run detection
             for (auto it = per_chat_map.cbegin(); it != per_chat_map.cend();
                  it++) {
@@ -132,27 +147,31 @@ void SpamBlockBase::consumeAndDetect() {
                                        [](const auto& x) { return x.first; });
                 if (Matcher::detect<MessageCountMatcher>(it) ||
                     Matcher::detect<SameMessageMatcher>(it)) {
-                    onDetected(chat, it->first, msgids);
+                    try {
+                        onDetected(chat, it->first, msgids);
+                    } catch (const std::exception& error) {
+                        LOG(ERROR) << "Spam action failed: " << error.what();
+                    } catch (...) {
+                        LOG(ERROR) << "Spam action failed: unknown exception";
+                    }
                 }
             }
         }
     }
-    chat_messages_data.clear();
-    chat_messages_count = 0;
 }
 
 void SpamBlockBase::addMessage(const Message::Ptr& message) {
     // Always ignore when spamblock is off
-    if (_config == Config::OFF) {
+    if (getConfig() == Config::OFF) {
+        return;
+    }
+
+    if (!message || !message->chat || !message->from) {
         return;
     }
 
     // Run possible additional checks
     if (shouldBeSkipped(message)) {
-        return;
-    }
-
-    if (!message->chat || !message->from) {
         return;
     }
 
@@ -175,12 +194,13 @@ void SpamBlockBase::addMessage(const Message::Ptr& message) {
     ChatId chatId = message->chat->id;
     UserId userId = (*message->from)->id;
     MessageId messageId = message->messageId;
+    std::size_t count = 0;
     {
         const std::lock_guard<std::mutex> _(mutex);
         chat_messages_data[chatId][userId].emplace_back(messageId, messageData);
         chat_map[chatId] = message->chat;
         user_map[userId] = *message->from;
-        chat_messages_count++;
-        onMessageAdded(chat_messages_count);
+        count = chat_messages_count.fetch_add(1, std::memory_order_acq_rel) + 1;
     }
+    onMessageAdded(count);
 }

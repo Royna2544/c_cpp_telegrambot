@@ -16,6 +16,7 @@
 #include <memory>
 
 #include "ImagePBase.hpp"
+#include "MediaLimits.hpp"
 
 struct jpegimg_error_mgr {
     jpeg_error_mgr pub;
@@ -43,6 +44,10 @@ JPEGImage::TinyStatus JPEGImage::read(const std::filesystem::path& filename,
         LOG(ERROR) << "Invalid target for JPEG image";
         return {PhotoBase::Status::kInvalidArgument,
                 "Invalid target for JPEG image"};
+    }
+    if (processingControl.shouldStop()) {
+        return {PhotoBase::Status::kProcessingError,
+                "JPEG processing cancelled or deadline exceeded"};
     }
 
     F infile;
@@ -75,6 +80,19 @@ JPEGImage::TinyStatus JPEGImage::read(const std::filesystem::path& filename,
 
     jpeg_stdio_src(&cinfo, infile.native_handle());
     jpeg_read_header(&cinfo, TRUE);
+
+    // Validate header dimensions before jpeg_start_decompress can allocate
+    // output-side codec buffers.
+    if (!imagep::limits::imageDimensionsAllowed(cinfo.image_width,
+                                                cinfo.image_height) ||
+        cinfo.num_components <= 0 || cinfo.num_components > 4) {
+        LOG(ERROR) << "JPEG dimensions out of allowed range: "
+                   << cinfo.image_width << "x" << cinfo.image_height << "x"
+                   << cinfo.num_components;
+        jpeg_destroy_decompress(&cinfo);
+        return {PhotoBase::Status::kInternalError,
+                "Image dimensions out of allowed range"};
+    }
     jpeg_start_decompress(&cinfo);
 
     width = cinfo.output_width;
@@ -85,11 +103,8 @@ JPEGImage::TinyStatus JPEGImage::read(const std::filesystem::path& filename,
     // dimensions, which would overflow the size computation on 32-bit size_t
     // (heap overflow) or request an enormous allocation (decompression-bomb
     // DoS). Checks are written division-first to avoid overflowing themselves.
-    constexpr size_t kMaxDimension = 16384;
-    constexpr size_t kMaxPixels = 64ULL * 1024 * 1024;  // 64 MP
-    if (width == 0 || height == 0 || num_channels <= 0 || num_channels > 4 ||
-        width > kMaxDimension || height > kMaxDimension ||
-        width > kMaxPixels / height) {
+    if (!imagep::limits::imageDimensionsAllowed(width, height) ||
+        num_channels <= 0 || num_channels > 4) {
         LOG(ERROR) << "JPEG dimensions out of allowed range: " << width << "x"
                    << height << "x" << num_channels;
         jpeg_destroy_decompress(&cinfo);
@@ -103,6 +118,12 @@ JPEGImage::TinyStatus JPEGImage::read(const std::filesystem::path& filename,
     std::array<unsigned char*, 1> rowptr{};
 
     while (cinfo.output_scanline < height) {
+        if (processingControl.shouldStop()) {
+            jpeg_abort_decompress(&cinfo);
+            jpeg_destroy_decompress(&cinfo);
+            return {PhotoBase::Status::kProcessingError,
+                    "JPEG processing cancelled or deadline exceeded"};
+        }
         rowptr[0] = &image_data[(cinfo.output_scanline) * row_stride];
         jpeg_read_scanlines(&cinfo, rowptr.data(), 1);
     }
@@ -200,6 +221,11 @@ JPEGImage::TinyStatus JPEGImage::processAndWrite(
     const std::filesystem::path& filename) {
     F outfile;
 
+    if (processingControl.shouldStop()) {
+        return {Status::kProcessingError,
+                "JPEG processing cancelled or deadline exceeded"};
+    }
+
     if (options.greyscale.get()) {
         greyscale();
     }
@@ -209,6 +235,11 @@ JPEGImage::TinyStatus JPEGImage::processAndWrite(
     }
     if (options.invert_color.get()) {
         invert();
+    }
+
+    if (processingControl.shouldStop()) {
+        return {Status::kProcessingError,
+                "JPEG processing cancelled or deadline exceeded"};
     }
 
     if (!outfile.open(filename, F::Mode::WriteBinary)) {
@@ -236,6 +267,12 @@ JPEGImage::TinyStatus JPEGImage::processAndWrite(
     std::array<unsigned char*, 1> rowptr{};
 
     while (cinfo.next_scanline < height) {
+        if (processingControl.shouldStop()) {
+            jpeg_abort_compress(&cinfo);
+            jpeg_destroy_compress(&cinfo);
+            return {Status::kProcessingError,
+                    "JPEG processing cancelled or deadline exceeded"};
+        }
         rowptr[0] = &image_data[cinfo.next_scanline * row_stride];
         jpeg_write_scanlines(&cinfo, rowptr.data(), 1);
     }
@@ -246,8 +283,8 @@ JPEGImage::TinyStatus JPEGImage::processAndWrite(
     return TinyStatus::ok();
 }
 
-#define _STR(x) #x
-#define STR(x) _STR(x)
+#define _STR(x)                   #x
+#define STR(x)                    _STR(x)
 #define LIBJPEG_TURBO_VERSION_STR STR(LIBJPEG_TURBO_VERSION)
 
 std::string JPEGImage::version() const {

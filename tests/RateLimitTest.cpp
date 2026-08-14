@@ -3,6 +3,7 @@
 #include <api/RateLimit.hpp>
 #include <chrono>
 #include <cstdint>
+#include <thread>
 
 using std::chrono_literals::operator""h;
 
@@ -40,6 +41,24 @@ TEST(KeyedIntervalRateLimiter, OneHeavyKeyDoesNotStarveOthers) {
     // ...everyone else is still served (the bug this guards against: a single
     // global limiter let one user block all others).
     for (std::int64_t key = 200; key < 210; ++key) {
-        EXPECT_TRUE(limiter.check(key)) << "key " << key << " should be allowed";
+        EXPECT_TRUE(limiter.check(key))
+            << "key " << key << " should be allowed";
     }
+}
+
+TEST(KeyedIntervalRateLimiter, ReportsExpiryRecoveryOnNextCheck) {
+    using namespace std::chrono_literals;
+    KeyedIntervalRateLimiter limiter(1, 20ms);
+
+    EXPECT_EQ(limiter.checkWithStatus(42),
+              KeyedIntervalRateLimiter::CheckResult::Allowed);
+    EXPECT_EQ(limiter.checkWithStatus(42),
+              KeyedIntervalRateLimiter::CheckResult::Limited);
+    EXPECT_EQ(limiter.checkWithStatus(42),
+              KeyedIntervalRateLimiter::CheckResult::StillLimited);
+    std::this_thread::sleep_for(30ms);
+    EXPECT_EQ(limiter.checkWithStatus(42),
+              KeyedIntervalRateLimiter::CheckResult::Recovered);
+    EXPECT_EQ(limiter.checkWithStatus(42),
+              KeyedIntervalRateLimiter::CheckResult::Limited);
 }

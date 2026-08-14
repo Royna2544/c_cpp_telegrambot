@@ -8,7 +8,6 @@
 #include <api/StringResLoader.hpp>
 #include <api/TgBotApi.hpp>
 #include <functional>
-#include <thread>
 
 #include "api/MessageExt.hpp"
 
@@ -17,17 +16,12 @@ constexpr auto kSpamDelayTime = std::chrono::milliseconds(700);
 
 namespace {
 
-void for_count(int count, const std::function<void(void)>& callback) {
-    for (int i = 0; i < count; ++i) {
-        callback();
-        std::this_thread::sleep_for(kSpamDelayTime);
-    }
-}
 void try_parse_spamcnt(const std::string_view data, int* count) {
     if (try_parse(data, count)) {
         *count = std::clamp(*count, 0, MAX_SPAM_COUNT);
     } else {
-        LOG(WARNING) << "Failed to parse " << std::quoted(data) << " as int; defaults to 1";
+        LOG(WARNING) << "Failed to parse " << std::quoted(data)
+                     << " as int; defaults to 1";
         *count = 1;
     }
 }
@@ -42,27 +36,23 @@ DECLARE_COMMAND_HANDLER(spam) {
     bool spamable = false;
 
     if (message->reply()->exists()) {
-        const auto chatid = message->reply()->get<MessageAttrs::Chat>();
+        const ChatId chatid = message->reply()->get<MessageAttrs::Chat>()->id;
 
         spamable = true;
         try_parse_spamcnt(message->get<MessageAttrs::ExtraText>(), &count);
         if (message->reply()->has<MessageAttrs::Sticker>()) {
-            fp = [api, message, chatid] {
-                api->sendSticker(
-                    chatid,
-                    MediaIds(message->reply()->get<MessageAttrs::Sticker>()));
-            };
+            const MediaIds sticker(
+                message->reply()->get<MessageAttrs::Sticker>());
+            fp = [api, chatid, sticker] { api->sendSticker(chatid, sticker); };
         } else if (message->reply()->has<MessageAttrs::Animation>()) {
-            fp = [api, message, chatid] {
-                api->sendAnimation(
-                    chatid,
-                    MediaIds(message->reply()->get<MessageAttrs::Animation>()));
+            const MediaIds animation(
+                message->reply()->get<MessageAttrs::Animation>());
+            fp = [api, chatid, animation] {
+                api->sendAnimation(chatid, animation);
             };
         } else if (message->reply()->has<MessageAttrs::ExtraText>()) {
-            fp = [api, message, chatid] {
-                api->sendMessage(
-                    chatid, message->reply()->get<MessageAttrs::ExtraText>());
-            };
+            const auto text = message->reply()->get<MessageAttrs::ExtraText>();
+            fp = [api, chatid, text] { api->sendMessage(chatid, text); };
         } else {
             api->sendReplyMessage(message->message(),
                                   res->get(Strings::SPAM_REPLY_SUPPORTS));
@@ -77,9 +67,9 @@ DECLARE_COMMAND_HANDLER(spam) {
         if (commands.size() == 2) {
             try_parse_spamcnt(commands[0], &spamData.first);
             spamData.second = commands[1];
-            fp = [api, message, spamData] {
-                api->sendMessage(message->get<MessageAttrs::Chat>()->id,
-                                 spamData.second);
+            const ChatId chatid = message->get<MessageAttrs::Chat>()->id;
+            fp = [api, chatid, spamData] {
+                api->sendMessage(chatid, spamData.second);
             };
             count = spamData.first;
             spamable = true;
@@ -92,12 +82,24 @@ DECLARE_COMMAND_HANDLER(spam) {
                               res->get(Strings::SPAM_SEND_CONFIG));
     }
     if (spamable) {
-        for_count(count, fp);
+        for (int index = 0; index < count; ++index) {
+            if (!api->submitCommandWork(
+                    "spam", TgBotApi::WorkClass::Outbound,
+                    [fp](std::stop_token stop) {
+                        if (!stop.stop_requested())
+                            fp();
+                    },
+                    {.delay = kSpamDelayTime * index,
+                     .deadline = std::chrono::seconds(30)})) {
+                LOG(WARNING) << "Spam outbound queue rejected item " << index;
+                break;
+            }
+        }
     }
 }
 
 extern "C" DYN_COMMAND_EXPORT const struct DynModule DYN_COMMAND_SYM = {
-    .flags = DynModule::Flags::Enforced,
+    .flags = DynModule::Flags::OwnerOnly,
     .name = "spam",
     .description = "Spam a given literal or media",
     .function = COMMAND_HANDLER_NAME(spam),

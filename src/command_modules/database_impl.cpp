@@ -11,6 +11,7 @@
 #include <api/Providers.hpp>
 #include <api/StringResLoader.hpp>
 #include <api/TgBotApi.hpp>
+#include <chrono>
 #include <database/bot/TgBotDatabaseImpl.hpp>
 #include <memory>
 #include <optional>
@@ -20,6 +21,13 @@ using TgBot::ReplyKeyboardRemove;
 
 template <DatabaseBase::ListType type>
 Strings handleAddUser(const Providers* provider, const UserId user) {
+    if constexpr (type == DatabaseBase::ListType::BLACKLIST) {
+        if (const auto owner = provider->database->getOwnerUserId();
+            owner && *owner == user) {
+            LOG(WARNING) << "Rejecting attempt to blacklist bot owner " << user;
+            return Strings::USER_ALREADY_IN_OTHER_LIST;
+        }
+    }
     auto res = provider->database.get()->addUserToList(type, user);
     Strings text{};
     switch (res) {
@@ -68,6 +76,8 @@ Strings handleRemoveUser(const Providers* provider, const UserId user) {
 
 namespace {
 
+constexpr auto kDatabasePromptLifetime = std::chrono::minutes(5);
+
 using TgBot::KeyboardButton;
 
 template <int X, int Y>
@@ -91,13 +101,21 @@ DECLARE_COMMAND_HANDLER(database) {
                               res->get(Strings::REPLY_TO_USER_MSG));
         return;
     }
+    const auto targetUser = message->reply()->get<MessageAttrs::User>();
+    if (!targetUser) {
+        api->sendReplyMessage(message->message(),
+                              res->get(Strings::REPLY_TO_USER_MSG));
+        return;
+    }
 
     auto reply = std::make_shared<TgBot::ReplyKeyboardMarkup>();
     reply->keyboard = genKeyboard<2, 2>();
-    const std::string addToWhitelist = std::string(res->get(Strings::DB_ADD_TO_WHITELIST));
+    const std::string addToWhitelist =
+        std::string(res->get(Strings::DB_ADD_TO_WHITELIST));
     const std::string removeFromWhitelist =
         std::string(res->get(Strings::DB_REMOVE_FROM_WHITELIST));
-    const std::string addToBlacklist = std::string(res->get(Strings::DB_ADD_TO_BLACKLIST));
+    const std::string addToBlacklist =
+        std::string(res->get(Strings::DB_ADD_TO_BLACKLIST));
     const std::string removeFromBlacklist =
         std::string(res->get(Strings::DB_REMOVE_FROM_BLACKLIST));
     reply->keyboard.at(0).at(0)->text = addToWhitelist;
@@ -108,7 +126,7 @@ DECLARE_COMMAND_HANDLER(database) {
     reply->resizeKeyboard = true;
     reply->selective = true;
 
-    UserId userId = message->reply()->get<MessageAttrs::User>()->id;
+    UserId userId = targetUser->id;
 
     // The admin who invoked /database; only they may drive the resulting
     // keyboard, otherwise any user replying to the prompt could mutate the
@@ -120,37 +138,59 @@ DECLARE_COMMAND_HANDLER(database) {
     auto msg = api->sendReplyMessage(
         message->message(),
         fmt::format(fmt::runtime(res->get(Strings::DB_CHOOSE_USER_ACTION)),
-                    message->reply()->get<MessageAttrs::User>()),
+                    targetUser),
         reply);
 
-    api->onAnyMessage([msg, userId, invokerId, res, provider, addToWhitelist,
-                       removeFromWhitelist, addToBlacklist,
-                       removeFromBlacklist](TgBotApi::CPtr api,
-                                            const Message::Ptr& m) {
-        if (invokerId != 0 && m->from && (*m->from)->id == invokerId &&
-            m->replyToMessage &&
-            (*m->replyToMessage)->messageId == msg->messageId) {
-            Strings text{};
-            if (m->text == addToWhitelist) {
-                text = handleAddUser<DatabaseBase::ListType::WHITELIST>(
-                    provider, userId);
-            } else if (m->text == removeFromWhitelist) {
-                text = handleRemoveUser<DatabaseBase::ListType::WHITELIST>(
-                    provider, userId);
-            } else if (m->text == addToBlacklist) {
-                text = handleAddUser<DatabaseBase::ListType::BLACKLIST>(
-                    provider, userId);
-            } else if (m->text == removeFromBlacklist) {
-                text = handleRemoveUser<DatabaseBase::ListType::BLACKLIST>(
-                    provider, userId);
+    if (!msg || !msg->chat || invokerId == 0) {
+        LOG(ERROR) << "Cannot register database prompt callback without a "
+                      "prompt chat and invoker";
+        return;
+    }
+    const ChatId promptChatId = msg->chat->id;
+    const auto expiresAt =
+        std::chrono::steady_clock::now() + kDatabasePromptLifetime;
+
+    api->onAnyMessageForCommand(
+        "database",
+        [msg, userId, invokerId, promptChatId, expiresAt, res, provider,
+         addToWhitelist, removeFromWhitelist, addToBlacklist,
+         removeFromBlacklist](TgBotApi::CPtr api, const Message::Ptr& m) {
+            if (std::chrono::steady_clock::now() >= expiresAt) {
+                return TgBotApi::AnyMessageResult::Deregister;
             }
-            auto remove = std::make_shared<ReplyKeyboardRemove>();
-            remove->removeKeyboard = true;
-            api->sendReplyMessage(m, res->get(text), remove);
-            return TgBotApi::AnyMessageResult::Deregister;
-        }
-        return TgBotApi::AnyMessageResult::Handled;
-    });
+            if (m && m->chat && m->chat->id == promptChatId && m->from &&
+                *m->from && (*m->from)->id == invokerId && m->replyToMessage &&
+                *m->replyToMessage &&
+                (*m->replyToMessage)->messageId == msg->messageId) {
+                std::optional<Strings> text;
+                if (m->text == addToWhitelist) {
+                    text = handleAddUser<DatabaseBase::ListType::WHITELIST>(
+                        provider, userId);
+                } else if (m->text == removeFromWhitelist) {
+                    text = handleRemoveUser<DatabaseBase::ListType::WHITELIST>(
+                        provider, userId);
+                } else if (m->text == addToBlacklist) {
+                    text = handleAddUser<DatabaseBase::ListType::BLACKLIST>(
+                        provider, userId);
+                } else if (m->text == removeFromBlacklist) {
+                    text = handleRemoveUser<DatabaseBase::ListType::BLACKLIST>(
+                        provider, userId);
+                }
+                auto remove = std::make_shared<ReplyKeyboardRemove>();
+                remove->removeKeyboard = true;
+                if (!text) {
+                    api->sendReplyMessage(
+                        m,
+                        fmt::format("{}: {}", res->get(Strings::UNKNOWN_ACTION),
+                                    m->text.value_or("")),
+                        remove);
+                    return TgBotApi::AnyMessageResult::Deregister;
+                }
+                api->sendReplyMessage(m, res->get(*text), remove);
+                return TgBotApi::AnyMessageResult::Deregister;
+            }
+            return TgBotApi::AnyMessageResult::Handled;
+        });
 };
 
 DECLARE_COMMAND_HANDLER(saveid) {
@@ -187,8 +227,9 @@ DECLARE_COMMAND_HANDLER(saveid) {
 
     switch (provider->database->addMediaInfo(info)) {
         case DatabaseBase::AddResult::OK: {
-            const auto content = fmt::format(fmt::runtime(res->get(Strings::DB_MEDIA_ADDED)),
-                                             fmt::join(info.names, "\n"));
+            const auto content =
+                fmt::format(fmt::runtime(res->get(Strings::DB_MEDIA_ADDED)),
+                            fmt::join(info.names, "\n"));
             api->sendReplyMessage(message->message(), content);
             break;
         }
@@ -208,7 +249,7 @@ DECLARE_COMMAND_HANDLER(saveid) {
 
 extern "C" DYN_COMMAND_EXPORT const struct DynModule DYN_COMMAND_SYM = {
 #ifdef cmd_database_EXPORTS
-    .flags = DynModule::Flags::Enforced,
+    .flags = DynModule::Flags::OwnerOnly,
     .name = "database",
     .description = "Run database commands",
     .function = COMMAND_HANDLER_NAME(database),

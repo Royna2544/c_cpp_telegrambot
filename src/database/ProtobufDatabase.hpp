@@ -34,6 +34,8 @@ struct DBIMPL_EXPORT ProtoDatabase : DatabaseBase {
     [[nodiscard]] std::optional<std::vector<decltype(MediaInfo::mediaId)>>
     getMediaIds(const std::string_view alias) const override;
     void setOwnerUserId(UserId userId) const override;
+    [[nodiscard]] OwnerClaimResult claimOwnerUserId(
+        UserId userId) const override;
     std::ostream& dump(std::ostream& ofs) const override;
 
     [[nodiscard]] AddResult addChatInfo(
@@ -63,4 +65,5 @@ struct DBIMPL_EXPORT ProtoDatabase : DatabaseBase {
     const PersonList& getOtherPersonList(ListType type) const;
     static std::optional<int> findByUid(const RepeatedField<UserId> list,
                                         const UserId uid);
+    [[nodiscard]] bool persistLocked() const;
 };

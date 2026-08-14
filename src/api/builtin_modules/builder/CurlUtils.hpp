@@ -1,5 +1,6 @@
 #pragma once
 
+#include <cstddef>
 #include <filesystem>
 #include <functional>
 #include <optional>
@@ -8,6 +9,12 @@
 #include <vector>
 
 namespace CurlUtils {
+
+inline constexpr long kInteractiveConnectTimeoutSeconds = 15;
+inline constexpr long kInteractiveIdleTimeoutSeconds = 30;
+inline constexpr long kInteractiveTotalTimeoutSeconds = 180;
+inline constexpr std::size_t kMaxInMemoryResponseBytes = 4ULL * 1024 * 1024;
+inline constexpr std::size_t kMaxJsonRequestBytes = 4ULL * 1024 * 1024;
 
 // Type for cancel checker callback
 // A function that returns true if the operation should be cancelled.
@@ -60,7 +67,8 @@ extern std::optional<std::string> download_memory(
  */
 extern std::optional<std::string> send_json_get_reply(
     const std::string_view url, std::string json,
-    const std::string_view authkey = "");
+    const std::string_view authkey = "",
+    CancelChecker cancel_checker = nullptr);
 
 /**
  * Send a JSON string via HTTP POST with arbitrary request headers and get the
@@ -73,6 +81,7 @@ extern std::optional<std::string> send_json_get_reply(
  */
 extern std::optional<std::string> send_json_get_reply(
     const std::string_view url, std::string json,
-    const std::vector<std::string>& headers);
+    const std::vector<std::string>& headers,
+    CancelChecker cancel_checker = nullptr);
 
 }  // namespace CurlUtils

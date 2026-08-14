@@ -108,8 +108,8 @@ SQLiteDatabase::Helper::Helper(sqlite3* db,
     int ret = 0;
 
     if (!sqlFile.is_open()) {
-        throw exception(
-            fmt::format("Could not open SQL script file: {}/{}", sqlScriptPath.string(), filename));
+        throw exception(fmt::format("Could not open SQL script file: {}/{}",
+                                    sqlScriptPath.string(), filename));
     }
     scriptContent = std::string((std::istreambuf_iterator<char>(sqlFile)),
                                 std::istreambuf_iterator<char>());
@@ -319,6 +319,7 @@ SQLiteDatabase::Helper::getNextStatement() {
 
 SQLiteDatabase::ListResult SQLiteDatabase::addUserToList(InfoType type,
                                                          UserId user) const {
+    const std::lock_guard lock(db_mutex_);
     ListResult res{};
 
     res = checkUserInList(type, user);
@@ -351,11 +352,13 @@ SQLiteDatabase::ListResult SQLiteDatabase::addUserToList(InfoType type,
 
 SQLiteDatabase::ListResult SQLiteDatabase::addUserToList(ListType type,
                                                          UserId user) const {
+    const std::lock_guard lock(db_mutex_);
     return addUserToList(toInfoType(type), user);
 }
 
 SQLiteDatabase::ListResult SQLiteDatabase::removeUserFromList(
     ListType type, UserId user) const {
+    const std::lock_guard lock(db_mutex_);
     ListResult res{};
 
     res = checkUserInList(type, user);
@@ -387,11 +390,13 @@ SQLiteDatabase::ListResult SQLiteDatabase::removeUserFromList(
 
 [[nodiscard]] DatabaseBase::ListResult SQLiteDatabase::checkUserInList(
     ListType type, UserId user) const {
+    const std::lock_guard lock(db_mutex_);
     return checkUserInList(toInfoType(type), user);
 }
 
 [[nodiscard]] DatabaseBase::ListResult SQLiteDatabase::checkUserInList(
     InfoType type, UserId user) const {
+    const std::lock_guard lock(db_mutex_);
     ListResult result = ListResult::BACKEND_ERROR;
     std::optional<Helper::Row> row;
 
@@ -419,6 +424,7 @@ SQLiteDatabase::ListResult SQLiteDatabase::removeUserFromList(
 
 std::optional<std::string> SQLiteDatabase::getChatName(
     const ChatId chatId) const {
+    const std::lock_guard lock(db_mutex_);
     std::optional<Helper::Row> row;
     auto helper =
         Helper::create(db, _sqlScriptsPath, Helper::kFindChatNameFile);
@@ -434,6 +440,7 @@ std::optional<std::string> SQLiteDatabase::getChatName(
 }
 
 bool SQLiteDatabase::deleteChatInfo(const ChatId chatId) const {
+    const std::lock_guard lock(db_mutex_);
     auto helper = Helper::create(db, _sqlScriptsPath, Helper::kDeleteChatFile);
     if (!helper->prepare()) {
         return false;
@@ -443,6 +450,7 @@ bool SQLiteDatabase::deleteChatInfo(const ChatId chatId) const {
 }
 
 std::vector<SQLiteDatabase::ChatInfo> SQLiteDatabase::getAllChatInfos() const {
+    const std::lock_guard lock(db_mutex_);
     std::vector<ChatInfo> result;
     std::optional<Helper::Row> row;
     auto helper =
@@ -460,6 +468,7 @@ std::vector<SQLiteDatabase::ChatInfo> SQLiteDatabase::getAllChatInfos() const {
 }
 
 bool SQLiteDatabase::load(std::filesystem::path filepath) {
+    const std::lock_guard lock(db_mutex_);
     std::error_code ec;
     if (db != nullptr) {
         LOG(WARNING) << "Attempting to load database while it is already open.";
@@ -480,7 +489,8 @@ bool SQLiteDatabase::load(std::filesystem::path filepath) {
     if (ret != SQLITE_OK) {
         LOG(ERROR) << "Could not open database: "
                    << (db ? sqlite3_errmsg(db) : sqlite3_errstr(ret));
-        if (db != nullptr) sqlite3_close(db);
+        if (db != nullptr)
+            sqlite3_close(db);
         db = nullptr;
         return false;
     }
@@ -500,12 +510,13 @@ bool SQLiteDatabase::load(std::filesystem::path filepath) {
         }
     }
 
-    constexpr int kCurrentSchemaVersion = 1;
+    constexpr int kCurrentSchemaVersion = 2;
     sqlite3_stmt* statement = nullptr;
-    if (sqlite3_prepare_v2(db, "PRAGMA user_version", -1, &statement, nullptr) !=
-            SQLITE_OK ||
+    if (sqlite3_prepare_v2(db, "PRAGMA user_version", -1, &statement,
+                           nullptr) != SQLITE_OK ||
         sqlite3_step(statement) != SQLITE_ROW) {
-        if (statement != nullptr) sqlite3_finalize(statement);
+        if (statement != nullptr)
+            sqlite3_finalize(statement);
         return failLoad("Failed to read SQLite schema version");
     }
     const int schemaVersion = sqlite3_column_int(statement, 0);
@@ -525,14 +536,15 @@ bool SQLiteDatabase::load(std::filesystem::path filepath) {
         if (sqlite3_prepare_v2(db, sql.data(), -1, &statement, nullptr) !=
                 SQLITE_OK ||
             sqlite3_step(statement) != SQLITE_ROW) {
-            if (statement != nullptr) sqlite3_finalize(statement);
+            if (statement != nullptr)
+                sqlite3_finalize(statement);
             return failLoad("Failed to validate legacy SQLite schema");
         }
         const int tableCount = sqlite3_column_int(statement, 0);
         sqlite3_finalize(statement);
         if (tableCount == 0) {
-            const auto helper =
-                Helper::create(db, _sqlScriptsPath, Helper::kCreateDatabaseFile);
+            const auto helper = Helper::create(db, _sqlScriptsPath,
+                                               Helper::kCreateDatabaseFile);
             if (!helper->executeAsScript()) {
                 return failLoad("Failed to initialize empty legacy database");
             }
@@ -540,10 +552,48 @@ bool SQLiteDatabase::load(std::filesystem::path filepath) {
             return failLoad("Incomplete legacy SQLite schema");
         }
     }
-    if (schemaVersion == 0 &&
-        sqlite3_exec(db, "PRAGMA user_version = 1", nullptr, nullptr, nullptr) !=
-            SQLITE_OK) {
-        return failLoad("Failed to migrate SQLite schema to version 1");
+    // Version 2 makes owner identity a database invariant. Historical files
+    // could contain several OWNER rows because the claim was check-then-set.
+    // Preserve the earliest inserted row and retain every later admin by
+    // demoting it to the whitelist before creating the partial unique index.
+    sqlite3_int64 ownerCount = 0;
+    sqlite3_int64 retainedOwner = 0;
+    statement = nullptr;
+    if (sqlite3_prepare_v2(
+            db,
+            "SELECT count(*), coalesce((SELECT userid FROM usermap WHERE "
+            "info = 0 ORDER BY rowid LIMIT 1), 0) FROM usermap WHERE info = 0",
+            -1, &statement, nullptr) != SQLITE_OK ||
+        sqlite3_step(statement) != SQLITE_ROW) {
+        if (statement != nullptr)
+            sqlite3_finalize(statement);
+        return failLoad("Failed to inspect legacy SQLite owner rows");
+    }
+    ownerCount = sqlite3_column_int64(statement, 0);
+    retainedOwner = sqlite3_column_int64(statement, 1);
+    sqlite3_finalize(statement);
+
+    constexpr const char* kOwnerMigration =
+        "BEGIN IMMEDIATE;"
+        "UPDATE usermap SET info = 2 WHERE info = 0 AND rowid NOT IN "
+        "(SELECT rowid FROM usermap WHERE info = 0 ORDER BY rowid LIMIT 1);"
+        "CREATE UNIQUE INDEX IF NOT EXISTS owner_singleton "
+        "ON usermap(info) WHERE info = 0;"
+        "PRAGMA user_version = 2;"
+        "COMMIT;";
+    char* migrationError = nullptr;
+    if (sqlite3_exec(db, kOwnerMigration, nullptr, nullptr, &migrationError) !=
+        SQLITE_OK) {
+        const std::string detail =
+            migrationError != nullptr ? migrationError : "unknown error";
+        sqlite3_free(migrationError);
+        (void)sqlite3_exec(db, "ROLLBACK", nullptr, nullptr, nullptr);
+        return failLoad("Failed to migrate SQLite owner invariant: " + detail);
+    }
+    if (ownerCount > 1) {
+        LOG(WARNING) << "Migrated " << ownerCount
+                     << " legacy owner rows: retained " << retainedOwner
+                     << " and demoted the remainder to the whitelist";
     }
     if (sqlite3_exec(db, "PRAGMA foreign_keys = ON", nullptr, nullptr,
                      nullptr) != SQLITE_OK) {
@@ -559,6 +609,7 @@ bool SQLiteDatabase::load(std::filesystem::path filepath) {
 }
 
 bool SQLiteDatabase::unload() {
+    const std::lock_guard lock(db_mutex_);
     if (db != nullptr) {
         if (sqlite3_close(db) == SQLITE_OK) {
             db = nullptr;
@@ -573,6 +624,7 @@ bool SQLiteDatabase::unload() {
 
 std::optional<SQLiteDatabase::MediaInfo> SQLiteDatabase::queryMediaInfo(
     std::string str) const {
+    const std::lock_guard lock(db_mutex_);
     MediaInfo info{};
 
     auto helper =
@@ -596,6 +648,7 @@ std::optional<SQLiteDatabase::MediaInfo> SQLiteDatabase::queryMediaInfo(
 
 SQLiteDatabase::AddResult SQLiteDatabase::addMediaInfo(
     const MediaInfo& info) const {
+    const std::lock_guard lock(db_mutex_);
     struct UpdateInfo {
         enum class Op {
             INSERT,  // This name does not exist in namemap: I should insert it
@@ -745,6 +798,7 @@ SQLiteDatabase::AddResult SQLiteDatabase::addMediaInfo(
 
 std::vector<SQLiteDatabase::MediaInfo> SQLiteDatabase::getAllMediaInfos()
     const {
+    const std::lock_guard lock(db_mutex_);
     using MergeMap =
         std::unordered_map<std::pair<std::string, std::string>,
                            std::pair<std::vector<std::string>, MediaType>,
@@ -786,6 +840,7 @@ std::vector<SQLiteDatabase::MediaInfo> SQLiteDatabase::getAllMediaInfos()
 
 bool SQLiteDatabase::deleteMediaInfo(
     const decltype(MediaInfo::mediaId) mediaId) const {
+    const std::lock_guard lock(db_mutex_);
     auto helper = Helper::create(db, _sqlScriptsPath, Helper::kDeleteMediaFile);
     if (!helper->prepare()) {
         return false;
@@ -799,6 +854,7 @@ bool SQLiteDatabase::deleteMediaInfo(
 
 std::optional<std::vector<decltype(SQLiteDatabase::MediaInfo::mediaId)>>
 SQLiteDatabase::getMediaIds(const std::string_view alias) const {
+    const std::lock_guard lock(db_mutex_);
     std::vector<decltype(MediaInfo::mediaId)> result;
     std::optional<Helper::Row> row;
     auto helper =
@@ -817,6 +873,7 @@ SQLiteDatabase::getMediaIds(const std::string_view alias) const {
 }
 
 std::optional<UserId> SQLiteDatabase::getOwnerUserId() const {
+    const std::lock_guard lock(db_mutex_);
     auto helper = Helper::create(db, _sqlScriptsPath, Helper::kFindOwnerFile);
     if (!helper->prepare()) {
         return std::nullopt;
@@ -839,6 +896,7 @@ SQLiteDatabase::InfoType SQLiteDatabase::toInfoType(ListType type) {
 }
 
 std::ostream& SQLiteDatabase::dump(std::ostream& ofs) const {
+    const std::lock_guard lock(db_mutex_);
     std::stringstream ss;
 
     if (db == nullptr) {
@@ -933,25 +991,40 @@ std::ostream& SQLiteDatabase::dump(std::ostream& ofs) const {
 }
 
 void SQLiteDatabase::setOwnerUserId(UserId userId) const {
+    (void)claimOwnerUserId(userId);
+}
+
+DatabaseBase::OwnerClaimResult SQLiteDatabase::claimOwnerUserId(
+    const UserId userId) const {
+    const std::lock_guard lock(db_mutex_);
+    if (getOwnerUserId()) {
+        return OwnerClaimResult::ALREADY_SET;
+    }
+
     switch (addUserToList(InfoType::OWNER, userId)) {
         case DatabaseBase::ListResult::OK:
             LOG(INFO) << "Owner set to " << userId;
-            break;
+            return OwnerClaimResult::OK;
         case DatabaseBase::ListResult::ALREADY_IN_OTHER_LIST:
         case DatabaseBase::ListResult::BACKEND_ERROR:
+            if (getOwnerUserId()) {
+                return OwnerClaimResult::ALREADY_SET;
+            }
             LOG(ERROR) << "Failed to set owner to " << userId;
-            break;
+            return OwnerClaimResult::BACKEND_ERROR;
         case DatabaseBase::ListResult::ALREADY_IN_LIST:
             DLOG(INFO) << "Owner already set to " << userId;
-            break;
+            return OwnerClaimResult::ALREADY_SET;
         case DatabaseBase::ListResult::NOT_IN_LIST:
             // Not possible
-            break;
+            return OwnerClaimResult::BACKEND_ERROR;
     }
+    return OwnerClaimResult::BACKEND_ERROR;
 }
 
 SQLiteDatabase::AddResult SQLiteDatabase::addChatInfo(
     const ChatId chatid, const std::string_view name) const {
+    const std::lock_guard lock(db_mutex_);
     if (getChatId(name)) {
         return AddResult::ALREADY_EXISTS;
     }
@@ -972,6 +1045,7 @@ SQLiteDatabase::AddResult SQLiteDatabase::addChatInfo(
 
 std::optional<ChatId> SQLiteDatabase::getChatId(
     const std::string_view name) const {
+    const std::lock_guard lock(db_mutex_);
     auto helper = Helper::create(db, _sqlScriptsPath, Helper::kFindChatIdFile);
     if (!helper->prepare()) {
         return std::nullopt;

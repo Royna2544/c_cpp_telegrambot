@@ -2,12 +2,15 @@
 
 #include <fmt/format.h>
 
+#include <cmath>
 #include <filesystem>
 #include <memory>
 #include <opencv2/core.hpp>
 #include <opencv2/core/utility.hpp>
 #include <opencv2/imgcodecs.hpp>
 #include <opencv2/videoio.hpp>
+
+#include "MediaLimits.hpp"
 
 OpenCVImage::TinyStatus OpenCVImage::read(const std::filesystem::path& filename,
                                           const Target flags) {
@@ -84,9 +87,19 @@ void OpenCVImage::Image::greyscale(cv::Mat& mat) {
 }
 
 void OpenCVImage::Image::invert(cv::Mat& mat) {
-    cv::Mat inverted_image;
-    cv::bitwise_not(mat, inverted_image);
-    mat = inverted_image;
+    if (mat.channels() != 4) {
+        cv::bitwise_not(mat, mat);
+        return;
+    }
+
+    // Preserve transparency. Inverting alpha makes transparent pixels opaque
+    // and is inconsistent with the native PNG/WebP implementations.
+    std::vector<cv::Mat> channels;
+    cv::split(mat, channels);
+    for (std::size_t i = 0; i < 3; ++i) {
+        cv::bitwise_not(channels[i], channels[i]);
+    }
+    cv::merge(channels, mat);
 }
 
 OpenCVImage::TinyStatus OpenCVImage::Image::read(
@@ -107,13 +120,36 @@ OpenCVImage::TinyStatus OpenCVImage::Video::read(
         return {Status::kInternalError,
                 "Error opening video file: " + file.filename().string()};
     }
-    LOG(INFO) << "Video dimensions: " << handle.get(cv::CAP_PROP_FRAME_WIDTH)
-              << "x" << handle.get(cv::CAP_PROP_FRAME_HEIGHT);
+    const auto width = handle.get(cv::CAP_PROP_FRAME_WIDTH);
+    const auto height = handle.get(cv::CAP_PROP_FRAME_HEIGHT);
+    const auto fps = handle.get(cv::CAP_PROP_FPS);
+    const auto frameCount = handle.get(cv::CAP_PROP_FRAME_COUNT);
+    if (!std::isfinite(width) || !std::isfinite(height) ||
+        !imagep::limits::videoDimensionsAllowed(
+            static_cast<std::int64_t>(width),
+            static_cast<std::int64_t>(height)) ||
+        !std::isfinite(fps) || fps <= 0.0 ||
+        fps > static_cast<double>(imagep::limits::kMaxFrameRate) ||
+        !std::isfinite(frameCount) ||
+        frameCount > static_cast<double>(imagep::limits::kMaxFrames) ||
+        (frameCount > 0.0 &&
+         frameCount / fps >
+             static_cast<double>(imagep::limits::kMaxDurationSeconds))) {
+        handle.release();
+        return {Status::kInvalidArgument,
+                "Video dimensions, frame count, or duration exceed limits"};
+    }
+    LOG(INFO) << "Video dimensions: " << width << "x" << height;
     return {Status::kOk, "Video read successfully"};
 }
 
 OpenCVImage::TinyStatus OpenCVImage::Video::procAndW(
-    const Options* opt, const std::filesystem::path& dest) {
+    const Options* opt, const std::filesystem::path& dest,
+    const ProcessingControl& control) {
+    if (control.shouldStop()) {
+        return {Status::kProcessingError,
+                "Video processing cancelled or deadline exceeded"};
+    }
     if (!handle.isOpened()) {
         return {Status::kInternalError, "No video data to rotate"};
     }
@@ -135,9 +171,11 @@ OpenCVImage::TinyStatus OpenCVImage::Video::procAndW(
                 "Unsupported output file format: " + dest.extension().string()};
     }
 
-    // Set up VideoWriter
-    auto size = cv::Size(frame_width, frame_height);
-    cv::VideoWriter writer(dest.string(), fourcc, fps, size,
+    const int angle = opt->rotate_angle.get();
+    const bool swapsAxes = angle == kAngle90 || angle == kAngle270;
+    const auto outputSize = swapsAxes ? cv::Size(frame_height, frame_width)
+                                      : cv::Size(frame_width, frame_height);
+    cv::VideoWriter writer(dest.string(), fourcc, fps, outputSize,
                            !opt->greyscale.get());
 
     if (!writer.isOpened()) {
@@ -148,11 +186,37 @@ OpenCVImage::TinyStatus OpenCVImage::Video::procAndW(
     // Rotate each frame and write it to the output video
     cv::Mat frame;
     bool logOnce = false;
+    std::uint64_t processedFrames = 0;
+    const auto durationFrameLimit = std::max<std::uint64_t>(
+        1, std::min<std::uint64_t>(
+               imagep::limits::kMaxFrames,
+               static_cast<std::uint64_t>(
+                   fps * imagep::limits::kMaxDurationSeconds)));
     while (true) {
+        if (control.shouldStop()) {
+            writer.release();
+            return {Status::kProcessingError,
+                    "Video processing cancelled or deadline exceeded"};
+        }
         handle >> frame;
 
+        if (control.shouldStop()) {
+            writer.release();
+            return {Status::kProcessingError,
+                    "Video processing cancelled or deadline exceeded"};
+        }
         if (frame.empty()) {
             break;  // End of video
+        }
+        if (!imagep::limits::videoDimensionsAllowed(frame.cols, frame.rows)) {
+            writer.release();
+            return {Status::kInvalidArgument,
+                    "Decoded video frame dimensions exceed limits"};
+        }
+        if (++processedFrames > durationFrameLimit) {
+            writer.release();
+            return {Status::kInvalidArgument,
+                    "Video frame count exceeds processing limit"};
         }
 
         // Rotate the frame
@@ -166,27 +230,50 @@ OpenCVImage::TinyStatus OpenCVImage::Video::procAndW(
             Image::invert(frame);
         }
 
-        if (frame.size[0] != size.width || frame.size[1] != size.height) {
+        if (control.shouldStop()) {
+            writer.release();
+            return {Status::kProcessingError,
+                    "Video processing cancelled or deadline exceeded"};
+        }
+
+        if (frame.cols != outputSize.width || frame.rows != outputSize.height) {
             cv::Mat resizedFrame;
             if (!logOnce) {
                 LOG(INFO) << fmt::format(
                     "Converted frame: {}x{}, VideoWriter config: {}x{}, "
                     "resizing",
-                    frame.size[0], frame.size[1], size.width, size.height);
+                    frame.cols, frame.rows, outputSize.width,
+                    outputSize.height);
                 logOnce = true;
             }
-            cv::resize(frame, resizedFrame, size);
+            cv::resize(frame, resizedFrame, outputSize);
             writer << resizedFrame;
         } else {
             // Write the rotated frame to the output video
             writer << frame;
         }
     }
+    writer.release();
+    if (control.shouldStop()) {
+        return {Status::kProcessingError,
+                "Video processing cancelled or deadline exceeded"};
+    }
+    std::error_code ec;
+    const auto outputBytes = std::filesystem::file_size(dest, ec);
+    if (ec || outputBytes > imagep::limits::kMaxOutputBytes) {
+        return {Status::kWriteError,
+                "Processed video output exceeds the size limit"};
+    }
     return {Status::kOk, "Video processed and written successfully"};
 }
 
 OpenCVImage::TinyStatus OpenCVImage::Image::procAndW(
-    const Options* opt, const std::filesystem::path& dest) {
+    const Options* opt, const std::filesystem::path& dest,
+    const ProcessingControl& control) {
+    if (control.shouldStop()) {
+        return {Status::kProcessingError,
+                "Image processing cancelled or deadline exceeded"};
+    }
     if (handle.empty()) {
         return {Status::kInternalError, "No image data to process"};
     }
@@ -202,6 +289,11 @@ OpenCVImage::TinyStatus OpenCVImage::Image::procAndW(
 
     Image::rotate(handle, opt->rotate_angle.get());
 
+    if (control.shouldStop()) {
+        return {Status::kProcessingError,
+                "Image processing cancelled or deadline exceeded"};
+    }
+
     // Write the processed image to the output file
     try {
         if (!cv::imwrite(dest.string(), handle)) {
@@ -211,6 +303,10 @@ OpenCVImage::TinyStatus OpenCVImage::Image::procAndW(
     } catch (const cv::Exception& ex) {
         return {Status::kWriteError, "Error writing image"};
     }
+    if (control.shouldStop()) {
+        return {Status::kProcessingError,
+                "Image processing cancelled or deadline exceeded"};
+    }
     return {Status::kOk, "Image processed and written successfully"};
 }
 
@@ -219,7 +315,7 @@ OpenCVImage::TinyStatus OpenCVImage::processAndWrite(
     if (!component) {
         return {Status::kInternalError, "No image or video component loaded"};
     }
-    return component->procAndW(&options, filename);
+    return component->procAndW(&options, filename, processingControl);
 }
 
 std::string OpenCVImage::version() const {

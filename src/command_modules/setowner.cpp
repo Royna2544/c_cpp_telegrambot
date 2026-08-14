@@ -3,13 +3,19 @@
 #include <database/bot/TgBotDatabaseImpl.hpp>
 
 DECLARE_COMMAND_HANDLER(setowner) {
-    auto *impl = provider->database.get();
-    if (!impl->getOwnerUserId().has_value()) {
-        impl->setOwnerUserId(message->get<MessageAttrs::User>()->id);
-        api->sendReplyMessage(message->message(),
-                              res->get(Strings::BOT_OWNER_SET));
-    } else {
-        LOG(WARNING) << "#setowner rejected";
+    auto* impl = provider->database.get();
+    switch (impl->claimOwnerUserId(message->get<MessageAttrs::User>()->id)) {
+        case DatabaseBase::OwnerClaimResult::OK:
+            api->sendReplyMessage(message->message(),
+                                  res->get(Strings::BOT_OWNER_SET));
+            break;
+        case DatabaseBase::OwnerClaimResult::ALREADY_SET:
+            LOG(WARNING) << "#setowner rejected: owner already set";
+            break;
+        case DatabaseBase::OwnerClaimResult::BACKEND_ERROR:
+            api->sendReplyMessage(message->message(),
+                                  res->get(Strings::BACKEND_ERROR));
+            break;
     }
 }
 

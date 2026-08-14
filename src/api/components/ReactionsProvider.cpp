@@ -7,10 +7,14 @@
 
 TgBotApiImpl::ReactionsProvider::ReactionsProvider(TgBotApi* apiImpl)
     : _apiImpl(apiImpl) {
-    _apiImpl->onAnyMessage(
+    anyMessageSubscription_ = _apiImpl->subscribeAnyMessage(
         [this](TgBotApi::CPtr /*api*/, const Message::Ptr& message) {
             return this->onAnyMessageFunction(message);
         });
+}
+
+TgBotApiImpl::ReactionsProvider::~ReactionsProvider() {
+    anyMessageSubscription_.reset();
 }
 
 static void addReaction(std::vector<TgBot::ReactionType::Ptr>& reactions,

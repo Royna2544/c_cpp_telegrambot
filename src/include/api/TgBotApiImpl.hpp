@@ -352,6 +352,9 @@ class TgBotApiImpl : public TgBotApi {
      */
     bool downloadFile_impl(const std::filesystem::path& destfilename,
                            const std::string_view fileid) const override;
+    bool downloadFileWithinLimit_impl(const std::filesystem::path& destfilename,
+                                      const std::string_view fileid,
+                                      std::uintmax_t maxBytes) const override;
 
     /**
      * @brief Retrieves the bot's user object.
@@ -458,8 +461,15 @@ class TgBotApiImpl : public TgBotApi {
 
    public:
     class Async;
+    class WorkScheduler;
 
     void startPoll() override;
+
+    std::optional<WorkId> submitCommandWork(std::string_view owner,
+                                            WorkClass workClass,
+                                            CancellableWork work,
+                                            WorkOptions options = {}) override;
+    bool cancelCommandWork(std::string_view owner, WorkId id) override;
 
     bool unloadCommand(const std::string& command) override;
     bool reloadCommand(const std::string& command) override;
@@ -488,12 +498,19 @@ class TgBotApiImpl : public TgBotApi {
      * received.
      */
     void onAnyMessage(const AnyMessageCallback& callback) override;
+    CallbackSubscription::Ptr subscribeAnyMessage(
+        const AnyMessageCallback& callback) override;
+    void onAnyMessageForCommand(std::string_view command,
+                                const AnyMessageCallback& callback) override;
+    void removeAnyMessageCallbacksForCommand(std::string_view command) override;
 
     void onCallbackQuery(
         std::string command,
         TgBot::EventBroadcaster::CallbackQueryListener listener) override;
 
     void onEditedMessage(
+        TgBot::EventBroadcaster::MessageListener listener) override;
+    CallbackSubscription::Ptr subscribeEditedMessage(
         TgBot::EventBroadcaster::MessageListener listener) override;
 
    private:

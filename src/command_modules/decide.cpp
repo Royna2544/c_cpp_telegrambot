@@ -1,3 +1,4 @@
+#include <absl/log/log.h>
 #include <fmt/core.h>
 
 #include <Random.hpp>
@@ -5,68 +6,122 @@
 #include <api/Providers.hpp>
 #include <api/StringResLoader.hpp>
 #include <api/TgBotApi.hpp>
+#include <chrono>
+#include <exception>
 #include <memory>
+#include <optional>
 #include <sstream>
-#include <thread>
 
 #include "tgbot/types/ReactionTypeEmoji.h"
 
-using std::chrono_literals::operator""s;
-
 DECLARE_COMMAND_HANDLER(decide) {
-    constexpr int COUNT_MAX = 10;
-    constexpr int RANDOM_RANGE_NUM = 10;
+    constexpr int kTrialCount = 10;
 
     std::string obj = message->get<MessageAttrs::ExtraText>();
-    std::stringstream msgtxt;
-    Message::Ptr msg;
-    int count = COUNT_MAX;
+    std::stringstream finalText;
+    std::stringstream progressText;
     int yesno = 0;
 
-    msgtxt << fmt::format(fmt::runtime(res->get(Strings::DECIDE_DECIDING_OBJECT)),
-                          obj);
-    msg = api->sendReplyMessage(message->message(), msgtxt.str());
-    msgtxt << std::endl << std::endl;
-    do {
-        msgtxt << fmt::format(fmt::runtime(res->get(Strings::DECIDE_TRY_PREFIX)),
-                              COUNT_MAX - count + 1);
-        if (provider->random->generate(RANDOM_RANGE_NUM) % 2 == 1) {
-            msgtxt << res->get(Strings::YES);
+    const std::string heading = fmt::format(
+        fmt::runtime(res->get(Strings::DECIDE_DECIDING_OBJECT)), obj);
+    finalText << heading << std::endl << std::endl;
+    progressText << heading << std::endl << std::endl;
+    for (int trial = 1; trial <= kTrialCount; ++trial) {
+        std::string line = fmt::format(
+            fmt::runtime(res->get(Strings::DECIDE_TRY_PREFIX)), trial);
+
+        // Ask the RNG for an actual coin flip. The previous 0..10 draw followed
+        // by modulo had six even outcomes and five odd ones, biasing "No".
+        if (provider->random->generate(0, 1) == 1) {
+            line += res->get(Strings::YES);
             ++yesno;
         } else {
-            msgtxt << res->get(Strings::NO);
+            line += res->get(Strings::NO);
             --yesno;
         }
-        msgtxt << std::endl;
-        count--;
-        api->editMessage(msg, msgtxt.str());
-        if (count != 0) {
-            if (abs(yesno) > count) {
-                msgtxt << res->get(Strings::SHORT_CIRCUITED_TO_THE_ANSWER)
-                       << std::endl;
-                break;
-            }
-        } else {
-            // count == 0
-            break;
-        }
-        std::this_thread::sleep_for(2s);
-    } while (count > 0);
-    msgtxt << std::endl;
-    if (yesno > 0) {
-        msgtxt << res->get(Strings::SO_YES);
-        auto like = std::make_shared<TgBot::ReactionTypeEmoji>();
-        like->emoji = "👍";
-        api->setMessageReaction(message->message(), {like}, true);
-    } else if (yesno == 0) {
-        msgtxt << res->get(Strings::SO_IDK);
-    } else {
-        msgtxt << res->get(Strings::SO_NO);
-        auto dislike = std::make_shared<TgBot::ReactionTypeEmoji>();
-        dislike->emoji = "👎";
-        api->setMessageReaction(message->message(), {dislike}, true);
+        finalText << line << std::endl;
+        if (trial <= kTrialCount / 2)
+            progressText << line << std::endl;
     }
-    api->editMessage(msg, msgtxt.str());
+    progressText << "…";
+
+    finalText << std::endl;
+    std::optional<std::string> reaction;
+    if (yesno > 0) {
+        finalText << res->get(Strings::SO_YES);
+        reaction = "👍";
+    } else if (yesno == 0) {
+        finalText << res->get(Strings::SO_IDK);
+    } else {
+        finalText << res->get(Strings::SO_NO);
+        reaction = "👎";
+    }
+
+    const auto sourceMessage = message->message();
+    const auto job = api->submitCommandWork(
+        "decide", TgBotApi::WorkClass::Outbound,
+        [api, sourceMessage, heading, progress = progressText.str(),
+         final = finalText.str(),
+         reaction = std::move(reaction)](std::stop_token stop) {
+            if (stop.stop_requested())
+                return;
+            const auto started = std::chrono::steady_clock::now();
+            const auto sent = api->sendReplyMessage(sourceMessage, heading);
+            if (!sent || stop.stop_requested())
+                return;
+            const auto remainingDelay = [started](const auto targetElapsed) {
+                const auto due = started + targetElapsed;
+                const auto now = std::chrono::steady_clock::now();
+                return now < due ? std::chrono::duration_cast<
+                                       std::chrono::milliseconds>(due - now)
+                                 : std::chrono::milliseconds::zero();
+            };
+
+            if (!api->submitCommandWork(
+                    "decide", TgBotApi::WorkClass::Outbound,
+                    [api, sent, progress = std::move(progress)](
+                        std::stop_token progressStop) {
+                        if (!progressStop.stop_requested())
+                            api->editMessage(sent, progress);
+                    },
+                    {.delay = remainingDelay(std::chrono::milliseconds(350)),
+                     .deadline = std::chrono::seconds(2)})) {
+                LOG(WARNING) << "Decision progress queue is full";
+            }
+
+            if (!api->submitCommandWork(
+                    "decide", TgBotApi::WorkClass::Outbound,
+                    [api, sourceMessage, sent, final = std::move(final),
+                     reaction =
+                         std::move(reaction)](std::stop_token finalStop) {
+                        if (finalStop.stop_requested())
+                            return;
+                        // Persist the result before a best-effort reaction; a
+                        // reaction failure must never hide the decision.
+                        api->editMessage(sent, final);
+                        if (!reaction || finalStop.stop_requested())
+                            return;
+                        try {
+                            auto emoji =
+                                std::make_shared<TgBot::ReactionTypeEmoji>();
+                            emoji->emoji = *reaction;
+                            (void)api->setMessageReaction(sourceMessage,
+                                                          {emoji}, true);
+                        } catch (const std::exception& error) {
+                            LOG(WARNING)
+                                << "Decision reaction failed after final edit: "
+                                << error.what();
+                        }
+                    },
+                    {.delay = remainingDelay(std::chrono::milliseconds(850)),
+                     .deadline = std::chrono::seconds(2)})) {
+                LOG(WARNING) << "Decision final queue is full";
+            }
+        },
+        {.deadline = std::chrono::seconds(2)});
+    if (!job) {
+        LOG(WARNING) << "Decision outbound queue is full";
+    }
 }
 
 extern "C" DYN_COMMAND_EXPORT const struct DynModule DYN_COMMAND_SYM = {

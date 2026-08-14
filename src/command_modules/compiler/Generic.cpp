@@ -30,6 +30,11 @@ bool CompilerInTgForGeneric::verifyParseWrite(const MessageExt::Ptr& message,
 }
 
 void CompilerInTgForGeneric::run(MessageExt::Ptr message) {
+    run(message, {});
+}
+
+void CompilerInTgForGeneric::run(MessageExt::Ptr message,
+                                 std::stop_token stop) {
     std::string extargs;
     std::stringstream cmd;
     std::stringstream res;
@@ -37,7 +42,7 @@ void CompilerInTgForGeneric::run(MessageExt::Ptr message) {
     if (verifyParseWrite(message, extargs)) {
         cmd << params.exe.string() << SPACE << extargs << SPACE
             << params.outfile.string();
-        runCommand(cmd.str(), res);
+        runCommand(cmd.str(), res, true, stop);
         _callback->onResultReady(res.str());
         std::filesystem::remove(params.outfile);
     }

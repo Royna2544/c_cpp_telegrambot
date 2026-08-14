@@ -13,7 +13,6 @@
 #include <mutex>
 #include <optional>
 #include <regex>
-#include <thread>
 
 constexpr std::string_view kZipExtensionSuffix = ".zip";
 constexpr int FLASH_DELAY_MAX_SEC = 5;
@@ -23,8 +22,6 @@ DECLARE_COMMAND_HANDLER(flash) {
     static std::vector<std::string> reasons;
     static std::once_flag once;
     std::optional<std::string> msg;
-    std::stringstream ss;
-    Message::Ptr sentmsg;
     const auto sleep_secs = provider->random->generate(FLASH_DELAY_MAX_SEC);
     Random::ret_type pos = 0;
 
@@ -56,25 +53,45 @@ DECLARE_COMMAND_HANDLER(flash) {
     if (!absl::EndsWith(msg.value(), kZipExtensionSuffix.data())) {
         msg.value() += kZipExtensionSuffix;
     }
-    ss << fmt::format("{} '{}'...\n", res->get(Strings::FLASHING_ZIP),
-                      msg.value());
-    sentmsg = api->sendReplyMessage(message->message(), ss.str());
-
-    std::this_thread::sleep_for(std::chrono::seconds(sleep_secs));
-
-    // Use a pseudo-random chance to "succeed" even if we picked a failure
-    // reason
-    std::random_device rd;
-    std::mt19937 gen(rd());
-    std::bernoulli_distribution d(SUCCESS_CHANCE);
-    if (!d(gen)) {
-        ss << fmt::format("{}\n{}: {}", res->get(Strings::FAILED_SUCCESSFULLY),
-                          res->get(Strings::REASON), reasons[pos]);
+    const std::string initial =
+        fmt::format("{} '{}'...\n", res->get(Strings::FLASHING_ZIP), *msg);
+    std::string final = initial;
+    constexpr Random::ret_type kChanceScale = 1000;
+    const bool succeeded =
+        provider->random->generate(0, kChanceScale - 1) <
+        static_cast<Random::ret_type>(SUCCESS_CHANCE * kChanceScale);
+    if (!succeeded) {
+        final +=
+            fmt::format("{}\n{}: {}", res->get(Strings::FAILED_SUCCESSFULLY),
+                        res->get(Strings::REASON), reasons[pos]);
     } else {
-        ss << fmt::format("{} {:.3}%", res->get(Strings::SUCCESS_CHANCE_WAS),
-                          SUCCESS_CHANCE * 100);
+        final += fmt::format("{} {:.3}%", res->get(Strings::SUCCESS_CHANCE_WAS),
+                             SUCCESS_CHANCE * 100);
     }
-    api->editMessage(sentmsg, ss.str());
+    const auto source = message->message();
+    if (!api->submitCommandWork(
+            "flash", TgBotApi::WorkClass::Outbound,
+            [api, source, initial, final = std::move(final),
+             sleep_secs](std::stop_token stop) mutable {
+                if (stop.stop_requested())
+                    return;
+                const auto sent = api->sendReplyMessage(source, initial);
+                if (!sent || stop.stop_requested())
+                    return;
+                if (!api->submitCommandWork(
+                        "flash", TgBotApi::WorkClass::Outbound,
+                        [api, sent,
+                         final = std::move(final)](std::stop_token editStop) {
+                            if (!editStop.stop_requested())
+                                api->editMessage(sent, final);
+                        },
+                        {.delay = std::chrono::seconds(sleep_secs),
+                         .deadline = std::chrono::seconds(10)})) {
+                    LOG(WARNING) << "Flash result queue is full";
+                }
+            })) {
+        LOG(WARNING) << "Flash outbound queue is full";
+    }
 }
 
 extern "C" DYN_COMMAND_EXPORT const struct DynModule DYN_COMMAND_SYM = {

@@ -6,9 +6,20 @@
 #include <fmt/format.h>
 #include <fmt/ranges.h>
 
+#include <atomic>
 #include <fstream>
 #include <optional>
 #include <trivial_helpers/log_once.hpp>
+
+#ifdef _WIN32
+#ifndef NOMINMAX
+#define NOMINMAX
+#endif
+#include <windows.h>
+#else
+#include <fcntl.h>
+#include <unistd.h>
+#endif
 
 #include "TgBotDB.pb.h"
 
@@ -52,6 +63,130 @@ struct fmt::formatter<glider::proto::database::MediaType>
 
 using namespace glider::proto::database;
 
+namespace {
+
+std::filesystem::path temporarySnapshotPath(
+    const std::filesystem::path& target) {
+    static std::atomic_uint64_t sequence{0};
+    auto temporary = target;
+#ifdef _WIN32
+    temporary +=
+        fmt::format(".tmp.{}.{}", GetCurrentProcessId(), sequence.fetch_add(1));
+#else
+    temporary += fmt::format(".tmp.{}.{}", getpid(), sequence.fetch_add(1));
+#endif
+    return temporary;
+}
+
+bool syncSnapshotFile(const std::filesystem::path& path) {
+#ifdef _WIN32
+    const HANDLE file =
+        CreateFileW(path.c_str(), GENERIC_READ | GENERIC_WRITE, FILE_SHARE_READ,
+                    nullptr, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr);
+    if (file == INVALID_HANDLE_VALUE) {
+        return false;
+    }
+    const bool ok = FlushFileBuffers(file) != 0;
+    CloseHandle(file);
+    return ok;
+#else
+    const int fd = open(path.c_str(), O_RDONLY);
+    if (fd < 0) {
+        return false;
+    }
+    const bool ok = fsync(fd) == 0;
+    close(fd);
+    return ok;
+#endif
+}
+
+bool replaceSnapshotFile(const std::filesystem::path& source,
+                         const std::filesystem::path& target) {
+#ifdef _WIN32
+    std::error_code existsError;
+    const bool targetExists = std::filesystem::exists(target, existsError);
+    if (existsError)
+        return false;
+    if (targetExists) {
+        return ReplaceFileW(target.c_str(), source.c_str(), nullptr,
+                            REPLACEFILE_WRITE_THROUGH, nullptr, nullptr) != 0;
+    }
+    return MoveFileExW(source.c_str(), target.c_str(),
+                       MOVEFILE_WRITE_THROUGH) != 0;
+#else
+    std::error_code ec;
+    std::filesystem::rename(source, target, ec);
+    if (ec) {
+        return false;
+    }
+
+    auto directory = target.parent_path();
+    if (directory.empty()) {
+        directory = ".";
+    }
+    const int fd = open(directory.c_str(), O_RDONLY | O_DIRECTORY);
+    if (fd >= 0) {
+        if (fsync(fd) != 0) {
+            LOG(WARNING) << "Failed to fsync protobuf database directory "
+                         << directory;
+        }
+        close(fd);
+    } else {
+        LOG(WARNING) << "Failed to open protobuf database directory for fsync: "
+                     << directory;
+    }
+    // The atomic rename already succeeded. A directory-fsync failure weakens
+    // crash guarantees but must not roll back memory after the new snapshot is
+    // visible at the target path.
+    return true;
+#endif
+}
+
+}  // namespace
+
+bool ProtoDatabase::persistLocked() const {
+    if (!dbinfo) {
+        return false;
+    }
+    if (dbinfo->path == kInMemoryDatabase) {
+        return true;
+    }
+
+    const auto temporary = temporarySnapshotPath(dbinfo->path);
+    std::error_code ec;
+    std::filesystem::remove(temporary, ec);
+
+    std::ofstream output(temporary, std::ios::binary | std::ios::trunc);
+    if (!output.is_open() || !dbinfo->object.SerializeToOstream(&output)) {
+        LOG(ERROR) << "Failed to serialize protobuf snapshot to " << temporary;
+        output.close();
+        std::filesystem::remove(temporary, ec);
+        return false;
+    }
+    output.flush();
+    if (!output.good()) {
+        LOG(ERROR) << "Failed to flush protobuf snapshot " << temporary;
+        output.close();
+        std::filesystem::remove(temporary, ec);
+        return false;
+    }
+    output.close();
+    if (!output.good()) {
+        LOG(ERROR) << "Failed to close protobuf snapshot " << temporary;
+        std::filesystem::remove(temporary, ec);
+        return false;
+    }
+
+    if (!syncSnapshotFile(temporary) ||
+        !replaceSnapshotFile(temporary, dbinfo->path)) {
+        LOG(ERROR) << "Failed to atomically replace protobuf database "
+                   << dbinfo->path;
+        std::filesystem::remove(temporary, ec);
+        return false;
+    }
+    return true;
+}
+
 std::optional<int> ProtoDatabase::findByUid(const RepeatedField<UserId> list,
                                             const UserId uid) {
     for (auto it = list.begin(); it != list.end(); ++it) {
@@ -66,6 +201,13 @@ std::optional<int> ProtoDatabase::findByUid(const RepeatedField<UserId> list,
 ProtoDatabase::ListResult ProtoDatabase::addUserToList(ListType type,
                                                        UserId user) const {
     std::lock_guard<std::mutex> lock(dbinfo_mutex_);
+    if (!dbinfo) {
+        return ListResult::BACKEND_ERROR;
+    }
+    if (type == ListType::BLACKLIST && dbinfo->object.has_ownerid() &&
+        dbinfo->object.ownerid() == user) {
+        return ListResult::ALREADY_IN_OTHER_LIST;
+    }
     auto const otherList = getOtherPersonList(type);
     if (findByUid(otherList.id(), user)) {
         return ListResult::ALREADY_IN_OTHER_LIST;
@@ -74,19 +216,32 @@ ProtoDatabase::ListResult ProtoDatabase::addUserToList(ListType type,
     if (findByUid(myList->id(), user)) {
         return ListResult::ALREADY_IN_LIST;
     }
+    Database previous = dbinfo->object;
     myList->add_id(user);
-    return ListResult::OK;
+    if (persistLocked()) {
+        return ListResult::OK;
+    }
+    dbinfo->object = std::move(previous);
+    return ListResult::BACKEND_ERROR;
 }
 
 ProtoDatabase::ListResult ProtoDatabase::removeUserFromList(ListType type,
                                                             UserId user) const {
     std::lock_guard<std::mutex> lock(dbinfo_mutex_);
+    if (!dbinfo) {
+        return ListResult::BACKEND_ERROR;
+    }
     auto* const myList = getMutablePersonList(type);
     auto loc = findByUid(myList->id(), user);
     if (loc.has_value()) {
+        Database previous = dbinfo->object;
         auto* list = myList->mutable_id();
         list->erase(list->begin() + loc.value());
-        return ListResult::OK;
+        if (persistLocked()) {
+            return ListResult::OK;
+        }
+        dbinfo->object = std::move(previous);
+        return ListResult::BACKEND_ERROR;
     }
     return ListResult::NOT_IN_LIST;
 }
@@ -115,7 +270,8 @@ std::optional<std::string> ProtoDatabase::getChatName(
         return std::nullopt;
     }
     for (const auto& chatInfo : dbinfo->object.chattonames()) {
-        if (chatInfo.telegramchatid() == chatId) return chatInfo.name();
+        if (chatInfo.telegramchatid() == chatId)
+            return chatInfo.name();
     }
     return std::nullopt;
 }
@@ -129,8 +285,13 @@ bool ProtoDatabase::deleteChatInfo(const ChatId chatId) const {
     auto* chatToNames = dbinfo->object.mutable_chattonames();
     for (int i = 0; i < chatToNames->size(); ++i) {
         if (chatToNames->Get(i).telegramchatid() == chatId) {
+            Database previous = dbinfo->object;
             chatToNames->DeleteSubrange(i, 1);
-            return true;
+            if (persistLocked()) {
+                return true;
+            }
+            dbinfo->object = std::move(previous);
+            return false;
         }
     }
     return false;
@@ -190,22 +351,7 @@ bool ProtoDatabase::unload() {
         return false;
     }
 
-    if (dbinfo->path == kInMemoryDatabase) {
-        // Effectively no-op
-        LOG(INFO) << "Unload in-memory database: noop";
-        dbinfo.reset();
-        return true;
-    }
-
-    std::fstream output(dbinfo->path.string(),
-                        std::ios::out | std::ios::binary);
-    if (!output.is_open()) {
-        LOG(ERROR) << "Failed to open output file for writing: "
-                   << dbinfo->path;
-        return false;
-    }
-    if (!dbinfo->object.SerializeToOstream(&output)) {
-        LOG(ERROR) << "Failed to serialize protobuf to output file";
+    if (!persistLocked()) {
         return false;
     }
     dbinfo.reset();
@@ -290,12 +436,16 @@ std::optional<ProtoDatabase::MediaInfo> ProtoDatabase::queryMediaInfo(
 ProtoDatabase::AddResult ProtoDatabase::addMediaInfo(
     const MediaInfo& info) const {
     std::lock_guard<std::mutex> lock(dbinfo_mutex_);
+    if (!dbinfo) {
+        return AddResult::BACKEND_ERROR;
+    }
     auto* const mediaEntries = dbinfo->object.mutable_mediatonames();
     for (const auto& elem : *mediaEntries) {
         if (elem.telegrammediauniqueid() == info.mediaUniqueId) {
             return AddResult::ALREADY_EXISTS;
         }
     }
+    Database previous = dbinfo->object;
     auto* const mediaEntry = mediaEntries->Add();
     mediaEntry->set_telegrammediaid(info.mediaId);
     mediaEntry->set_telegrammediauniqueid(info.mediaUniqueId);
@@ -305,7 +455,11 @@ ProtoDatabase::AddResult ProtoDatabase::addMediaInfo(
     for (const auto& name : info.names) {
         *mediaNames->Add() = name;
     }
-    return AddResult::OK;
+    if (persistLocked()) {
+        return AddResult::OK;
+    }
+    dbinfo->object = std::move(previous);
+    return AddResult::BACKEND_ERROR;
 }
 
 std::vector<ProtoDatabase::MediaInfo> ProtoDatabase::getAllMediaInfos() const {
@@ -330,8 +484,13 @@ bool ProtoDatabase::deleteMediaInfo(
     auto* mediaToNames = dbinfo->object.mutable_mediatonames();
     for (int i = 0; i < mediaToNames->size(); ++i) {
         if (mediaToNames->Get(i).telegrammediaid() == mediaId) {
+            Database previous = dbinfo->object;
             mediaToNames->DeleteSubrange(i, 1);
-            return true;
+            if (persistLocked()) {
+                return true;
+            }
+            dbinfo->object = std::move(previous);
+            return false;
         }
     }
     return false;
@@ -408,31 +567,54 @@ std::ostream& ProtoDatabase::dump(std::ostream& os) const {
 }
 
 void ProtoDatabase::setOwnerUserId(UserId userId) const {
+    (void)claimOwnerUserId(userId);
+}
+
+DatabaseBase::OwnerClaimResult ProtoDatabase::claimOwnerUserId(
+    const UserId userId) const {
     std::lock_guard<std::mutex> lock(dbinfo_mutex_);
     if (!dbinfo.has_value()) {
         LOG(WARNING) << "Database not loaded! Cannot set owner user id!";
-        return;
+        return OwnerClaimResult::BACKEND_ERROR;
     }
     if (dbinfo->object.has_ownerid()) {
         LOG(WARNING) << "Database already contains owner user id!";
-        return;
+        return OwnerClaimResult::ALREADY_SET;
+    }
+    if (findByUid(dbinfo->object.blacklist().id(), userId)) {
+        LOG(ERROR) << "Refusing to claim blacklisted user " << userId
+                   << " as owner";
+        return OwnerClaimResult::BACKEND_ERROR;
     }
     dbinfo->object.set_ownerid(userId);
+    if (persistLocked()) {
+        return OwnerClaimResult::OK;
+    }
+    dbinfo->object.clear_ownerid();
+    return OwnerClaimResult::BACKEND_ERROR;
 }
 
 [[nodiscard]] ProtoDatabase::AddResult ProtoDatabase::addChatInfo(
     const ChatId chatid, const std::string_view name) const {
     std::lock_guard<std::mutex> lock(dbinfo_mutex_);
+    if (!dbinfo) {
+        return AddResult::BACKEND_ERROR;
+    }
     auto* const chats = dbinfo->object.mutable_chattonames();
     for (const auto& chat : *chats) {
         if (chat.telegramchatid() == chatid) {
             return AddResult::ALREADY_EXISTS;
         }
     }
+    Database previous = dbinfo->object;
     auto* const chat = chats->Add();
     chat->set_telegramchatid(chatid);
-    chat->set_name(name.data());
-    return AddResult::OK;
+    chat->set_name(name.data(), name.size());
+    if (persistLocked()) {
+        return AddResult::OK;
+    }
+    dbinfo->object = std::move(previous);
+    return AddResult::BACKEND_ERROR;
 }
 
 [[nodiscard]] std::optional<ChatId> ProtoDatabase::getChatId(

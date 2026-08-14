@@ -86,6 +86,7 @@ tgbot_library(
   SRCS 
     TgBotApiImpl.cpp
     components/Async.cpp
+    components/WorkScheduler.cpp
     components/ChatJoinRequest.cpp
     components/ModuleManagement.cpp
     components/OnAnyMessage.cpp

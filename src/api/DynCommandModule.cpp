@@ -5,6 +5,7 @@
 
 #include <GitBuildInfo.hpp>
 #include <api/CommandModule.hpp>
+#include <atomic>
 #include <memory>
 #include <string_view>
 
@@ -61,6 +62,10 @@ DynCommandModule::DynCommandModule(std::filesystem::path filePath)
     : handle(nullptr, &dlclose), filePath(std::move(filePath)) {}
 
 bool DynCommandModule::load() {
+    return loadImage(filePath);
+}
+
+bool DynCommandModule::loadImage(const std::filesystem::path& imagePath) {
     if (!mLock.try_lock()) {
         // Already concurrent.
         return false;
@@ -81,10 +86,10 @@ bool DynCommandModule::load() {
         return false;
     }
 
-    DLWrapper dlwrapper(filePath);
+    DLWrapper dlwrapper(imagePath);
     if (dlwrapper == nullptr) {
         LOG(WARNING) << fmt::format("dlopen failed for {}: {}",
-                                    filePath.filename().string(),
+                                    imagePath.filename().string(),
                                     DLWrapper::error());
         return false;
     }
@@ -118,8 +123,45 @@ bool DynCommandModule::load() {
                                   fmt::ptr(modulePtr));
     }
     handle = dlwrapper.underlying();
+    if (imagePath != filePath)
+        loadedImagePath = imagePath;
     enableExecutions();
     return true;
+}
+
+std::unique_ptr<DynCommandModule> DynCommandModule::makeReloadCandidate()
+    const {
+    static std::atomic<std::uint64_t> sequence{1};
+    const auto id = sequence.fetch_add(1, std::memory_order_relaxed);
+    const auto imagePath =
+        filePath.parent_path() / fmt::format(".glider-reload-{}-{}{}",
+                                             filePath.stem().string(), id,
+                                             filePath.extension().string());
+    std::error_code ec;
+    if (!std::filesystem::copy_file(filePath, imagePath,
+                                    std::filesystem::copy_options::none, ec)) {
+        LOG(ERROR) << "Cannot stage reload image " << imagePath << ": "
+                   << ec.message();
+        return nullptr;
+    }
+    auto candidate = std::make_unique<DynCommandModule>(filePath);
+    if (!candidate->loadImage(imagePath)) {
+        std::filesystem::remove(imagePath, ec);
+        return nullptr;
+    }
+    return candidate;
+}
+
+void DynCommandModule::removeReloadImage() {
+    if (loadedImagePath.empty())
+        return;
+    std::error_code ec;
+    std::filesystem::remove(loadedImagePath, ec);
+    if (ec) {
+        LOG(WARNING) << "Cannot remove staged reload image " << loadedImagePath
+                     << ": " << ec.message();
+    }
+    loadedImagePath.clear();
 }
 
 bool DynCommandModule::unload() {
@@ -133,10 +175,19 @@ bool DynCommandModule::unload() {
 
     if (handle) {
         handle = nullptr;
+        removeReloadImage();
         return true;
     }
     LOG(WARNING) << "Attempted to unload unloaded module";
     return false;
+}
+
+DynCommandModule::~DynCommandModule() {
+    if (handle) {
+        (void)unload();
+    } else {
+        removeReloadImage();
+    }
 }
 
 bool DynCommandModule::isLoaded() const {

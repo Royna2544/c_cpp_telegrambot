@@ -5,7 +5,9 @@
 #include <GitBuildInfo.hpp>
 #include <api/CommandModule.hpp>
 #include <memory>
+#include <mutex>
 #include <sol/sol.hpp>
+#include <stdexcept>
 #include <string_view>
 
 #include "tgbot/TgException.h"
@@ -13,6 +15,7 @@
 struct LuaCommandModule::Context {
     sol::state lua;
     std::filesystem::path filePath;
+    mutable std::mutex luaMutex;
     bool isLoaded = false;
 };
 
@@ -33,11 +36,22 @@ void binds(TgBotApi::Ptr api, MessageExt* message,
     msg["chat_id"] = message->get<MessageAttrs::Chat>()->id;
     msg["message_id"] = message->get<MessageAttrs::MessageId>();
     msg["date"] = message->message()->date;  // seconds since epoch
-    msg["user_id"] = message->get<MessageAttrs::User>()->id;
+    if (const auto sender = message->get<MessageAttrs::User>()) {
+        msg["user_id"] = sender->id;
+    } else {
+        msg["user_id"] = sol::lua_nil;
+    }
     msg["text"] = message->get<MessageAttrs::ExtraText>();
-    msg["has_reply"] = message->reply()->exists();
-    if (message->reply()->exists()) {
-        msg["reply_user_id"] = message->reply()->get<MessageAttrs::User>()->id;
+    const auto reply = message->reply();
+    const bool hasReply = reply != nullptr && reply->exists();
+    const auto replySender =
+        hasReply ? reply->get<MessageAttrs::User>() : TgBot::User::Ptr{};
+    msg["has_reply"] = hasReply;
+    msg["reply_has_sender"] = replySender != nullptr;
+    if (replySender) {
+        msg["reply_user_id"] = replySender->id;
+    } else {
+        msg["reply_user_id"] = sol::lua_nil;
     }
     lua["message"] = msg;
 
@@ -56,6 +70,9 @@ void binds(TgBotApi::Ptr api, MessageExt* message,
     /*───────────────────  bot helpers  ─────────────────────*/
     lua["reply"] = [api, message, &lua](const std::string& txt) {
         auto m = api->sendReplyMessage(message->message(), txt);
+        if (!m || !m->chat) {
+            throw std::runtime_error("Telegram reply did not return a message");
+        }
 
         sol::table t = lua.create_table();
         t["chat_id"] = m->chat->id;
@@ -132,6 +149,7 @@ void binds(TgBotApi::Ptr api, MessageExt* message,
 }
 
 bool LuaCommandModule::load() {
+    const std::lock_guard lock(_context->luaMutex);
     _context->lua.open_libraries(sol::lib::base, sol::lib::string,
                                  sol::lib::os);
 
@@ -140,8 +158,8 @@ bool LuaCommandModule::load() {
     // script escape into the host (os.execute, file removal, dynamic code
     // loading). Keep the benign time helpers (os.time/os.date) used by modules.
     if (sol::table os_tbl = _context->lua["os"]; os_tbl.valid()) {
-        for (const auto* fn : {"execute", "remove", "rename", "exit",
-                               "tmpname", "getenv", "setlocale"}) {
+        for (const auto* fn : {"execute", "remove", "rename", "exit", "tmpname",
+                               "getenv", "setlocale"}) {
             os_tbl[fn] = sol::lua_nil;
         }
     }
@@ -190,6 +208,10 @@ bool LuaCommandModule::load() {
                         TgBotApi::Ptr api, MessageExt* message,
                         const StringResLoader::PerLocaleMap* res,
                         const Providers* provider) {
+        // A sol::state/lua_State is not safe for concurrent use. Command
+        // workers may invoke the same Lua module at the same time, so keep the
+        // complete bind-and-run transaction serialized per module.
+        const std::lock_guard lock(c->luaMutex);
         sol::state_view lua = c->lua;
 
         if (!c->isLoaded) {
@@ -222,11 +244,13 @@ bool LuaCommandModule::load() {
 bool LuaCommandModule::unload() {
     stopExecutions();
     auto executionLease = acquireUnloadLease();
+    const std::lock_guard lock(_context->luaMutex);
     _context->lua = {};
     _context->isLoaded = false;
     return true;
 }
 
 bool LuaCommandModule::isLoaded() const {
+    const std::lock_guard lock(_context->luaMutex);
     return _context->isLoaded;
 }

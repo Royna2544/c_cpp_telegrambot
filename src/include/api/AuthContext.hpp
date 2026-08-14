@@ -20,10 +20,12 @@ class AuthContext {
     // Unprotected: Anything including bot messages
     // User: Requires a valid user (Human) excl. blacklist
     // AdminUser: Owner or whitelisted user
+    // Owner: The configured bot owner only
     enum class AccessLevel {
         Unprotected,
         User,
         AdminUser,
+        Owner,
     };
 
     // Holds result of isAuthorized() function
@@ -139,6 +141,7 @@ inline std::ostream& operator<<(std::ostream& self,
         CASE_STR(Unprotected);
         CASE_STR(User);
         CASE_STR(AdminUser);
+        CASE_STR(Owner);
     };
 
 #undef CASE_STR

@@ -27,7 +27,8 @@ class OpenCVImage : public PhotoBase {
         virtual ~ComponentBase() = default;
         virtual TinyStatus read(const std::filesystem::path& file) = 0;
         virtual TinyStatus procAndW(const Options* opt,
-                                    const std::filesystem::path& dest) = 0;
+                                    const std::filesystem::path& dest,
+                                    const ProcessingControl& control) = 0;
     };
 
     struct Image : public ComponentBase {
@@ -39,14 +40,16 @@ class OpenCVImage : public PhotoBase {
         static void invert(cv::Mat& mat);
 
         TinyStatus procAndW(const Options* opt,
-                            const std::filesystem::path& dest) override;
+                            const std::filesystem::path& dest,
+                            const ProcessingControl& control) override;
     };
     struct Video : public ComponentBase {
         cv::VideoCapture handle;
 
         TinyStatus read(const std::filesystem::path& file) override;
         TinyStatus procAndW(const Options* opt,
-                            const std::filesystem::path& filename) override;
+                            const std::filesystem::path& filename,
+                            const ProcessingControl& control) override;
     };
     std::unique_ptr<ComponentBase> component;
 };

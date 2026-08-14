@@ -3,6 +3,7 @@ CREATE TABLE usermap (
     userid BIGINT NOT NULL PRIMARY KEY,
     info INT NOT NULL
 );
+CREATE UNIQUE INDEX owner_singleton ON usermap(info) WHERE info = 0;
 
 CREATE TABLE mediaids (
     id INTEGER PRIMARY KEY AUTOINCREMENT,

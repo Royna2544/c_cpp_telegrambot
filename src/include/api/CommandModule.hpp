@@ -1,7 +1,7 @@
 #pragma once
 
-#include <api/StringResLoader.hpp>
 #include <RefLock.hpp>
+#include <api/StringResLoader.hpp>
 #include <atomic>
 #include <filesystem>
 #include <functional>
@@ -40,7 +40,12 @@ struct DynModule {
                                         const StringResLoader::PerLocaleMap*,
                                         const Providers* provider);
 
-    enum class Flags { None = 0, Enforced = 1 << 0, HideDescription = 1 << 1 };
+    enum class Flags {
+        None = 0,
+        Enforced = 1 << 0,
+        HideDescription = 1 << 1,
+        OwnerOnly = 1 << 2
+    };
 
     template <int... Ints>
     constexpr static bool are_all_unique() {
@@ -121,8 +126,7 @@ class CommandModule {
     using command_callback_t =
         std::function<std::remove_pointer_t<DynModule::command_callback_t>>;
 
-    [[nodiscard]] std::optional<RefLock::SharedLease>
-    acquireExecutionLease() {
+    [[nodiscard]] std::optional<RefLock::SharedLease> acquireExecutionLease() {
         if (!acceptingExecutions.load(std::memory_order_acquire)) {
             return std::nullopt;
         }
@@ -188,7 +192,10 @@ class CommandModule {
 
         // Trival accessors.
         [[nodiscard]] bool isPrivileged() const {
-            return flags & DynModule::Flags::Enforced;
+            return (flags & DynModule::Flags::Enforced) || isOwnerOnly();
+        }
+        [[nodiscard]] bool isOwnerOnly() const {
+            return flags & DynModule::Flags::OwnerOnly;
         }
         [[nodiscard]] bool isHideDescription() const {
             return flags & DynModule::Flags::HideDescription;
@@ -231,9 +238,12 @@ class DynCommandModule : public CommandModule {
     // dlclose RAII handle
     std::unique_ptr<void, int (*)(void*)> handle;
     std::filesystem::path filePath;
+    std::filesystem::path loadedImagePath;
 
     // Lock
     mutable std::mutex mLock;
+    bool loadImage(const std::filesystem::path& imagePath);
+    void removeReloadImage();
 
     /**
      * @brief Constructs a new instance of DynCommandModule.
@@ -247,6 +257,10 @@ class DynCommandModule : public CommandModule {
      */
    public:
     explicit DynCommandModule(std::filesystem::path filePath);
+    [[nodiscard]] const std::filesystem::path& sourcePath() const {
+        return filePath;
+    }
+    [[nodiscard]] std::unique_ptr<DynCommandModule> makeReloadCandidate() const;
 
     /**
      * @brief Loads the command module from the specified file path.
@@ -275,7 +289,7 @@ class DynCommandModule : public CommandModule {
     // Trival accessors.
     [[nodiscard]] bool isLoaded() const override;
 
-    ~DynCommandModule() override = default;
+    ~DynCommandModule() override;
 };
 
 #ifdef HAVE_LUA

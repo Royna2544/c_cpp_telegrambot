@@ -31,6 +31,7 @@
 #include <fstream>
 #include <iterator>
 #include <libos/libsighandler.hpp>
+#include <limits>
 #include <memory>
 #include <nlohmann/json.hpp>
 #include <set>
@@ -159,7 +160,7 @@ bool TgBotApiImpl::authorized(const MessageExt::Ptr& message,
 
 std::shared_ptr<MessageExt> TgBotApiImpl::prepareCommand(
     const std::string& command, const AuthContext::AccessLevel authflags,
-    CommandModule* module, Message::Ptr message, bool applyRateLimit) {
+    CommandModule* module, Message::Ptr message, bool /*applyRateLimit*/) {
     if (module == nullptr || !module->isLoaded()) {
         LOG(INFO) << "Command module is unavailable: " << command;
         return {};
@@ -178,26 +179,18 @@ std::shared_ptr<MessageExt> TgBotApiImpl::prepareCommand(
         return {};
     }
 
-    if (applyRateLimit) {
-        const auto rlUser = ext->get<MessageAttrs::User>();
-        const std::int64_t rlKey =
-            rlUser ? rlUser->id : ext->get<MessageAttrs::Chat>()->id;
-        if (!_rateLimiter.check(rlKey)) {
-            LOG(INFO) << fmt::format("Ratelimiting key {}", rlKey);
-            return {};
-        }
+    // Validate before reserving quota. ModuleManagement commits the rate-limit
+    // reservation only after it knows the bounded command queue has capacity.
+    if (!validateValidArgs(&module->info, ext.get())) {
+        return {};
     }
     return ext;
 }
 
-void TgBotApiImpl::commandHandler(
-    const std::string& command, CommandModule* module,
-    const std::shared_ptr<MessageExt>& ext) {
+void TgBotApiImpl::commandHandler(const std::string& command,
+                                  CommandModule* module,
+                                  const std::shared_ptr<MessageExt>& ext) {
     auto lock = _refLock->acquireShared();
-
-    if (!validateValidArgs(&module->info, ext.get())) {
-        return;
-    }
 
     [[maybe_unused]] MilliSecondDP dp;
     module->info.function(this, ext.get(),
@@ -214,28 +207,15 @@ void TgBotApiImpl::addCommandListener(CommandListener* listener) {
 }
 
 bool TgBotApiImpl::unloadCommand(const std::string& command) {
-    DLOG(INFO) << "Notifying onUnload listeners";
-    for (auto* listener : _listeners) {
-        listener->onUnload(command);
-    }
-    DLOG(INFO) << "Done notifying";
-    // Remove the command from the loader.
-    return kModuleLoader->unload(command);
+    return kModuleLoader && kModuleLoader->unload(command);
 }
 
 bool TgBotApiImpl::reloadCommand(const std::string& command) {
-    DLOG(INFO) << "Notifying onReload listeners";
-    for (auto* listener : _listeners) {
-        listener->onReload(command);
-    }
-    DLOG(INFO) << "Done notifying";
-    // Reload the command to the loader.
-    return kModuleLoader->load(command);
+    return kModuleLoader && kModuleLoader->reload(command);
 }
 
 bool TgBotApiImpl::invokeCommand(const std::string& command,
-                                 Message::Ptr message,
-                                 std::string payload) {
+                                 Message::Ptr message, std::string payload) {
     if (!payload.empty()) {
         auto forwarded = std::make_shared<Message>(*message);
         forwarded->text = std::move(payload);
@@ -245,8 +225,41 @@ bool TgBotApiImpl::invokeCommand(const std::string& command,
     return kModuleLoader && kModuleLoader->invoke(command, std::move(message));
 }
 
+std::optional<TgBotApi::WorkId> TgBotApiImpl::submitCommandWork(
+    std::string_view owner, WorkClass workClass, CancellableWork work,
+    WorkOptions options) {
+    if (!kModuleLoader)
+        return std::nullopt;
+    return kModuleLoader->submitWork(owner, workClass, std::move(work),
+                                     options);
+}
+
+bool TgBotApiImpl::cancelCommandWork(std::string_view owner, WorkId id) {
+    return kModuleLoader && kModuleLoader->cancelWork(owner, id);
+}
+
 void TgBotApiImpl::onAnyMessage(const AnyMessageCallback& callback) {
     onAnyMessageImpl->onAnyMessage(callback);
+}
+
+TgBotApi::CallbackSubscription::Ptr TgBotApiImpl::subscribeAnyMessage(
+    const AnyMessageCallback& callback) {
+    if (!onAnyMessageImpl) {
+        return {};
+    }
+    return onAnyMessageImpl->subscribeAnyMessage(callback);
+}
+
+void TgBotApiImpl::onAnyMessageForCommand(const std::string_view command,
+                                          const AnyMessageCallback& callback) {
+    onAnyMessageImpl->onAnyMessage(callback, std::string(command));
+}
+
+void TgBotApiImpl::removeAnyMessageCallbacksForCommand(
+    const std::string_view command) {
+    if (onAnyMessageImpl) {
+        onAnyMessageImpl->removeCallbacksForCommand(command);
+    }
 }
 
 void TgBotApiImpl::onCallbackQuery(
@@ -259,6 +272,14 @@ void TgBotApiImpl::onCallbackQuery(
 void TgBotApiImpl::onEditedMessage(
     TgBot::EventBroadcaster::MessageListener listener) {
     getEvents().onEditedMessage(listener);
+}
+
+TgBotApi::CallbackSubscription::Ptr TgBotApiImpl::subscribeEditedMessage(
+    TgBot::EventBroadcaster::MessageListener listener) {
+    if (!onAnyMessageImpl) {
+        return {};
+    }
+    return onAnyMessageImpl->subscribeEditedMessage(std::move(listener));
 }
 
 void TgBotApiImpl::addInlineQueryKeyboard(
@@ -495,9 +516,22 @@ NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(ErrorOutput, ok, error_code, description);
 
 bool TgBotApiImpl::downloadFile_impl(const std::filesystem::path& destfilename,
                                      const std::string_view fileid) const {
+    return downloadFileWithinLimit_impl(
+        destfilename, fileid, std::numeric_limits<std::uintmax_t>::max());
+}
+
+bool TgBotApiImpl::downloadFileWithinLimit_impl(
+    const std::filesystem::path& destfilename, const std::string_view fileid,
+    std::uintmax_t maxBytes) const {
     const auto file = getApi().getFile(fileid);
     if (!file) {
         LOG(INFO) << "File " << fileid << " not found in Telegram servers.";
+        return false;
+    }
+    if (file->fileSize &&
+        (*file->fileSize < 0 ||
+         static_cast<std::uintmax_t>(*file->fileSize) > maxBytes)) {
+        LOG(INFO) << "Refusing oversized Telegram file " << fileid;
         return false;
     }
     if (!file->filePath) {
@@ -512,6 +546,11 @@ bool TgBotApiImpl::downloadFile_impl(const std::filesystem::path& destfilename,
         getApi().downloadFile(*file->filePath, {}, _apiServerLocalMapper);
     if (buffer.empty()) {
         LOG(INFO) << "Failed to download file " << fileid;
+        return false;
+    }
+    if (buffer.size() > maxBytes) {
+        LOG(INFO) << "Downloaded Telegram file " << fileid
+                  << " exceeds the configured byte limit";
         return false;
     }
 
@@ -537,6 +576,13 @@ bool TgBotApiImpl::downloadFile_impl(const std::filesystem::path& destfilename,
     }
     ofs.write(buffer.data(), buffer.size());
     ofs.close();
+    if (!ofs) {
+        LOG(ERROR) << "Failed to write downloaded file " << fileid << " to "
+                   << destfilename;
+        std::error_code ignored;
+        (void)std::filesystem::remove(destfilename, ignored);
+        return false;
+    }
     LOG(INFO) << "Downloaded file " << fileid << " to " << destfilename;
     return true;
 }
@@ -737,4 +783,27 @@ TgBotApiImpl::TgBotApiImpl(const std::string_view token, AuthContext* auth,
     }
 }
 
-TgBotApiImpl::~TgBotApiImpl() = default;
+TgBotApiImpl::~TgBotApiImpl() {
+    // ModulesManagement drains module-owned callbacks through lifecycle
+    // listeners. Destroy it while those listener components are still alive;
+    // normal reverse member destruction would otherwise destroy the listener
+    // objects first and leave dangling pointers in _listeners.
+    kModuleLoader.reset();
+
+    // ReactionsProvider owns a cancellable subscription. Drain its callback
+    // before tearing down the dispatcher; subscription tokens owned by
+    // external components remain safe even if they outlive this API because
+    // their host wrapper state does not retain the dispatcher.
+    reactionsProvider.reset();
+
+    // `_bot` is declared after these component pointers and would therefore be
+    // destroyed first by the language's normal reverse-member order. Join all
+    // remaining callback workers while the Telegram API is still alive.
+    onCallbackQueryImpl.reset();
+    onAnyMessageImpl.reset();
+    onInlineQueryImpl.reset();
+    onUnknownCommandImpl.reset();
+    onChatJoinRequestImpl.reset();
+    onMyChatMemberImpl.reset();
+    restartCommand.reset();
+}

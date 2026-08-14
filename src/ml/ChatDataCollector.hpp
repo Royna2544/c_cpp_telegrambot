@@ -48,6 +48,8 @@ class ChatDataCollector {
     std::mutex mutex_;
     std::map<UserId, TgBot::User::Ptr> userDict_;
     std::map<ChatId, TgBot::Chat::Ptr> chatDict_;
+    TgBotApi::CallbackSubscription::Ptr anyMessageSubscription_;
+    TgBotApi::CallbackSubscription::Ptr editedMessageSubscription_;
 };
 
 inline std::ostream& operator<<(std::ostream& os, ChatDataCollector::Data d) {

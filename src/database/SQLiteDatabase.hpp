@@ -7,6 +7,7 @@
 #include <cstdint>
 #include <functional>
 #include <memory>
+#include <mutex>
 #include <source_location>
 #include <string>
 #include <string_view>
@@ -70,6 +71,8 @@ struct DBIMPL_EXPORT SQLiteDatabase : DatabaseBase {
     [[nodiscard]] std::optional<std::vector<decltype(MediaInfo::mediaId)>>
     getMediaIds(const std::string_view alias) const override;
     void setOwnerUserId(UserId userId) const override;
+    [[nodiscard]] OwnerClaimResult claimOwnerUserId(
+        UserId userId) const override;
     std::ostream& dump(std::ostream& ofs) const override;
     [[nodiscard]] AddResult addChatInfo(
         const ChatId chatid, const std::string_view name) const override;
@@ -317,4 +320,8 @@ struct DBIMPL_EXPORT SQLiteDatabase : DatabaseBase {
     static InfoType toInfoType(ListType type);
     sqlite3* db = nullptr;
     std::filesystem::path _sqlScriptsPath;
+    // Transactions belong to the connection, not to a calling thread. Keep a
+    // complete logical operation under one recursive lock because several
+    // public operations call shared private helpers.
+    mutable std::recursive_mutex db_mutex_;
 };

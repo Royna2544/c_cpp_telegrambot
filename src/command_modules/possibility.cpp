@@ -2,79 +2,138 @@
 #include <fmt/format.h>
 
 #include <Random.hpp>
+#include <algorithm>
 #include <api/CommandModule.hpp>
 #include <api/Providers.hpp>
 #include <api/TgBotApi.hpp>
+#include <cctype>
+#include <string_view>
+#include <unordered_set>
 
 #include "api/MessageExt.hpp"
 
-DECLARE_COMMAND_HANDLER(possibility) {
-    constexpr int PERCENT_MAX = 100;
-    std::string text;
-    std::string lastItem;
-    std::stringstream outStream;
-    std::unordered_map<std::string, Random::ret_type> kItemAndPercentMap;
-    std::vector<std::string> vec;
-    Random::ret_type total = 0;
-    using map_t = std::pair<std::string, Random::ret_type>;
+namespace {
 
-    if (message->get<MessageAttrs::ParsedArgumentsList>().empty()) {
+constexpr Random::ret_type kPercentMax = 100;
+constexpr std::size_t kMaxChoices = 100;
+constexpr std::size_t kMaxChoiceBytes = 64;
+constexpr std::size_t kMaxTelegramTextBytes = 4096;
+
+bool isValidChoice(const std::string_view choice) {
+    if (choice.empty() || choice.size() > kMaxChoiceBytes) {
+        return false;
+    }
+    return std::ranges::none_of(
+        choice, [](const unsigned char ch) { return std::iscntrl(ch) != 0; });
+}
+
+std::string validationError(const StringResLoader::PerLocaleMap* res,
+                            const std::string_view detail) {
+    return fmt::format("{}: {}", res->get(Strings::INVALID_ARGS_PASSED),
+                       detail);
+}
+
+}  // namespace
+
+DECLARE_COMMAND_HANDLER(possibility) {
+    std::stringstream outStream;
+    using WeightedChoice = std::pair<std::string, Random::ret_type>;
+
+    const auto& parsed = message->get<MessageAttrs::ParsedArgumentsList>();
+    if (parsed.empty()) {
         api->sendReplyMessage(message->message(),
                               res->get(Strings::SEND_POSSIBILITIES));
         return;
     }
-    text = message->get<MessageAttrs::ExtraText>();
-    // Split string by newline
-    vec = message->get<MessageAttrs::ParsedArgumentsList>();
-    // Pre-reserve memory
-    kItemAndPercentMap.reserve(vec.size());
 
-    auto [b, e] = std::ranges::unique(vec);
-    // Create a set of unique items
-    vec.erase(b, e);
+    // Preserve the first occurrence of each choice. ranges::unique only
+    // removed adjacent duplicates, allowing repeated non-adjacent choices to
+    // overwrite one another after percentages had already been allocated.
+    std::vector<std::string> choices;
+    choices.reserve(std::min(parsed.size(), kMaxChoices));
+    std::unordered_set<std::string> seen;
+    seen.reserve(std::min(parsed.size(), kMaxChoices));
+    for (const auto& choice : parsed) {
+        if (!isValidChoice(choice)) {
+            api->sendReplyMessage(
+                message->message(),
+                validationError(
+                    res, fmt::format("each choice must contain 1-{} bytes of "
+                                     "printable text",
+                                     kMaxChoiceBytes)));
+            return;
+        }
+        if (!seen.emplace(choice).second) {
+            continue;
+        }
+        if (choices.size() == kMaxChoices) {
+            api->sendReplyMessage(
+                message->message(),
+                validationError(
+                    res, fmt::format("at most {} unique choices are allowed",
+                                     kMaxChoices)));
+            return;
+        }
+        choices.emplace_back(choice);
+    }
 
-    // Can't get possitibities for 1 element
-    if (vec.size() <= 1) {
+    if (choices.size() <= 1) {
         api->sendReplyMessage(message->message(),
                               res->get(Strings::GIVE_MORE_THAN_ONE));
         return;
     }
-    // Shuffle the vector.
-    provider->random->shuffle(vec);
-    // Start the output stream
-    outStream << fmt::format("{} {} {}\n", res->get(Strings::TOTAL_ITEMS_PREFIX),
-                             vec.size(), res->get(Strings::TOTAL_ITEMS_SUFFIX));
-    // Get the last item and remove it from the vector.
-    lastItem = vec.back();
-    vec.pop_back();
-    // Generate all random numbers
-    for (const auto &cond : vec) {
-        Random::ret_type thisper = 0;
-        if (total < PERCENT_MAX) {
-            thisper = provider->random->generate(PERCENT_MAX - total);
-            if (total + thisper >= PERCENT_MAX) {
-                thisper = PERCENT_MAX - total;
+
+    provider->random->shuffle(choices);
+    outStream << fmt::format(
+        "{} {} {}\n", res->get(Strings::TOTAL_ITEMS_PREFIX), choices.size(),
+        res->get(Strings::TOTAL_ITEMS_SUFFIX));
+
+    // Keep the original skewed allocation: each item receives a random part
+    // of the remaining percentage, and the final item receives the remainder.
+    // Shuffling first keeps that positional skew fair across the choices.
+    std::vector<WeightedChoice> weighted;
+    weighted.reserve(choices.size());
+    Random::ret_type remaining = kPercentMax;
+    for (std::size_t i = 0; i < choices.size(); ++i) {
+        Random::ret_type percent = remaining;
+        if (i + 1 != choices.size() && remaining != 0) {
+            percent =
+                std::min(provider->random->generate(0, remaining), remaining);
+        }
+        weighted.emplace_back(std::move(choices[i]), percent);
+        remaining -= percent;
+    }
+
+    std::ranges::sort(
+        weighted, [](const WeightedChoice& map1, const WeightedChoice& map2) {
+            if (map1.second != map2.second) {
+                return map1.second > map2.second;
             }
-        }
-        kItemAndPercentMap[cond] = thisper;
-        total += thisper;
-    }
-    // Nonetheless of total being 100 or whatever
-    kItemAndPercentMap[lastItem] = PERCENT_MAX - total;
-    std::vector<map_t> elem(kItemAndPercentMap.begin(),
-                            kItemAndPercentMap.end());
-    // Sort by percentages, descending
-    std::ranges::sort(elem, [](const map_t &map1, const map_t &map2) {
-        if (map1.second != map2.second) {
-            return map1.second > map2.second;
-        }
-        return map1.first < map2.first;
-    });
-    // Output the results
-    for (const map_t &m : elem) {
+            return map1.first < map2.first;
+        });
+
+    Random::ret_type displayedTotal = 0;
+    for (const auto& m : weighted) {
         outStream << m.first << " : " << m.second << "%" << std::endl;
+        displayedTotal += m.second;
     }
-    api->sendReplyMessage(message->message(), outStream.str());
+    if (displayedTotal != kPercentMax) {
+        api->sendReplyMessage(
+            message->message(),
+            validationError(res, "failed to allocate exactly 100 percent"));
+        return;
+    }
+    outStream << res->get(Strings::TOTAL_ITEMS_PREFIX) << ": " << displayedTotal
+              << "%";
+    auto output = outStream.str();
+    if (output.size() > kMaxTelegramTextBytes) {
+        api->sendReplyMessage(
+            message->message(),
+            validationError(res, fmt::format("combined output exceeds {} bytes",
+                                             kMaxTelegramTextBytes)));
+        return;
+    }
+    api->sendReplyMessage(message->message(), output);
 }
 
 extern "C" DYN_COMMAND_EXPORT const struct DynModule DYN_COMMAND_SYM = {

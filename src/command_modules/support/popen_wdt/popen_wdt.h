@@ -3,6 +3,9 @@
 #include <limits.h>
 #include <stdbool.h>
 #include <stdint.h>
+#ifndef _WIN32
+#include <signal.h>
+#endif
 
 #ifndef NDEBUG
 #define POPEN_WDT_DEBUG
@@ -33,8 +36,16 @@ typedef uint8_t popen_watchdog_exit_code_t;
 // Default sleep seconds if not specified.
 #define POPEN_WDT_DEFAULT_SLEEP_SECS 10
 
-// Identical to POSIX SIGINT, what is currently used to terminate the process
+// Status values used when a watchdog has to stop a process. Keep the Windows
+// termination code stable while exposing the real POSIX signal numbers on
+// Unix-like hosts.
+#ifdef _WIN32
 #define POPEN_WDT_SIGTERM 2
+#define POPEN_WDT_SIGKILL 9
+#else
+#define POPEN_WDT_SIGTERM SIGTERM
+#define POPEN_WDT_SIGKILL SIGKILL
+#endif
 
 #ifdef __cplusplus
 extern "C" {
@@ -50,12 +61,11 @@ typedef struct {
 #define POPEN_WDT_EXIT_INITIALIZER {POPEN_WDT_EXIT_CODE_MAX, false}
 
 typedef struct {
-    const char *command;     /* command string */
+    const char* command;     /* command string */
     bool watchdog_enabled;   /* Is watchdog enabled? [in] */
-    bool watchdog_activated; /* Result callback, stored true if watchdog did the
-                                work [out] */
+    bool watchdog_activated; /* True after timeout or explicit cancellation */
     int sleep_secs; /* Number of seconds to sleep if watchdog is enabled */
-    void *privdata; /* Private data pointer */
+    void* privdata; /* Private data pointer */
 } popen_watchdog_data_t;
 
 typedef int64_t popen_watchdog_ssize_t;
@@ -66,7 +76,7 @@ typedef int64_t popen_watchdog_ssize_t;
  * @param data the data structure to initialize
  * @return if the initialization succeeded
  */
-bool popen_watchdog_init(popen_watchdog_data_t **data);
+bool popen_watchdog_init(popen_watchdog_data_t** data);
 
 /**
  * @brief starts the popen watchdog, which monitors the given command and kills
@@ -75,7 +85,7 @@ bool popen_watchdog_init(popen_watchdog_data_t **data);
  * @param data the data structure containing the command to monitor
  * @return true if the watchdog was successfully started, false otherwise
  */
-bool popen_watchdog_start(popen_watchdog_data_t **data);
+bool popen_watchdog_start(popen_watchdog_data_t** data);
 
 /**
  * @brief Checks if the watchdog has been activated for the given popen data.
@@ -83,7 +93,24 @@ bool popen_watchdog_start(popen_watchdog_data_t **data);
  * @param data The data structure containing the popen information.
  * @return true if the watchdog activated, false otherwise.
  */
-bool popen_watchdog_activated(popen_watchdog_data_t **data);
+bool popen_watchdog_activated(popen_watchdog_data_t** data);
+
+/**
+ * @brief Cancels the running command and its process group.
+ *
+ * POSIX
+ * callers get the same graceful shutdown as a watchdog timeout.
+ * SIGTERM is
+ * sent to the whole process group, followed by SIGKILL after a
+ * two-second
+ * grace period when any member remains. The call is synchronous so
+ * the owner
+ * may safely proceed to destroy the watchdog after it returns.
+ *
+ * @return
+ * true when cancellation was requested for a running process.
+ */
+bool popen_watchdog_cancel(popen_watchdog_data_t** data);
 
 /**
  * @brief Reads data from the file pointer associated with the popen watchdog.
@@ -96,9 +123,9 @@ bool popen_watchdog_activated(popen_watchdog_data_t **data);
  * @param size The maximum number of bytes to read from the file pointer.
  * @return Total size of read bytes, fail means negative.
  */
-popen_watchdog_ssize_t popen_watchdog_read(popen_watchdog_data_t **data,
-                                          char *buf,
-                                          popen_watchdog_ssize_t size);
+popen_watchdog_ssize_t popen_watchdog_read(popen_watchdog_data_t** data,
+                                           char* buf,
+                                           popen_watchdog_ssize_t size);
 
 /**
  * @brief Cleans up and frees the resources associated with the popen watchdog
@@ -113,7 +140,7 @@ popen_watchdog_ssize_t popen_watchdog_read(popen_watchdog_data_t **data,
  * @return The exit status of the process. If the process was signaled, the
  * exit status will be the signum.
  */
-popen_watchdog_exit_t popen_watchdog_destroy(popen_watchdog_data_t **data);
+popen_watchdog_exit_t popen_watchdog_destroy(popen_watchdog_data_t** data);
 
 #ifdef __cplusplus
 }

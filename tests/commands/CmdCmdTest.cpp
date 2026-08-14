@@ -51,3 +51,17 @@ TEST_F(CMDCommandTest, UnloadCommandSuccess) {
     willSendReplyMessage(HasSubstr(successMessage));
     execute();
 }
+
+TEST_F(CMDCommandTest, RejectsSelfUnloadBeforeCallingModuleManager) {
+    setCommandExtArgs({"cmd", "unload"});
+    EXPECT_CALL(*botApi, unloadCommand(_)).Times(0);
+    willSendReplyMessage(HasSubstr(failureMessage));
+    execute();
+}
+
+TEST_F(CMDCommandTest, RejectsSelfReloadBeforeCallingModuleManager) {
+    setCommandExtArgs({"cmd", "reload"});
+    EXPECT_CALL(*botApi, reloadCommand(_)).Times(0);
+    willSendReplyMessage(HasSubstr(failureMessage));
+    execute();
+}
