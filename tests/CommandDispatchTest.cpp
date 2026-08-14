@@ -492,6 +492,10 @@ TEST(AnyMessageCallbackDispatcherTest,
             changed.wait_for(lock, 2s, [&] { return healthyCalls == 2; }));
         EXPECT_EQ(failingCalls, 1);
     }
+    // The count is published before the callback's following notify_all().
+    // Drain the healthy strand before destroying its stack-owned condition
+    // variable.
+    dispatcher.removeCallbacksForCommand("healthy");
 }
 
 TEST(AnyMessageCallbackDispatcherTest,

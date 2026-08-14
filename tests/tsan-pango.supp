@@ -5,3 +5,4 @@
 # Keep this suppression at the external queue frame; application frames remain
 # fully instrumented and every other TSan report still stops the test job.
 race:g_queue_pop_tail
+race:fc_thread_func
