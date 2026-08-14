@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cstddef>
+#include <functional>
 #include <memory>
 #include <string>
 #include <string_view>
@@ -14,6 +15,8 @@ namespace tgbot::detail {
 // while a single callback is never re-entered for two messages at once.
 class AnyMessageCallbackDispatcher final {
    public:
+    using CancellationPublishedHook = std::function<void()>;
+
     explicit AnyMessageCallbackDispatcher(
         TgBotApiImpl::Ptr api, std::size_t workerCount = 2,
         std::size_t maxPendingInvocations = 256);
@@ -28,7 +31,12 @@ class AnyMessageCallbackDispatcher final {
     [[nodiscard]] TgBotApi::CallbackSubscription::Ptr subscribeCallback(
         const TgBotApi::AnyMessageCallback& callback);
     [[nodiscard]] bool enqueue(Message::Ptr message);
-    void removeCallbacksForCommand(std::string_view command);
+    // The optional hook observes the cancellation linearization point before
+    // registry-lock contention; it is intended for deterministic lifecycle
+    // coordination and tests.
+    void removeCallbacksForCommand(
+        std::string_view command,
+        const CancellationPublishedHook& cancellationPublishedHook = {});
 
    private:
     class Impl;

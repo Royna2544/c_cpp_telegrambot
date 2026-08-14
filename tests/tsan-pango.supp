@@ -1,8 +1,9 @@
-# Pango 1.57 runs fontconfig work on a GLib GAsyncQueue.  The vcpkg GLib/Pango
-# objects are not TSan-instrumented, so TSan cannot observe the GMutex
-# synchronization that transfers Pango's ThreadData to the worker.  It then
-# reports the worker's queue-node free as racing with the producer allocation.
-# Keep this suppression at the external queue frame; application frames remain
-# fully instrumented and every other TSan report still stops the test job.
+# Pango 1.57 runs fontconfig work on a GLib GAsyncQueue. The vcpkg
+# GLib/Pango/fontconfig objects are not TSan-instrumented, so TSan cannot observe
+# the external queue and font-cache synchronization. Keep every suppression at
+# an exact external symbol; application frames remain fully instrumented and
+# every other TSan report still stops the test job.
 race:g_queue_pop_tail
 race:fc_thread_func
+race:pango_fc_is_supported_font_format
+race:FcDirCacheMapFd

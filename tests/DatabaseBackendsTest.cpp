@@ -250,6 +250,32 @@ TEST(ProtoDatabaseTest, MutationIsDurableBeforeUnload) {
     EXPECT_TRUE(writer.unload());
     std::filesystem::remove(path);
 }
+
+TEST(ProtoDatabaseTest, RepeatedListLookupsDoNotCopyProtobufContainers) {
+    ProtoDatabase database;
+    ASSERT_TRUE(database.load(DatabaseBase::kInMemoryDatabase));
+
+    constexpr UserId first = 4000;
+    constexpr UserId count = 128;
+    for (UserId offset = 0; offset < count; ++offset) {
+        ASSERT_EQ(database.addUserToList(DatabaseBase::ListType::WHITELIST,
+                                         first + offset),
+                  DatabaseBase::ListResult::OK);
+    }
+
+    for (UserId offset = 0; offset < count; ++offset) {
+        EXPECT_EQ(database.checkUserInList(DatabaseBase::ListType::WHITELIST,
+                                           first + offset),
+                  DatabaseBase::ListResult::OK);
+        EXPECT_EQ(database.checkUserInList(DatabaseBase::ListType::BLACKLIST,
+                                           first + offset),
+                  DatabaseBase::ListResult::ALREADY_IN_OTHER_LIST);
+    }
+    EXPECT_EQ(database.checkUserInList(DatabaseBase::ListType::WHITELIST,
+                                       first + count),
+              DatabaseBase::ListResult::NOT_IN_LIST);
+    EXPECT_TRUE(database.unload());
+}
 #endif
 
 // Test chat info operations

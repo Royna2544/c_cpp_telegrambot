@@ -181,6 +181,18 @@ TEST_F(IbashCommandTest, ExactCancelDoesNotEnterTheProcessLane) {
     execute();
 }
 
+TEST_F(IbashCommandTest, TrimmedCancelKeepsCommandTextAlive) {
+    setCommandExtArgs({"  cancel  "});
+    ON_CALL(strings, get(Strings::IBASH_NO_ACTIVE_SESSION))
+        .WillByDefault(testing::Return("no active session"));
+    EXPECT_CALL(*botApi, submitCommandWork(testing::_, testing::_, testing::_,
+                                           testing::_))
+        .Times(0);
+    willSendReplyMessage("no active session");
+
+    execute();
+}
+
 TEST_F(IbashCommandTest, SessionsAreScopedByChatAndUser) {
     ON_CALL(strings, get(Strings::IBASH_SESSION_STARTED))
         .WillByDefault(testing::Return("session started"));

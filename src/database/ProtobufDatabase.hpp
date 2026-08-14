@@ -65,7 +65,7 @@ struct DBIMPL_EXPORT ProtoDatabase : DatabaseBase {
     const PersonList& getPersonList(ListType type) const;
     PersonList* getMutablePersonList(ListType type) const;
     const PersonList& getOtherPersonList(ListType type) const;
-    static std::optional<int> findByUid(const RepeatedField<UserId> list,
+    static std::optional<int> findByUid(const RepeatedField<UserId>& list,
                                         const UserId uid);
     [[nodiscard]] bool persistLocked() const;
 };

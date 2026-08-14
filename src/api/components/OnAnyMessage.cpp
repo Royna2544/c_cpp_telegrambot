@@ -6,6 +6,7 @@
 #include <api/components/ModuleExecutionContext.hpp>
 #include <api/components/ModuleManagement.hpp>
 #include <api/components/OnAnyMessage.hpp>
+#include <atomic>
 #include <condition_variable>
 #include <cstdint>
 #include <deque>
@@ -185,6 +186,11 @@ class AnyMessageCallbackDispatcher::Impl {
     const std::size_t maxPendingInvocations_;
     std::mutex mutex_;
     std::condition_variable readyCondition_;
+    // Owner cancellation is published before it competes for mutex_. Workers
+    // only promote queued work to an active lease while no cancellation is
+    // pending. This gives removal a start boundary independent of which
+    // thread wins the registry mutex after the request is made.
+    std::atomic_size_t cancellationRequests_ = 0;
     std::vector<std::shared_ptr<CallbackEntry>> callbacks_;
     std::deque<EntryId> ready_;
     std::size_t pendingInvocations_ = 0;
@@ -194,6 +200,34 @@ class AnyMessageCallbackDispatcher::Impl {
 
     inline static thread_local Impl* currentDispatcher_ = nullptr;
     inline static thread_local EntryId currentEntry_ = 0;
+
+    class CancellationRequest final {
+       public:
+        explicit CancellationRequest(Impl& dispatcher)
+            : dispatcher_(dispatcher) {
+            dispatcher_.cancellationRequests_.fetch_add(
+                1, std::memory_order_seq_cst);
+        }
+
+        ~CancellationRequest() {
+            // Pair the reopening transition with the mutex used by the
+            // condition-variable predicate. Otherwise a worker could observe
+            // a closed gate, miss this notification, and sleep indefinitely
+            // despite ready work.
+            {
+                const std::lock_guard lock(dispatcher_.mutex_);
+                dispatcher_.cancellationRequests_.fetch_sub(
+                    1, std::memory_order_seq_cst);
+            }
+            dispatcher_.readyCondition_.notify_all();
+        }
+
+        CancellationRequest(const CancellationRequest&) = delete;
+        CancellationRequest& operator=(const CancellationRequest&) = delete;
+
+       private:
+        Impl& dispatcher_;
+    };
 
     auto findEntry(EntryId id) {
         return std::ranges::find(callbacks_, id, &CallbackEntry::id);
@@ -237,8 +271,11 @@ class AnyMessageCallbackDispatcher::Impl {
             Message::Ptr message;
             {
                 std::unique_lock lock(mutex_);
-                readyCondition_.wait(
-                    lock, [this] { return stopping_ || !ready_.empty(); });
+                readyCondition_.wait(lock, [this] {
+                    return stopping_ || (cancellationRequests_.load(
+                                             std::memory_order_seq_cst) == 0 &&
+                                         !ready_.empty());
+                });
                 if (stopping_) {
                     return;
                 }
@@ -478,9 +515,21 @@ class AnyMessageCallbackDispatcher::Impl {
         return true;
     }
 
-    void removeCallbacksForCommand(const std::string_view command) {
+    void removeCallbacksForCommand(
+        const std::string_view command,
+        const AnyMessageCallbackDispatcher::CancellationPublishedHook&
+            cancellationPublishedHook) {
+        // Publish cancellation before taking mutex_. A worker that has
+        // already crossed the worker predicate is an active invocation and
+        // is drained below; a worker that has not crossed it cannot turn
+        // queued work into another invocation before matching entries are
+        // cancelled and detached.
         std::vector<std::shared_ptr<CallbackEntry>> removed;
         {
+            const CancellationRequest cancellation(*this);
+            if (cancellationPublishedHook) {
+                cancellationPublishedHook();
+            }
             const std::lock_guard lock(mutex_);
             for (auto it = callbacks_.begin(); it != callbacks_.end();) {
                 const auto& entry = *it;
@@ -502,7 +551,6 @@ class AnyMessageCallbackDispatcher::Impl {
                 it = callbacks_.erase(it);
             }
         }
-        readyCondition_.notify_all();
 
         for (const auto& entry : removed) {
             std::unique_lock lock(entry->drain->mutex);
@@ -538,8 +586,9 @@ bool AnyMessageCallbackDispatcher::enqueue(Message::Ptr message) {
 }
 
 void AnyMessageCallbackDispatcher::removeCallbacksForCommand(
-    const std::string_view command) {
-    impl_->removeCallbacksForCommand(command);
+    const std::string_view command,
+    const CancellationPublishedHook& cancellationPublishedHook) {
+    impl_->removeCallbacksForCommand(command, cancellationPublishedHook);
 }
 
 }  // namespace tgbot::detail

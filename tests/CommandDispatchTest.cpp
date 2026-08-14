@@ -301,6 +301,7 @@ TEST(AnyMessageCallbackDispatcherTest,
     std::condition_variable changed;
     bool callbackStarted = false;
     bool releaseCallback = false;
+    bool cancellationPublished = false;
     int callbackCalls = 0;
     std::atomic<bool> destroyed = false;
     auto probe = std::make_shared<LifetimeProbe>(&destroyed);
@@ -326,16 +327,28 @@ TEST(AnyMessageCallbackDispatcherTest,
     }
     ASSERT_TRUE(dispatcher.enqueue(std::make_shared<Message>()));
 
-    std::atomic<bool> removalStarted = false;
     std::atomic<bool> removalReturned = false;
     std::thread remover([&] {
-        removalStarted = true;
-        dispatcher.removeCallbacksForCommand("owned");
+        dispatcher.removeCallbacksForCommand("owned", [&] {
+            // Observe the dispatcher's cancellation linearization point, not
+            // merely the remover thread starting. The active callback is
+            // released only after workers are barred from promoting its
+            // queued invocation.
+            {
+                const std::lock_guard lock(mutex);
+                cancellationPublished = true;
+            }
+            changed.notify_all();
+        });
         removalReturned = true;
     });
-    while (!removalStarted.load()) {
-        std::this_thread::yield();
+    bool observedCancellation = false;
+    {
+        std::unique_lock lock(mutex);
+        observedCancellation =
+            changed.wait_for(lock, 2s, [&] { return cancellationPublished; });
     }
+    EXPECT_TRUE(observedCancellation);
     EXPECT_FALSE(removalReturned.load());
     EXPECT_FALSE(destroyed.load());
 

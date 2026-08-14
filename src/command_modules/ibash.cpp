@@ -844,7 +844,11 @@ DECLARE_COMMAND_HANDLER(ibash) {
     }
 
     if (message->has<MessageAttrs::ExtraText>()) {
-        const auto control = trimAscii(message->get<MessageAttrs::ExtraText>());
+        // MessageExt::get<ExtraText>() returns an owning string. Keep it alive
+        // while the trimmed view is inspected; binding trimAscii() directly to
+        // the temporary leaves control dangling at the end of the initializer.
+        const auto extra_text = message->get<MessageAttrs::ExtraText>();
+        const auto control = trimAscii(extra_text);
         if (control == "exit" || control == "cancel") {
             const bool ended =
                 InteractiveBashManager::getInstance().retireSession(*key);

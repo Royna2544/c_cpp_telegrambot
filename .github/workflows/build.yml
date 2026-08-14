@@ -63,8 +63,8 @@ jobs:
             flags: '-DCMAKE_C_FLAGS=-fsanitize=thread -DCMAKE_CXX_FLAGS=-fsanitize=thread -DCMAKE_EXE_LINKER_FLAGS=-fsanitize=thread -DCMAKE_SHARED_LINKER_FLAGS=-fsanitize=thread'
             str: (TSan)
             # vcpkg dependencies are not built with this target's sanitizer
-            # flags.  Keep the one documented Pango/GLib queue handoff
-            # suppression narrow while continuing to halt on every other race.
+            # flags. Keep the documented Pango/GLib/fontconfig suppressions at
+            # exact external symbols while halting on every other race.
             tsan_options: halt_on_error=1:suppressions=tsan-pango.supp
           - os: ubuntu-latest
             cc: GCC-ARMHF
@@ -130,6 +130,10 @@ jobs:
             libx11-dev libxft-dev libxext-dev libltdl-dev libxi-dev libxtst-dev \
             x11-xserver-utils gi-docgen nasm mono-complete gcc-arm-linux-gnueabihf \
             g++-arm-linux-gnueabihf libc6-dev-armhf-cross
+
+      - name: Install Build Dependencies (macOS Only)
+        if: matrix.os == 'macos-latest'
+        run: brew install autoconf autoconf-archive automake libtool
 
       - name: Select vcpkg binary cache sources
         shell: bash

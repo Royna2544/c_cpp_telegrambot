@@ -189,12 +189,11 @@ bool ProtoDatabase::persistLocked() const {
     return true;
 }
 
-std::optional<int> ProtoDatabase::findByUid(const RepeatedField<UserId> list,
+std::optional<int> ProtoDatabase::findByUid(const RepeatedField<UserId>& list,
                                             const UserId uid) {
-    for (auto it = list.begin(); it != list.end(); ++it) {
-        auto distance = std::distance(list.begin(), it);
-        if (list.Get(distance) == uid) {
-            return distance;
+    for (int index = 0; index < list.size(); ++index) {
+        if (list.Get(index) == uid) {
+            return index;
         }
     }
     return std::nullopt;
@@ -210,7 +209,7 @@ ProtoDatabase::ListResult ProtoDatabase::addUserToList(ListType type,
         dbinfo->object.ownerid() == user) {
         return ListResult::ALREADY_IN_OTHER_LIST;
     }
-    auto const otherList = getOtherPersonList(type);
+    const auto& otherList = getOtherPersonList(type);
     if (findByUid(otherList.id(), user)) {
         return ListResult::ALREADY_IN_OTHER_LIST;
     }
@@ -251,12 +250,12 @@ ProtoDatabase::ListResult ProtoDatabase::removeUserFromList(ListType type,
 [[nodiscard]] DatabaseBase::ListResult ProtoDatabase::checkUserInList(
     ListType type, UserId user) const {
     std::lock_guard<std::mutex> lock(dbinfo_mutex_);
-    auto const myList = getPersonList(type);
+    const auto& myList = getPersonList(type);
     auto loc = findByUid(myList.id(), user);
     if (loc.has_value()) {
         return ListResult::OK;
     }
-    auto const otherList = getOtherPersonList(type);
+    const auto& otherList = getOtherPersonList(type);
     auto otherLoc = findByUid(otherList.id(), user);
     if (otherLoc.has_value()) {
         return ListResult::ALREADY_IN_OTHER_LIST;
