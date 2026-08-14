@@ -144,6 +144,8 @@ bool replaceSnapshotFile(const std::filesystem::path& source,
 
 }  // namespace
 
+ProtoDatabase::~ProtoDatabase() = default;
+
 bool ProtoDatabase::persistLocked() const {
     if (!dbinfo) {
         return false;

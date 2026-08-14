@@ -79,6 +79,10 @@ tgbot_exe(
   TEST
 )
 target_link_libraries(test_database PRIVATE GTest::gtest DBImpl Utils)
+find_package(SQLite3 QUIET)
+if(SQLite3_FOUND)
+  target_link_libraries(test_database PRIVATE SQLite::SQLite3)
+endif()
 
 tgbot_exe(
   NAME regex

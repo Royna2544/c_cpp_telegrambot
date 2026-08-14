@@ -223,6 +223,11 @@ TEST(SQLiteDatabaseTest, MigratesLegacyDuplicateOwnersDeterministically) {
 #endif
 
 #ifdef DATABASE_HAVE_PROTOBUF
+TEST(ProtoDatabaseTest, ConstructsAndDestructsAcrossLibraryBoundary) {
+    std::unique_ptr<DatabaseBase> database = std::make_unique<ProtoDatabase>();
+    ASSERT_NE(database, nullptr);
+}
+
 TEST(ProtoDatabaseTest, MutationIsDurableBeforeUnload) {
     const auto path = std::filesystem::temp_directory_path() /
                       "glider-protobuf-immediate-persist-test.db";

@@ -16,6 +16,8 @@ using google::protobuf::RepeatedField;
 using google::protobuf::RepeatedPtrField;
 
 struct DBIMPL_EXPORT ProtoDatabase : DatabaseBase {
+    ~ProtoDatabase() override;
+
     [[nodiscard]] ListResult addUserToList(ListType type,
                                            UserId user) const override;
     [[nodiscard]] ListResult removeUserFromList(ListType type,
