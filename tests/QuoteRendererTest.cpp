@@ -461,22 +461,124 @@ TEST(QuoteRenderer, RejectsInvalidCropAndOversizedSourceBudget) {
 
 TEST(QuoteRenderer, ConcurrentRendersDoNotShareMutableState) {
     TestResolver resolver;
-    quote::QuoteRenderer renderer(testFontDirectory(), &resolver);
+    quote::QuoteRenderer firstRenderer(testFontDirectory(), &resolver);
+    quote::QuoteRenderer secondRenderer(testFontDirectory(), &resolver);
     std::vector<std::future<bool>> futures;
     for (int i = 0; i < 8; ++i) {
-        futures.push_back(std::async(std::launch::async, [&renderer, i] {
-            auto request = baseRequest();
-            request.messages.front().text += " #" + std::to_string(i);
-            request.messages.front().media.push_back(quote::QuoteMedia{
-                .type = quote::QuoteMediaType::Sticker,
-                .assetId = "asset",
-            });
-            auto result = renderer.render(request);
-            return result.has_value() && !result.value().bytes.empty();
-        }));
+        futures.push_back(std::async(
+            std::launch::async, [&firstRenderer, &secondRenderer, i] {
+                auto request = baseRequest();
+                request.messages.front().text += " #" + std::to_string(i);
+                request.messages.front().media.push_back(quote::QuoteMedia{
+                    .type = quote::QuoteMediaType::Sticker,
+                    .assetId = "asset",
+                });
+                auto& renderer = (i % 2 == 0) ? firstRenderer : secondRenderer;
+                auto result = renderer.render(request);
+                return result.has_value() && !result.value().bytes.empty();
+            }));
     }
     for (auto& future : futures)
         EXPECT_TRUE(future.get());
+}
+
+TEST(QuoteRenderer, TextBackendContentionHonorsRenderDeadline) {
+    struct RenderOutcome {
+        bool hasValue{};
+        quote::QuoteErrorCode errorCode{quote::QuoteErrorCode::Internal};
+        std::string errorMessage;
+    };
+    const auto renderOutcome = [](quote::QuoteRenderer& renderer,
+                                  const quote::QuoteRenderRequest& request) {
+        auto result = renderer.render(request);
+        if (result.has_value())
+            return RenderOutcome{.hasValue = true};
+        return RenderOutcome{.hasValue = false,
+                             .errorCode = result.error().code,
+                             .errorMessage = result.error().message};
+    };
+
+    class BlockingResolver final : public quote::QuoteAssetResolver {
+       public:
+        explicit BlockingResolver(std::shared_future<void> release)
+            : release_(std::move(release)) {}
+
+        std::future<void> takeEnteredFuture() { return entered_.get_future(); }
+
+        compat::expected<quote::QuoteAsset, quote::QuoteError> resolve(
+            std::string_view) override {
+            entered_.set_value();
+            release_.wait();
+            return quote::QuoteAsset{
+                .bytes =
+                    std::vector<std::uint8_t>(std::begin(kPng), std::end(kPng)),
+                .mimeType = "image/png",
+            };
+        }
+
+       private:
+        std::promise<void> entered_;
+        std::shared_future<void> release_;
+    };
+
+    std::promise<void> releasePromise;
+    BlockingResolver blockingResolver(releasePromise.get_future().share());
+    auto resolverEntered = blockingResolver.takeEnteredFuture();
+    quote::QuoteRenderer blockingRenderer(testFontDirectory(),
+                                          &blockingResolver);
+    auto blockingRequest = baseRequest();
+    blockingRequest.messages.front().media.push_back(quote::QuoteMedia{
+        .type = quote::QuoteMediaType::Photo,
+        .assetId = "blocking",
+    });
+    auto blockingRender =
+        std::async(std::launch::async, [&blockingRenderer, &renderOutcome,
+                                        request = std::move(blockingRequest)] {
+            return renderOutcome(blockingRenderer, request);
+        });
+
+    if (resolverEntered.wait_for(std::chrono::seconds(5)) !=
+        std::future_status::ready) {
+        releasePromise.set_value();
+        (void)blockingRender.get();
+        FAIL() << "blocking render never acquired the text backend";
+    }
+
+    quote::QuoteRenderer waitingRenderer(testFontDirectory());
+    auto waitingRequest = baseRequest();
+    waitingRequest.deadline = std::chrono::milliseconds(30);
+    std::promise<void> waitingStartedPromise;
+    auto waitingStarted = waitingStartedPromise.get_future();
+    auto waitingRender =
+        std::async(std::launch::async,
+                   [&waitingRenderer, &waitingStartedPromise, &renderOutcome,
+                    request = std::move(waitingRequest)] {
+                       waitingStartedPromise.set_value();
+                       return renderOutcome(waitingRenderer, request);
+                   });
+
+    if (waitingStarted.wait_for(std::chrono::seconds(5)) !=
+        std::future_status::ready) {
+        releasePromise.set_value();
+        (void)blockingRender.get();
+        (void)waitingRender.get();
+        FAIL() << "waiting render thread did not start";
+    }
+    const auto waitingStatus = waitingRender.wait_for(std::chrono::seconds(5));
+    EXPECT_EQ(waitingStatus, std::future_status::ready)
+        << "text-backend contention ignored the render deadline";
+    const bool releaseWasNeeded = waitingStatus != std::future_status::ready;
+    if (releaseWasNeeded)
+        releasePromise.set_value();
+
+    auto waitingResult = waitingRender.get();
+    if (!releaseWasNeeded)
+        releasePromise.set_value();
+    auto blockingResult = blockingRender.get();
+
+    ASSERT_FALSE(waitingResult.hasValue);
+    EXPECT_EQ(waitingResult.errorCode, quote::QuoteErrorCode::DeadlineExceeded);
+    ASSERT_TRUE(blockingResult.hasValue) << blockingResult.errorMessage;
 }
 
 TEST(QuoteRenderer, RejectsMalformedUtf8EntityRangesAndTinyCanvas) {

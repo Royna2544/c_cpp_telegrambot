@@ -20,6 +20,7 @@
 #include <filesystem>
 #include <limits>
 #include <memory>
+#include <mutex>
 #ifdef QUOTE_HAVE_OPENCV
 #include <opencv2/imgcodecs.hpp>
 #include <opencv2/imgproc.hpp>
@@ -87,6 +88,18 @@ using AttrListPtr =
     std::unique_ptr<PangoAttrList, decltype(&pango_attr_list_unref)>;
 using FontConfigPtr = std::unique_ptr<FcConfig, decltype(&FcConfigDestroy)>;
 using FontMapPtr = std::unique_ptr<PangoFontMap, decltype(&g_object_unref)>;
+
+[[nodiscard]] std::recursive_timed_mutex& textBackendMutex() {
+    // Pango 1.57 reuses one process-global HarfBuzz buffer under a GLib lock.
+    // Keep the complete Pango object lifetime behind an application-visible
+    // synchronization boundary as well. Besides making that ownership explicit,
+    // this lets TSan observe the hand-off when Pango/GLib are linked from
+    // uninstrumented static dependencies. The mutex must be process-wide
+    // because the cached buffer is shared by every Pango font map and
+    // QuoteRenderer.
+    static std::recursive_timed_mutex mutex;
+    return mutex;
+}
 
 struct Rgba {
     double red{};
@@ -1916,6 +1929,15 @@ compat::expected<QuoteRenderResult, QuoteError> QuoteRenderer::render(
 
     try {
         const auto started = std::chrono::steady_clock::now();
+        const auto expiresAt = started + request.deadline;
+        std::unique_lock<std::recursive_timed_mutex> textBackendLock(
+            textBackendMutex(), std::defer_lock);
+        if (!textBackendLock.try_lock_until(expiresAt) ||
+            std::chrono::steady_clock::now() >= expiresAt) {
+            return makeRenderError(QuoteErrorCode::DeadlineExceeded,
+                                   "quote render deadline exceeded while "
+                                   "waiting for the text backend");
+        }
         auto fontMapResult = createBundledFontMap(fontDirectory_);
         if (!fontMapResult.has_value())
             return compat::unexpected<QuoteError>(fontMapResult.error());
@@ -1923,7 +1945,7 @@ compat::expected<QuoteRenderResult, QuoteError> QuoteRenderer::render(
         RenderState state{.request = request,
                           .resolver = resolver_,
                           .started = started,
-                          .expiresAt = started + request.deadline};
+                          .expiresAt = expiresAt};
         const double scale = request.scale;
         std::uint32_t logicalWidth = request.width;
         std::uint32_t logicalHeight = request.height;
@@ -2080,6 +2102,15 @@ compat::expected<QuoteRenderResult, QuoteError> QuoteRenderer::render(
             return makeRenderError(QuoteErrorCode::Internal,
                                    "quote drawing surface failed");
         }
+
+        // Drop Cairo contexts that may retain Pango-created scaled fonts, then
+        // destroy the private font map before releasing the backend boundary.
+        // Encoding and sticker scaling below use Cairo image surfaces and
+        // WebP/PNG only, so they can still proceed concurrently.
+        cr.reset();
+        scratch.reset();
+        fontMap.reset();
+        textBackendLock.unlock();
 
         SurfacePtr stickerCardSurface(nullptr, &cairo_surface_destroy);
         SurfacePtr stickerOutputSurface(nullptr, &cairo_surface_destroy);
