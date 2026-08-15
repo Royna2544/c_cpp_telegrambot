@@ -10,8 +10,8 @@
 
 // Match the production include order: AskConfirmTool instantiates the JSON
 // serializer for optional<json> before the LM Studio adapter is included.
-static_assert(
-    sizeof(nlohmann::adl_serializer<std::optional<nlohmann::json>>) > 0);
+static_assert(sizeof(nlohmann::adl_serializer<std::optional<nlohmann::json>>) >
+              0);
 
 #include "llm/LMStudioApi.hpp"
 #include "llm/OpenAIApi.hpp"
@@ -297,6 +297,52 @@ TEST(ToolCallSafety, BoundsToolResults) {
     const auto bounded = llm::tool_safety::boundedToolResult(std::move(large));
     EXPECT_NE(bounded.find("[tool result truncated]"), std::string::npos);
     EXPECT_EQ(bounded.size(), llm::tool_safety::kMaxToolResultBytes);
+}
+
+TEST(ToolCancellationSafety, RejectsExecutionAfterCancellation) {
+    int executions = 0;
+    llm::ToolExecutor delegate = [&executions](const std::string&,
+                                               const nlohmann::json&, bool&) {
+        ++executions;
+        return std::string("executed");
+    };
+    bool isError = false;
+    std::string result;
+
+    EXPECT_EQ(llm::tool_safety::executeUnlessCancelled(
+                  [] { return true; }, delegate, "kernelbuild",
+                  nlohmann::json::object(), isError, result),
+              llm::tool_safety::ToolExecutionStatus::Cancelled);
+    EXPECT_EQ(executions, 0);
+    EXPECT_TRUE(result.empty());
+}
+
+TEST(ToolCancellationSafety, RechecksBetweenCallsInOneBatch) {
+    bool cancelled = false;
+    int executions = 0;
+    llm::ToolExecutor delegate = [&](const std::string&, const nlohmann::json&,
+                                     bool&) {
+        ++executions;
+        cancelled = true;
+        return std::string("executed");
+    };
+    const std::function<bool()> cancellationCheck = [&] { return cancelled; };
+    bool isError = false;
+    std::string result;
+
+    EXPECT_EQ(llm::tool_safety::executeUnlessCancelled(
+                  cancellationCheck, delegate, "get_chat_name",
+                  nlohmann::json::object(), isError, result),
+              llm::tool_safety::ToolExecutionStatus::Executed);
+    EXPECT_EQ(result, "executed");
+
+    result.clear();
+    EXPECT_EQ(llm::tool_safety::executeUnlessCancelled(
+                  cancellationCheck, delegate, "kernelbuild",
+                  nlohmann::json::object(), isError, result),
+              llm::tool_safety::ToolExecutionStatus::Cancelled);
+    EXPECT_EQ(executions, 1);
+    EXPECT_TRUE(result.empty());
 }
 
 TEST(CurlSafety, InteractiveLimitsStayFiniteAndMemoryBounded) {

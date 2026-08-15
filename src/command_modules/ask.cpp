@@ -468,7 +468,8 @@ void runAskWork(TgBotApi::Ptr api, Message::Ptr sourceMessage, std::string text,
     queuePlainReply(api, sourceMessage,
                     res->get(Strings::LLM_PROCESSING_QUERY));
     const bool isAdmin = provider->auth->isAuthorized(
-        sourceMessage, AuthContext::AccessLevel::AdminUser);
+        sourceMessage, AuthContext::AccessLevel::AdminUser,
+        AuthContext::MessageAgePolicy::AuthenticatedInternal);
     const auto userId = sourceMessage->from.value()->id;
     auto toolDomain = llm::tool_router::Domain::Chat;
     std::vector<llm::Tool> tools;

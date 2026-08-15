@@ -1,7 +1,10 @@
 #include <chrono>
 #include <cstdint>
 #include <sstream>
+#include <stop_token>
 #include <string>
+#include <thread>
+#include <vector>
 
 #include "CommandModulesTest.hpp"
 #include "gmock/gmock.h"
@@ -54,7 +57,7 @@ struct DecideCommandTest : CommandTestBase {
     DecideCommandTest() : CommandTestBase("decide") {}
 };
 
-TEST_F(DecideCommandTest, UsesFairCoinAndCompletesWithinOneSecond) {
+TEST_F(DecideCommandTest, UsesFairCoinAndSchedulesFinalWithinOneSecond) {
     using namespace std::chrono_literals;
     useDecisionStrings(strings);
     setCommandExtArgs({"ship it"});
@@ -78,10 +81,19 @@ TEST_F(DecideCommandTest, UsesFairCoinAndCompletesWithinOneSecond) {
                              TEST_CHAT_ID, defaultProvidedMessage->messageId,
                              testing::_, true))
         .WillOnce(testing::Return(true));
+    std::vector<TgBotApi::WorkOptions> scheduled;
     EXPECT_CALL(*botApi,
                 submitCommandWork("decide", TgBotApi::WorkClass::Outbound,
                                   testing::_, testing::_))
-        .Times(3);
+        .Times(3)
+        .WillRepeatedly(
+            testing::Invoke([&scheduled](std::string_view, TgBotApi::WorkClass,
+                                         TgBotApi::CancellableWork work,
+                                         TgBotApi::WorkOptions options) {
+                scheduled.push_back(options);
+                work(std::stop_token{});
+                return std::optional<TgBotApi::WorkId>{scheduled.size()};
+            }));
 
     const auto started = std::chrono::steady_clock::now();
     execute();
@@ -91,6 +103,107 @@ TEST_F(DecideCommandTest, UsesFairCoinAndCompletesWithinOneSecond) {
     EXPECT_EQ(countOccurrences(progressText, "Try "), 5U);
     EXPECT_EQ(countOccurrences(finalText, "Try "), 10U);
     EXPECT_THAT(finalText, HasSubstr("So, yes"));
+    ASSERT_EQ(scheduled.size(), 3U);
+    EXPECT_EQ(scheduled[0].delay, 0ms);
+    EXPECT_GT(scheduled[1].delay, 100ms);
+    EXPECT_LE(scheduled[1].delay, 250ms);
+    EXPECT_GT(scheduled[2].delay, 500ms);
+    EXPECT_LE(scheduled[2].delay, 750ms);
+}
+
+TEST_F(DecideCommandTest, CancellationDuringInitialSendStopsRemainingWork) {
+    useDecisionStrings(strings);
+    setCommandExtArgs({"ship it"});
+
+    EXPECT_CALL(*random, generate(0, 1))
+        .Times(10)
+        .WillRepeatedly(testing::Return(1));
+    const auto sent = createDefaultMessage();
+    sent->from = createDefaultUser(TEST_BOT_USER_ID_OFFSET);
+
+    std::stop_source deadline;
+    EXPECT_CALL(*botApi,
+                submitCommandWork("decide", TgBotApi::WorkClass::Outbound,
+                                  testing::_, testing::_))
+        .WillOnce(testing::Invoke(
+            [&deadline](std::string_view, TgBotApi::WorkClass,
+                        TgBotApi::CancellableWork work, TgBotApi::WorkOptions) {
+                work(deadline.get_token());
+                return std::optional<TgBotApi::WorkId>{1};
+            }));
+    EXPECT_CALL(*botApi,
+                sendMessage_impl(TEST_CHAT_ID, HasSubstr("Deciding 'ship it'"),
+                                 createMessageReplyMatcher(), testing::IsNull(),
+                                 TgBotApi::ParseMode::None))
+        .WillOnce(testing::DoAll(testing::InvokeWithoutArgs(
+                                     [&deadline] { deadline.request_stop(); }),
+                                 testing::Return(sent)));
+
+    EXPECT_CALL(*botApi, editMessage_impl(sent, testing::_, testing::IsNull(),
+                                          TgBotApi::ParseMode::None))
+        .Times(0);
+    EXPECT_CALL(*botApi, setMessageReaction_impl(testing::_, testing::_,
+                                                 testing::_, testing::_))
+        .Times(0);
+
+    execute();
+}
+
+TEST_F(DecideCommandTest, SlowInitialSendSkipsProgressAndCommitsFinal) {
+    using namespace std::chrono_literals;
+    useDecisionStrings(strings);
+    setCommandExtArgs({"ship it"});
+
+    EXPECT_CALL(*random, generate(0, 1))
+        .Times(10)
+        .WillRepeatedly(testing::Return(1));
+    const auto sent = createDefaultMessage();
+    sent->from = createDefaultUser(TEST_BOT_USER_ID_OFFSET);
+
+    std::vector<TgBotApi::WorkOptions> scheduled;
+    EXPECT_CALL(*botApi,
+                submitCommandWork("decide", TgBotApi::WorkClass::Outbound,
+                                  testing::_, testing::_))
+        .Times(2)
+        .WillRepeatedly(
+            testing::Invoke([&scheduled](std::string_view, TgBotApi::WorkClass,
+                                         TgBotApi::CancellableWork work,
+                                         TgBotApi::WorkOptions options) {
+                scheduled.push_back(options);
+                work(std::stop_token{});
+                return std::optional<TgBotApi::WorkId>{scheduled.size()};
+            }));
+    EXPECT_CALL(*botApi,
+                sendMessage_impl(TEST_CHAT_ID, HasSubstr("Deciding 'ship it'"),
+                                 createMessageReplyMatcher(), testing::IsNull(),
+                                 TgBotApi::ParseMode::None))
+        .WillOnce(testing::InvokeWithoutArgs([sent] {
+            std::this_thread::sleep_for(400ms);
+            return sent;
+        }));
+
+    std::string finalText;
+    {
+        InSequence sequence;
+        EXPECT_CALL(*botApi,
+                    editMessage_impl(sent, testing::_, testing::IsNull(),
+                                     TgBotApi::ParseMode::None))
+            .WillOnce(testing::DoAll(testing::SaveArg<1>(&finalText),
+                                     testing::Return(sent)));
+        EXPECT_CALL(*botApi,
+                    setMessageReaction_impl(TEST_CHAT_ID,
+                                            defaultProvidedMessage->messageId,
+                                            testing::_, true))
+            .WillOnce(testing::Return(true));
+    }
+
+    execute();
+
+    EXPECT_EQ(countOccurrences(finalText, "Try "), 10U);
+    EXPECT_THAT(finalText, HasSubstr("So, yes"));
+    ASSERT_EQ(scheduled.size(), 2U);
+    EXPECT_GT(scheduled[1].delay, 200ms);
+    EXPECT_LT(scheduled[1].delay, 500ms);
 }
 
 struct PossibilityCommandTest : CommandTestBase {

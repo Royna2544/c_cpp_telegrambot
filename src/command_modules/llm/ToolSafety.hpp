@@ -19,6 +19,26 @@ inline constexpr std::size_t kMaxToolCallsPerResponse = 4;
 inline constexpr std::size_t kMaxToolCallsPerTurn = 8;
 inline constexpr std::size_t kMaxToolResultBytes = 16 * 1024;
 
+enum class ToolExecutionStatus {
+    Executed,
+    Cancelled,
+};
+
+// Keep the cancellation check adjacent to the actual side-effect boundary.
+// HTTP cancellation alone is insufficient: a stop request can arrive after a
+// response has been received but before (or between) the tool calls it
+// contains.
+inline ToolExecutionStatus executeUnlessCancelled(
+    const std::function<bool()>& cancelled, const ToolExecutor& delegate,
+    const std::string& toolName, const nlohmann::json& input, bool& isError,
+    std::string& result) {
+    if (cancelled && cancelled()) {
+        return ToolExecutionStatus::Cancelled;
+    }
+    result = delegate(toolName, input, isError);
+    return ToolExecutionStatus::Executed;
+}
+
 // Checks a complete provider tool-call batch before any call in it runs. This
 // avoids partially executing an oversized or malformed parallel batch.
 class ToolCallBudget {

@@ -270,11 +270,11 @@ senderForMessage(const Message::Ptr& target) {
         }
         return compat::unexpected<std::string>(origin->type);
     }
-    if (target->from && *target->from)
-        return senderFromUser(*target->from);
     if (target->senderChat && *target->senderChat) {
         return senderFromChat(*target->senderChat);
     }
+    if (target->from && *target->from)
+        return senderFromUser(*target->from);
     return compat::unexpected<std::string>("sender-less message");
 }
 
@@ -497,8 +497,12 @@ DECLARE_COMMAND_HANDLER(q) {
     quote::QuoteRenderRequest request;
     request.type = quote::QuoteOutputType::Quote;
     request.format = quote::QuoteOutputFormat::WebP;
-    request.background = transparent ? "transparent" : "#20252b";
+    request.background = transparent ? "transparent" : "//#292232";
     request.width = 512;
+    // Match quote-api's default high-resolution layout pass.  The renderer
+    // shrink-wraps that 2x card and downsamples the completed sticker, keeping
+    // short quotes and sender labels readable in Telegram.
+    request.scale = 2.0;
     request.telegramSticker = true;
     request.maximumSourceBytes = 24U * 1024U * 1024U;
     request.maximumEncodedBytes = 512U * 1024U;

@@ -52,9 +52,9 @@ jobs:
             cc: GCC-ASan-UBSan
             real_cc: gcc
             real_cxx: g++
-            flags: '-DCMAKE_C_FLAGS=-fsanitize=address,undefined -DCMAKE_CXX_FLAGS=-fsanitize=address,undefined -DCMAKE_EXE_LINKER_FLAGS=-fsanitize=address,undefined -DCMAKE_SHARED_LINKER_FLAGS=-fsanitize=address,undefined'
+            flags: '-DCMAKE_C_FLAGS=-fsanitize=address,undefined -DCMAKE_CXX_FLAGS=-fsanitize=address,undefined -DCMAKE_EXE_LINKER_FLAGS=-fsanitize=address,undefined -DCMAKE_SHARED_LINKER_FLAGS=-fsanitize=address,undefined -DVCPKG_TARGET_TRIPLET=x64-linux-asan-ubsan -DVCPKG_OVERLAY_TRIPLETS=$GITHUB_WORKSPACE/CMake/triplets'
             str: (ASan, UBSan)
-            asan_options: detect_leaks=0:halt_on_error=1
+            asan_options: detect_container_overflow=1:detect_leaks=0:halt_on_error=1
             ubsan_options: halt_on_error=1:print_stacktrace=1
           - os: ubuntu-latest
             cc: GCC-TSan
@@ -62,9 +62,9 @@ jobs:
             real_cxx: g++
             flags: '-DCMAKE_C_FLAGS=-fsanitize=thread -DCMAKE_CXX_FLAGS=-fsanitize=thread -DCMAKE_EXE_LINKER_FLAGS=-fsanitize=thread -DCMAKE_SHARED_LINKER_FLAGS=-fsanitize=thread'
             str: (TSan)
-            # vcpkg dependencies are not built with this target's sanitizer
-            # flags. Keep the documented Pango/GLib/fontconfig suppressions at
-            # exact external symbols while halting on every other race.
+            # These static vcpkg dependencies are not TSan-instrumented. Keep
+            # suppression at the anchored GLib worker and Pango/Fontconfig C
+            # namespace boundaries while halting on every application race.
             tsan_options: halt_on_error=1:suppressions=tsan-pango.supp
           - os: ubuntu-latest
             cc: GCC-ARMHF
@@ -107,8 +107,8 @@ jobs:
         uses: actions/cache@v4
         with:
           path: ${{ github.workspace }}/vcpkg_cache
-          # Cache key depends on OS, compiler, and the vcpkg.json file
-          key: vcpkg-${{ matrix.os }}-${{ matrix.cc }}-${{ hashFiles('vcpkg.json') }}
+          # Include custom triplets so sanitizer-ABI changes get a fresh cache.
+          key: vcpkg-${{ matrix.os }}-${{ matrix.cc }}-${{ hashFiles('vcpkg.json', 'CMake/triplets/*.cmake') }}
           restore-keys: |
             vcpkg-${{ matrix.os }}-${{ matrix.cc }}-
 

@@ -85,6 +85,72 @@ class AuthContextTest : public ::testing::TestWithParam<AuthParam> {
     AuthContext* auth;
 };
 
+TEST_F(AuthContextTest,
+       DelayedAuthenticatedInternalDispatchSkipsOnlyMessageAge) {
+    auto message = std::make_shared<Message>();
+    message->from = std::make_shared<TgBot::User>();
+    (*message->from)->id = FAKE_OWNER_ID;
+    MakeMessageDateBefore(message);
+
+    ON_CALL(*database, getOwnerUserId).WillByDefault(Return(FAKE_OWNER_ID));
+    ON_CALL(*database,
+            checkUserInList(DatabaseBase::ListType::BLACKLIST, FAKE_OWNER_ID))
+        .WillByDefault(Return(DatabaseBase::ListResult::NOT_IN_LIST));
+    ON_CALL(*database,
+            checkUserInList(DatabaseBase::ListType::WHITELIST, FAKE_OWNER_ID))
+        .WillByDefault(Return(DatabaseBase::ListResult::NOT_IN_LIST));
+
+    const auto inbound =
+        auth->isAuthorized(message, AuthContext::AccessLevel::Owner);
+    EXPECT_FALSE(inbound);
+    EXPECT_EQ(inbound.result.second,
+              AuthContext::Result::Reason::MessageTooOld);
+
+    const auto internal = auth->isAuthorized(
+        message, AuthContext::AccessLevel::Owner,
+        AuthContext::MessageAgePolicy::AuthenticatedInternal);
+    EXPECT_TRUE(internal);
+    EXPECT_EQ(internal.result.second, AuthContext::Result::Reason::Ok);
+}
+
+TEST_F(AuthContextTest, DelayedInternalDispatchStillEnforcesTargetAccess) {
+    ON_CALL(*database, getOwnerUserId).WillByDefault(Return(FAKE_OWNER_ID));
+    ON_CALL(*database, checkUserInList(DatabaseBase::ListType::BLACKLIST,
+                                       FAKE_WHITELISTED_ID))
+        .WillByDefault(Return(DatabaseBase::ListResult::NOT_IN_LIST));
+    ON_CALL(*database, checkUserInList(DatabaseBase::ListType::WHITELIST,
+                                       FAKE_WHITELISTED_ID))
+        .WillByDefault(Return(DatabaseBase::ListResult::OK));
+    ON_CALL(*database, checkUserInList(DatabaseBase::ListType::BLACKLIST,
+                                       FAKE_BLACKLISTED_ID))
+        .WillByDefault(Return(DatabaseBase::ListResult::OK));
+    ON_CALL(*database, checkUserInList(DatabaseBase::ListType::WHITELIST,
+                                       FAKE_BLACKLISTED_ID))
+        .WillByDefault(Return(DatabaseBase::ListResult::NOT_IN_LIST));
+
+    auto nonOwner = std::make_shared<Message>();
+    nonOwner->from = std::make_shared<TgBot::User>();
+    (*nonOwner->from)->id = FAKE_WHITELISTED_ID;
+    MakeMessageDateBefore(nonOwner);
+    const auto ownerOnly = auth->isAuthorized(
+        nonOwner, AuthContext::AccessLevel::Owner,
+        AuthContext::MessageAgePolicy::AuthenticatedInternal);
+    EXPECT_FALSE(ownerOnly);
+    EXPECT_EQ(ownerOnly.result.second,
+              AuthContext::Result::Reason::PermissionDenied);
+
+    auto blacklisted = std::make_shared<Message>();
+    blacklisted->from = std::make_shared<TgBot::User>();
+    (*blacklisted->from)->id = FAKE_BLACKLISTED_ID;
+    MakeMessageDateBefore(blacklisted);
+    const auto userCommand = auth->isAuthorized(
+        blacklisted, AuthContext::AccessLevel::User,
+        AuthContext::MessageAgePolicy::AuthenticatedInternal);
+    EXPECT_FALSE(userCommand);
+    EXPECT_EQ(userCommand.result.second,
+              AuthContext::Result::Reason::ForbiddenUser);
+}
+
 TEST_P(AuthContextTest, expectedForMessagesInTime) {
     const auto& Authparam = GetParam();
     auto message = std::make_shared<Message>();

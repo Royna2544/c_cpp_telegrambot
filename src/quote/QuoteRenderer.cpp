@@ -1,6 +1,8 @@
 #include <absl/log/log.h>
 #include <cairo.h>
+#include <fontconfig/fontconfig.h>
 #include <pango/pangocairo.h>
+#include <pango/pangofc-fontmap.h>
 #include <png.h>
 #include <turbojpeg.h>
 #include <webp/decode.h>
@@ -8,6 +10,7 @@
 
 #include <algorithm>
 #include <array>
+#include <cctype>
 #include <chrono>
 #include <cmath>
 #include <cstddef>
@@ -31,6 +34,8 @@
 
 #if defined(_WIN32)
 #include <windows.h>
+#elif defined(__unix__) || defined(__APPLE__)
+#include <dlfcn.h>
 #endif
 
 namespace quote {
@@ -49,6 +54,24 @@ constexpr std::size_t kMaximumBackgroundBytes = 256;
 constexpr std::size_t kTelegramStickerBytes = 512U * 1024U;
 constexpr auto kMaximumDeadline = std::chrono::minutes(5);
 constexpr double kPi = 3.14159265358979323846;
+// quote-api 0.14 lays out quote bubbles in logical pixels and normally
+// rasterizes them at 2x.  Keep the geometry in one place so measurement and
+// painting cannot silently drift apart.
+constexpr double kBubblePadX = 16.0;
+constexpr double kBubblePadY = 12.0;
+constexpr double kBubbleGap = 5.0;
+constexpr double kBubbleRadius = 25.0;
+constexpr double kBubbleMinimumWidth = 100.0;
+constexpr double kAvatarSize = 50.0;
+constexpr double kAvatarGap = 10.0;
+constexpr double kBubbleTail = 14.0;
+constexpr double kShadowPad = 12.0;
+constexpr double kShadowPadTop = 4.0;
+constexpr double kSenderFontSize = 18.0;
+constexpr double kTextFontSize = 24.0;
+constexpr double kReplyNameFontSize = 14.0;
+constexpr double kReplyTextFontSize = 15.0;
+constexpr double kStickerBottomPadding = 75.0;
 constexpr std::array<std::string_view, 4> kBundledFontFiles = {
     "NotoSans-Variable.ttf", "NotoSansKR-Variable.ttf",
     "NotoSansArabic-Variable.ttf", "NotoEmoji-Variable.ttf"};
@@ -56,11 +79,14 @@ constexpr std::array<std::string_view, 4> kBundledFontFiles = {
 using SurfacePtr =
     std::unique_ptr<cairo_surface_t, decltype(&cairo_surface_destroy)>;
 using CairoPtr = std::unique_ptr<cairo_t, decltype(&cairo_destroy)>;
+using ContextPtr = std::unique_ptr<PangoContext, decltype(&g_object_unref)>;
 using LayoutPtr = std::unique_ptr<PangoLayout, decltype(&g_object_unref)>;
 using FontPtr = std::unique_ptr<PangoFontDescription,
                                 decltype(&pango_font_description_free)>;
 using AttrListPtr =
     std::unique_ptr<PangoAttrList, decltype(&pango_attr_list_unref)>;
+using FontConfigPtr = std::unique_ptr<FcConfig, decltype(&FcConfigDestroy)>;
+using FontMapPtr = std::unique_ptr<PangoFontMap, decltype(&g_object_unref)>;
 
 struct Rgba {
     double red{};
@@ -91,9 +117,12 @@ struct RenderState {
 
 struct MessageMetrics {
     double height{};
+    double bubbleWidth{};
+    double senderHeight{};
     double textHeight{};
     double replyHeight{};
     double replyMediaSize{};
+    std::vector<double> mediaWidths;
     std::vector<double> mediaHeights;
 };
 
@@ -121,104 +150,123 @@ struct MessageMetrics {
 }
 
 [[nodiscard]] bool pinDynamicPangoRuntime() noexcept {
+    static const bool pinned = []() noexcept {
 #ifdef _WIN32
-    // GObject keeps registered Pango type metadata for the life of the
-    // process. If /q is the last consumer, unloading Pango and loading it again
-    // attempts to register those names twice. Taking the address of an imported
-    // function is not sufficient here: some toolchains return the command
-    // module's IAT thunk rather than the address inside the Pango DLL. Resolve
-    // the export from the loaded DLL, then pin the module containing that exact
-    // address.
-    constexpr std::array moduleNames = {L"pangocairo-1.0-0.dll",
-                                        L"libpangocairo-1.0-0.dll"};
-    for (const auto* moduleName : moduleNames) {
-        const HMODULE module = GetModuleHandleW(moduleName);
-        if (module == nullptr)
-            continue;
-        const auto function =
-            GetProcAddress(module, "pango_cairo_font_map_get_default");
-        if (function == nullptr)
-            continue;
-        HMODULE pinnedModule = nullptr;
-        return GetModuleHandleExW(GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS |
-                                      GET_MODULE_HANDLE_EX_FLAG_PIN,
-                                  reinterpret_cast<LPCWSTR>(function),
-                                  &pinnedModule) != FALSE;
-    }
-    return false;
+        // GObject keeps registered Pango type metadata for the life of the
+        // process. If /q is the last consumer, unloading Pango and loading it
+        // again attempts to register those names twice. Taking the address of
+        // an imported function is not sufficient here: some toolchains return
+        // the command module's IAT thunk rather than the address inside the
+        // Pango DLL. Resolve the export from the loaded DLL, then pin the
+        // module containing that exact address.
+        const auto pinExport = [](const auto& moduleNames,
+                                  const char* exportName) noexcept {
+            for (const auto* moduleName : moduleNames) {
+                const HMODULE module = GetModuleHandleW(moduleName);
+                if (module == nullptr)
+                    continue;
+                const auto function = GetProcAddress(module, exportName);
+                if (function == nullptr)
+                    continue;
+                HMODULE pinnedModule = nullptr;
+                return GetModuleHandleExW(
+                           GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS |
+                               GET_MODULE_HANDLE_EX_FLAG_PIN,
+                           reinterpret_cast<LPCWSTR>(function),
+                           &pinnedModule) != FALSE;
+            }
+            return false;
+        };
+        constexpr std::array cairoModules = {L"pangocairo-1.0-0.dll",
+                                             L"libpangocairo-1.0-0.dll"};
+        constexpr std::array freetypeModules = {L"pangoft2-1.0-0.dll",
+                                                L"libpangoft2-1.0-0.dll"};
+        return pinExport(cairoModules,
+                         "pango_cairo_font_map_new_for_font_type") &&
+               pinExport(freetypeModules, "pango_fc_font_map_set_config");
+#elif defined(__unix__) || defined(__APPLE__)
+        // GObject type registrations and PangoFc's worker threads outlive an
+        // individual render. Keep the image containing each implementation
+        // resident for the process lifetime. QuoteRenderer is forced SHARED, so
+        // a statically linked Pango resolves to QuoteRenderer rather than
+        // cmd_q; cmd_q can therefore still be unloaded and reloaded normally.
+        // When Pango is dynamic, dladdr instead identifies and pins the
+        // external Pango DSO.
+        const auto pinImageContaining = [](const void* address) noexcept {
+            Dl_info info{};
+            if (dladdr(address, &info) == 0 || info.dli_fname == nullptr ||
+                info.dli_fname[0] == '\0') {
+                return false;
+            }
+            // Intentionally leak this reference. dlclose would reintroduce the
+            // exact worker/GType lifetime hazard this function prevents.
+            return dlopen(info.dli_fname, RTLD_NOW | RTLD_LOCAL) != nullptr;
+        };
+        return pinImageContaining(reinterpret_cast<const void*>(
+                   &pango_cairo_font_map_new_for_font_type)) &&
+               pinImageContaining(reinterpret_cast<const void*>(
+                   &pango_fc_font_map_set_config));
 #else
-    return true;
+        return true;
 #endif
+    }();
+    return pinned;
 }
 
-[[nodiscard]] std::optional<QuoteError> registerBundledFonts(
+[[nodiscard]] compat::expected<FontMapPtr, QuoteError> createBundledFontMap(
     const std::filesystem::path& directory) {
-    // Pango's default Cairo font map is per-thread. Force the portable
-    // FreeType/fontconfig backend so the same bundled outline fonts are used
-    // on Windows, macOS, Linux, and ARM, then mark that thread-owned map after
-    // registration. The marker lives in Pango rather than this unloadable
-    // module, avoiding unsafe thread_local destructors across module reloads.
-    constexpr char registrationKey[] =
-        "glider-quote-fonts-352f6b7d9d6cc4fa9e242b931291d31b21a6dc84";
+    const auto fail =
+        [](QuoteErrorCode code,
+           std::string message) -> compat::expected<FontMapPtr, QuoteError> {
+        return compat::unexpected<QuoteError>(
+            QuoteError{.code = code, .message = std::move(message)});
+    };
     if (!containsBundledFonts(directory)) {
-        return QuoteError{.code = QuoteErrorCode::AssetUnavailable,
-                          .message = "bundled quote fonts are unavailable"};
+        return fail(QuoteErrorCode::AssetUnavailable,
+                    "bundled quote fonts are unavailable");
     }
     if (!pinDynamicPangoRuntime()) {
-        return QuoteError{.code = QuoteErrorCode::Internal,
-                          .message = "failed to retain the Pango runtime"};
+        return fail(QuoteErrorCode::Internal,
+                    "failed to retain the Pango runtime");
     }
-    PangoFontMap* fontMap = pango_cairo_font_map_get_default();
-    if (fontMap == nullptr) {
-        return QuoteError{.code = QuoteErrorCode::Internal,
-                          .message = "Pango font map is unavailable"};
-    }
-    if (pango_cairo_font_map_get_font_type(PANGO_CAIRO_FONT_MAP(fontMap)) !=
-        CAIRO_FONT_TYPE_FT) {
-        PangoFontMap* freetypeMap =
-            pango_cairo_font_map_new_for_font_type(CAIRO_FONT_TYPE_FT);
-        if (freetypeMap == nullptr) {
-            return QuoteError{
-                .code = QuoteErrorCode::AssetUnavailable,
-                .message = "Pango FreeType font backend is unavailable"};
-        }
-        pango_cairo_font_map_set_default(PANGO_CAIRO_FONT_MAP(freetypeMap));
-        g_object_unref(freetypeMap);
-        fontMap = pango_cairo_font_map_get_default();
-        if (fontMap == nullptr) {
-            return QuoteError{.code = QuoteErrorCode::Internal,
-                              .message = "Pango font map switch failed"};
-        }
-    }
-    if (g_object_get_data(G_OBJECT(fontMap), registrationKey) != nullptr)
-        return std::nullopt;
 
+    // Embedded deployments do not necessarily ship /etc/fonts/fonts.conf.
+    // Build a private app-font configuration and attach it to a private
+    // FreeType Pango map. Never replace Fontconfig's process-global current
+    // configuration: another renderer (or another module) may be using it.
+    FontConfigPtr fontConfig(FcConfigCreate(), &FcConfigDestroy);
+    if (!fontConfig) {
+        return fail(QuoteErrorCode::AssetUnavailable,
+                    "cannot create bundled font config");
+    }
     for (const auto file : kBundledFontFiles) {
         const auto path = pangoFontPath(directory / file);
-        GError* error = nullptr;
-        if (pango_font_map_add_font_file(fontMap, path.c_str(), &error) ==
-            FALSE) {
-            std::string message = "failed to load bundled quote font";
-            if (error != nullptr && error->message != nullptr)
-                message.append(": ").append(error->message);
-            if (error != nullptr)
-                g_error_free(error);
-            return QuoteError{.code = QuoteErrorCode::AssetUnavailable,
-                              .message = std::move(message)};
+        if (FcConfigAppFontAddFile(
+                fontConfig.get(),
+                reinterpret_cast<const FcChar8*>(path.c_str())) == FcFalse) {
+            return fail(QuoteErrorCode::AssetUnavailable,
+                        "failed to register bundled quote font");
         }
     }
+    FontMapPtr fontMap(
+        pango_cairo_font_map_new_for_font_type(CAIRO_FONT_TYPE_FT),
+        &g_object_unref);
+    if (!fontMap || !PANGO_IS_FC_FONT_MAP(fontMap.get())) {
+        return fail(QuoteErrorCode::AssetUnavailable,
+                    "Pango FreeType font backend is unavailable");
+    }
+    pango_fc_font_map_set_config(PANGO_FC_FONT_MAP(fontMap.get()),
+                                 fontConfig.get());
     constexpr std::array<std::string_view, 4> requiredFamilies = {
         "Noto Sans", "Noto Sans KR", "Noto Sans Arabic", "Noto Emoji"};
     for (const auto family : requiredFamilies) {
         const std::string name(family);
-        if (pango_font_map_get_family(fontMap, name.c_str()) == nullptr) {
-            return QuoteError{
-                .code = QuoteErrorCode::AssetUnavailable,
-                .message = "bundled quote font family is unavailable: " + name};
+        if (pango_font_map_get_family(fontMap.get(), name.c_str()) == nullptr) {
+            return fail(QuoteErrorCode::AssetUnavailable,
+                        "bundled quote font family is unavailable: " + name);
         }
     }
-    g_object_set_data(G_OBJECT(fontMap), registrationKey, GINT_TO_POINTER(1));
-    return std::nullopt;
+    return fontMap;
 }
 
 [[nodiscard]] compat::expected<DecodedImage, QuoteError> makeError(
@@ -303,6 +351,25 @@ struct MessageMetrics {
 }
 
 [[nodiscard]] std::vector<Rgba> backgroundColors(std::string_view value) {
+    const auto adjustLuminance = [](Rgba color, double amount) {
+        const auto adjust = [amount](double channel) {
+            return std::clamp(channel * (1.0 + amount), 0.0, 1.0);
+        };
+        color.red = adjust(color.red);
+        color.green = adjust(color.green);
+        color.blue = adjust(color.blue);
+        return color;
+    };
+
+    // quote-api's default `//#292232` notation means a two-stop bubble
+    // gradient derived from the supplied base colour, not a solid canvas
+    // fill.  Preserve the slash-separated colour form as well.
+    if (value.starts_with("//")) {
+        if (auto base = parseHexColor(value.substr(2))) {
+            return {adjustLuminance(*base, 0.35),
+                    adjustLuminance(*base, -0.15)};
+        }
+    }
     std::vector<Rgba> colors;
     for (std::size_t i = 0; i < value.size(); ++i) {
         if (value[i] != '#')
@@ -333,7 +400,9 @@ struct MessageMetrics {
         if (value == "transparent") {
             colors.push_back(Rgba{0, 0, 0, 0});
         } else {
-            colors.push_back(Rgba{0.12, 0.14, 0.16, 1});
+            const auto base = parseHexColor("#292232").value();
+            colors.push_back(adjustLuminance(base, 0.35));
+            colors.push_back(adjustLuminance(base, -0.15));
         }
     }
     return colors;
@@ -349,6 +418,99 @@ void roundedRectangle(cairo_t* cr, double x, double y, double width,
     cairo_arc(cr, x + radius, y + height - radius, radius, kPi / 2.0, kPi);
     cairo_arc(cr, x + radius, y + radius, radius, kPi, 3.0 * kPi / 2.0);
     cairo_close_path(cr);
+}
+
+void quoteBubblePath(cairo_t* cr, double x, double y, double width,
+                     double height, double radius, double tail) {
+    radius = std::max(0.0, std::min(radius, std::min(width, height) / 2.0));
+    cairo_new_sub_path(cr);
+    cairo_move_to(cr, x + radius, y);
+    cairo_line_to(cr, x + width - radius, y);
+    cairo_arc(cr, x + width - radius, y + radius, radius, -kPi / 2.0, 0);
+    cairo_line_to(cr, x + width, y + height - radius);
+    cairo_arc(cr, x + width - radius, y + height - radius, radius, 0,
+              kPi / 2.0);
+    if (tail > 0.0) {
+        cairo_line_to(cr, x - tail, y + height);
+        cairo_curve_to(cr, x - tail * 0.4, y + height, x,
+                       y + height - radius * 0.3, x, y + height - radius);
+    } else {
+        cairo_line_to(cr, x + radius, y + height);
+        cairo_arc(cr, x + radius, y + height - radius, radius, kPi / 2.0, kPi);
+    }
+    cairo_line_to(cr, x, y + radius);
+    cairo_arc(cr, x + radius, y + radius, radius, kPi, 3.0 * kPi / 2.0);
+    cairo_close_path(cr);
+}
+
+void paintQuoteBubble(cairo_t* cr, double x, double y, double width,
+                      double height, double radius, double tail,
+                      std::string_view background, double scale) {
+    const auto colors = backgroundColors(background);
+    if (std::all_of(colors.begin(), colors.end(),
+                    [](const Rgba& color) { return color.alpha == 0.0; })) {
+        return;
+    }
+
+    // Cairo does not expose a portable blurred-shadow primitive.  A soft,
+    // low-alpha offset silhouette provides the same separation from Telegram
+    // wallpaper without expanding the encoded sticker bounds.
+    cairo_save(cr);
+    quoteBubblePath(cr, x, y + 2.0 * scale, width, height, radius, tail);
+    cairo_set_source_rgba(cr, 0.0, 0.0, 0.0, 0.24);
+    cairo_fill(cr);
+    cairo_restore(cr);
+
+    cairo_save(cr);
+    quoteBubblePath(cr, x, y, width, height, radius, tail);
+    if (colors.size() == 1) {
+        const auto& color = colors.front();
+        cairo_set_source_rgba(cr, color.red, color.green, color.blue,
+                              color.alpha);
+    } else {
+        cairo_pattern_t* gradient =
+            cairo_pattern_create_linear(x, y, x + width, y + height);
+        cairo_pattern_add_color_stop_rgba(gradient, 0, colors[0].red,
+                                          colors[0].green, colors[0].blue,
+                                          colors[0].alpha);
+        cairo_pattern_add_color_stop_rgba(gradient, 1, colors[1].red,
+                                          colors[1].green, colors[1].blue,
+                                          colors[1].alpha);
+        cairo_set_source(cr, gradient);
+        cairo_pattern_destroy(gradient);
+    }
+    cairo_fill_preserve(cr);
+    cairo_set_source_rgba(cr, 1.0, 1.0, 1.0, 0.09);
+    cairo_set_line_width(cr, 1.25 * scale);
+    cairo_stroke(cr);
+    cairo_restore(cr);
+}
+
+[[nodiscard]] Rgba senderColor(std::int64_t senderId) {
+    constexpr std::array<std::string_view, 7> palette = {
+        "#ff8e86", "#ffa357", "#b18fff", "#4dd6bf",
+        "#45e8d1", "#7ac9ff", "#ff7fd5"};
+    const auto magnitude = senderId < 0
+                               ? static_cast<std::uint64_t>(-(senderId + 1)) + 1
+                               : static_cast<std::uint64_t>(senderId);
+    return parseHexColor(palette[magnitude % palette.size()]).value();
+}
+
+[[nodiscard]] std::pair<Rgba, Rgba> avatarColors(std::int64_t senderId) {
+    constexpr std::array<std::pair<std::string_view, std::string_view>, 7>
+        palette = {{{"#ff885e", "#ff516a"},
+                    {"#ffcd6a", "#ffa85c"},
+                    {"#e0a2f3", "#d669ed"},
+                    {"#a0de7e", "#54cb68"},
+                    {"#53edd6", "#28c9b7"},
+                    {"#72d5fd", "#2a9ef1"},
+                    {"#ffa8a8", "#ff719a"}}};
+    const auto magnitude = senderId < 0
+                               ? static_cast<std::uint64_t>(-(senderId + 1)) + 1
+                               : static_cast<std::uint64_t>(senderId);
+    const auto& colors = palette[magnitude % palette.size()];
+    return {parseHexColor(colors.first).value(),
+            parseHexColor(colors.second).value()};
 }
 
 void paintBackground(cairo_t* cr, int width, int height,
@@ -480,11 +642,14 @@ void addEntityAttribute(PangoAttrList* list, PangoAttribute* attribute,
     return list;
 }
 
-[[nodiscard]] LayoutPtr createLayout(cairo_t* cr, std::string_view text,
+[[nodiscard]] LayoutPtr createLayout(cairo_t* cr, PangoFontMap* fontMap,
+                                     std::string_view text,
                                      const std::vector<QuoteEntity>& entities,
                                      double width, double fontPixels,
                                      bool bold = false, int maximumLines = 0) {
-    LayoutPtr layout(pango_cairo_create_layout(cr), &g_object_unref);
+    ContextPtr context(pango_font_map_create_context(fontMap), &g_object_unref);
+    pango_cairo_update_context(cr, context.get());
+    LayoutPtr layout(pango_layout_new(context.get()), &g_object_unref);
     pango_layout_set_text(layout.get(), text.data(),
                           static_cast<int>(text.size()));
     pango_layout_set_width(
@@ -869,47 +1034,109 @@ void paintImage(cairo_t* cr, const DecodedImage& image, double x, double y,
     return 160.0 * scale;
 }
 
-[[nodiscard]] MessageMetrics measureMessage(cairo_t* cr,
+[[nodiscard]] MessageMetrics measureMessage(cairo_t* cr, PangoFontMap* fontMap,
                                             const QuoteMessage& message,
-                                            double contentWidth, double scale) {
+                                            double maximumBubbleWidth,
+                                            double scale) {
     MessageMetrics metrics;
-    double height = 16.0 * scale;
-    if (!message.groupWithPrevious)
-        height += 24.0 * scale;
+    const double padX = kBubblePadX * scale;
+    const double padY = kBubblePadY * scale;
+    const double gap = kBubbleGap * scale;
+    const double maximumContentWidth =
+        std::max(1.0, maximumBubbleWidth - 2.0 * padX);
+    double naturalContentWidth = 0.0;
+    double height = 2.0 * padY;
+    bool hasBlock = false;
+    const auto appendBlock = [&](double blockHeight, double blockGap) {
+        if (blockHeight <= 0.0)
+            return;
+        if (hasBlock)
+            height += blockGap;
+        height += blockHeight;
+        hasBlock = true;
+    };
+
+    if (!message.groupWithPrevious) {
+        const std::string senderName =
+            message.sender.name.empty() ? "Unknown" : message.sender.name;
+        auto senderLayout =
+            createLayout(cr, fontMap, senderName, {}, maximumContentWidth,
+                         kSenderFontSize * scale, true, 1);
+        const auto size = layoutSize(senderLayout.get());
+        metrics.senderHeight =
+            std::max(kSenderFontSize * scale, static_cast<double>(size.second));
+        naturalContentWidth =
+            std::max(naturalContentWidth, static_cast<double>(size.first));
+        appendBlock(metrics.senderHeight, 0.0);
+    }
     if (message.reply) {
         const double replyPreview = message.reply->media ? 38.0 * scale : 0.0;
         metrics.replyMediaSize = replyPreview;
+        auto replyNameLayout = createLayout(
+            cr, fontMap,
+            message.reply->sender.name.empty() ? "Reply"
+                                               : message.reply->sender.name,
+            {}, maximumContentWidth - 20.0 * scale - replyPreview,
+            kReplyNameFontSize * scale, true, 1);
         auto replyLayout = createLayout(
-            cr, message.reply->text, message.reply->entities,
-            contentWidth - 20.0 * scale - replyPreview, 12.0 * scale, false, 2);
+            cr, fontMap, message.reply->text, message.reply->entities,
+            maximumContentWidth - 20.0 * scale - replyPreview,
+            kReplyTextFontSize * scale, false, 2);
+        const auto nameSize = layoutSize(replyNameLayout.get());
         const auto size = layoutSize(replyLayout.get());
-        metrics.replyHeight =
-            std::max({35.0 * scale, size.second + 20.0 * scale,
-                      replyPreview + 4.0 * scale});
-        height += metrics.replyHeight + 6.0 * scale;
+        metrics.replyHeight = std::max(
+            {38.0 * scale,
+             static_cast<double>(nameSize.second + size.second) + 8.0 * scale,
+             replyPreview + 4.0 * scale});
+        naturalContentWidth =
+            std::max(naturalContentWidth,
+                     static_cast<double>(std::max(nameSize.first, size.first)) +
+                         20.0 * scale + replyPreview);
+        appendBlock(metrics.replyHeight, gap);
     }
     if (!message.text.empty()) {
-        auto layout = createLayout(cr, message.text, message.entities,
-                                   contentWidth, 17.0 * scale);
+        auto layout = createLayout(cr, fontMap, message.text, message.entities,
+                                   maximumContentWidth, kTextFontSize * scale);
         const auto size = layoutSize(layout.get());
         metrics.textHeight =
-            std::max(18.0 * scale, static_cast<double>(size.second));
-        height += metrics.textHeight + 6.0 * scale;
+            std::max(kTextFontSize * scale, static_cast<double>(size.second));
+        naturalContentWidth =
+            std::max(naturalContentWidth, static_cast<double>(size.first));
+        // Text's font metrics already provide the visual separation below a
+        // sender header, matching quote-api's zero-margin text node.
+        appendBlock(metrics.textHeight, 0.0);
     }
+    const double baseMediaWidth = std::max(
+        80.0 * scale,
+        std::min(maximumContentWidth, maximumContentWidth * 2.0 / 3.0));
+    metrics.mediaWidths.reserve(message.media.size());
     metrics.mediaHeights.reserve(message.media.size());
     for (const auto& media : message.media) {
-        const double current = mediaHeight(media, contentWidth, scale);
-        metrics.mediaHeights.push_back(current);
-        height += current + 6.0 * scale;
+        double mediaWidth = baseMediaWidth;
+        if (media.width > 0) {
+            mediaWidth = std::clamp(static_cast<double>(media.width),
+                                    80.0 * scale, baseMediaWidth);
+        }
+        const double mediaBlockHeight = mediaHeight(media, mediaWidth, scale);
+        metrics.mediaWidths.push_back(mediaWidth);
+        metrics.mediaHeights.push_back(mediaBlockHeight);
+        naturalContentWidth = std::max(naturalContentWidth, mediaWidth);
+        appendBlock(mediaBlockHeight, gap);
     }
-    if (message.voice)
-        height += 54.0 * scale;
-    metrics.height = height + 10.0 * scale;
+    if (message.voice) {
+        naturalContentWidth = std::max(
+            naturalContentWidth, std::min(maximumContentWidth, 260.0 * scale));
+        appendBlock(44.0 * scale, gap);
+    }
+    metrics.bubbleWidth =
+        std::ceil(std::clamp(naturalContentWidth + 2.0 * padX,
+                             kBubbleMinimumWidth * scale, maximumBubbleWidth));
+    metrics.height = std::ceil(std::max(height, 2.0 * padY));
     return metrics;
 }
 
-void drawVoice(cairo_t* cr, const QuoteVoice& voice, double x, double y,
-               double width, double scale) {
+void drawVoice(cairo_t* cr, PangoFontMap* fontMap, const QuoteVoice& voice,
+               double x, double y, double width, double scale) {
     const double height = 44.0 * scale;
     cairo_save(cr);
     cairo_set_source_rgba(cr, 0.17, 0.22, 0.27, 0.9);
@@ -938,7 +1165,8 @@ void drawVoice(cairo_t* cr, const QuoteVoice& voice, double x, double y,
     if (seconds < 10)
         duration += '0';
     duration += std::to_string(seconds);
-    auto layout = createLayout(cr, duration, {}, 50.0 * scale, 11.0 * scale);
+    auto layout =
+        createLayout(cr, fontMap, duration, {}, 50.0 * scale, 11.0 * scale);
     cairo_move_to(cr, x + width - 47.0 * scale, y + 14.0 * scale);
     pango_cairo_show_layout(cr, layout.get());
     cairo_restore(cr);
@@ -965,15 +1193,82 @@ void drawCustomEmoji(cairo_t* cr, RenderState& state, PangoLayout* layout,
     }
 }
 
-void drawSenderAvatar(cairo_t* cr, RenderState& state,
+[[nodiscard]] std::string firstUtf8Codepoint(std::string_view value,
+                                             std::size_t offset) {
+    if (offset >= value.size())
+        return {};
+    const auto first = static_cast<unsigned char>(value[offset]);
+    std::size_t length = 1;
+    if ((first & 0xE0U) == 0xC0U)
+        length = 2;
+    else if ((first & 0xF0U) == 0xE0U)
+        length = 3;
+    else if ((first & 0xF8U) == 0xF0U)
+        length = 4;
+    length = std::min(length, value.size() - offset);
+    std::string result(value.substr(offset, length));
+    if (result.size() == 1) {
+        result.front() = static_cast<char>(
+            std::toupper(static_cast<unsigned char>(result.front())));
+    }
+    return result;
+}
+
+[[nodiscard]] std::string avatarInitials(std::string_view name) {
+    const auto isSpace = [](char value) {
+        return std::isspace(static_cast<unsigned char>(value)) != 0;
+    };
+    std::size_t first = 0;
+    while (first < name.size() && isSpace(name[first]))
+        ++first;
+    if (first == name.size())
+        return "?";
+
+    std::size_t lastWord = first;
+    for (std::size_t offset = first; offset < name.size();) {
+        while (offset < name.size() && !isSpace(name[offset]))
+            ++offset;
+        while (offset < name.size() && isSpace(name[offset]))
+            ++offset;
+        if (offset < name.size())
+            lastWord = offset;
+    }
+    std::string result = firstUtf8Codepoint(name, first);
+    if (lastWord != first)
+        result += firstUtf8Codepoint(name, lastWord);
+    return result.empty() ? "?" : result;
+}
+
+void drawSenderAvatar(cairo_t* cr, PangoFontMap* fontMap, RenderState& state,
                       const QuoteMessage& message, double x, double y,
                       double size) {
     const auto drawPlaceholder = [&] {
         cairo_save(cr);
-        cairo_set_source_rgba(cr, 0.32, 0.57, 0.82, 1.0);
         cairo_arc(cr, x + size / 2.0, y + size / 2.0, size / 2.0, 0, 2.0 * kPi);
-        cairo_fill(cr);
+        cairo_clip(cr);
+        const auto [first, second] = avatarColors(message.sender.id);
+        cairo_pattern_t* gradient =
+            cairo_pattern_create_linear(x, y, x + size, y + size);
+        cairo_pattern_add_color_stop_rgba(gradient, 0, first.red, first.green,
+                                          first.blue, first.alpha);
+        cairo_pattern_add_color_stop_rgba(gradient, 1, second.red, second.green,
+                                          second.blue, second.alpha);
+        cairo_set_source(cr, gradient);
+        cairo_pattern_destroy(gradient);
+        cairo_paint(cr);
         cairo_restore(cr);
+
+        const auto initials = avatarInitials(message.sender.name);
+        const bool multipleInitials =
+            firstUtf8Codepoint(initials, 0).size() < initials.size();
+        const double fontSize = size * (multipleInitials ? 0.38 : 0.48);
+        auto layout =
+            createLayout(cr, fontMap, initials, {}, size, fontSize, true, 1);
+        const auto [textWidth, textHeight] = layoutSize(layout.get());
+        cairo_set_source_rgba(cr, 1.0, 1.0, 1.0, 1.0);
+        cairo_move_to(cr, x + (size - textWidth) / 2.0,
+                      y + (size - textHeight) / 2.0);
+        pango_cairo_show_layout(cr, layout.get());
     };
     if (!message.avatar || !message.sender.avatar ||
         message.sender.avatar->assetId.empty()) {
@@ -989,101 +1284,130 @@ void drawSenderAvatar(cairo_t* cr, RenderState& state,
 }
 
 [[nodiscard]] std::optional<QuoteError> drawMessage(
-    cairo_t* cr, RenderState& state, const QuoteMessage& message,
-    const MessageMetrics& metrics, double canvasWidth, double y, double scale) {
-    const double outer = 18.0 * scale;
-    const double avatarSize = 42.0 * scale;
-    const double avatarGap = 8.0 * scale;
+    cairo_t* cr, PangoFontMap* fontMap, RenderState& state,
+    const QuoteMessage& message, const MessageMetrics& metrics, double bubbleX,
+    double y, double scale, std::string_view background) {
+    const double padX = kBubblePadX * scale;
+    const double padY = kBubblePadY * scale;
+    const double gap = kBubbleGap * scale;
+    const double avatarSize = kAvatarSize * scale;
+    const double avatarGap = kAvatarGap * scale;
     const bool showSender = !message.groupWithPrevious;
-    const double left =
-        outer + (showSender && message.avatar ? avatarSize + avatarGap : 0.0);
-    const double bubbleWidth = canvasWidth - left - outer;
-    const double contentX = left + 14.0 * scale;
-    const double contentWidth = bubbleWidth - 28.0 * scale;
+    const double contentX = bubbleX + padX;
+    const double contentWidth = metrics.bubbleWidth - 2.0 * padX;
+    const double tail =
+        showSender && message.avatar ? kBubbleTail * scale : 0.0;
 
-    cairo_save(cr);
-    cairo_set_source_rgba(cr, 0.10, 0.12, 0.15, 0.94);
-    roundedRectangle(cr, left, y, bubbleWidth, metrics.height, 17.0 * scale);
-    cairo_fill(cr);
-    cairo_restore(cr);
+    paintQuoteBubble(cr, bubbleX, y, metrics.bubbleWidth, metrics.height,
+                     kBubbleRadius * scale, tail, background, scale);
 
     if (showSender && message.avatar) {
-        drawSenderAvatar(cr, state, message, outer, y, avatarSize);
+        const double avatarY =
+            y + std::max(0.0, metrics.height - avatarSize - 2.0 * scale);
+        drawSenderAvatar(cr, fontMap, state, message,
+                         bubbleX - avatarGap - avatarSize, avatarY, avatarSize);
     }
 
-    double cursorY = y + 11.0 * scale;
+    double cursorY = y + padY;
+    bool hasBlock = false;
     if (showSender) {
-        cairo_set_source_rgba(cr, 0.38, 0.72, 0.98, 1.0);
+        const auto color = senderColor(message.sender.id);
+        cairo_set_source_rgba(cr, color.red, color.green, color.blue,
+                              color.alpha);
         const std::string senderName =
             message.sender.name.empty() ? "Unknown" : message.sender.name;
-        auto senderLayout = createLayout(cr, senderName, {}, contentWidth,
-                                         14.0 * scale, true, 1);
+        auto senderLayout =
+            createLayout(cr, fontMap, senderName, {}, contentWidth,
+                         kSenderFontSize * scale, true, 1);
         cairo_move_to(cr, contentX, cursorY);
         pango_cairo_show_layout(cr, senderLayout.get());
-        cursorY += 24.0 * scale;
+        cursorY += metrics.senderHeight;
+        hasBlock = true;
     }
     if (message.reply) {
-        cairo_set_source_rgba(cr, 0.30, 0.68, 0.93, 1.0);
-        roundedRectangle(cr, contentX, cursorY, 3.0 * scale,
-                         metrics.replyHeight, 1.5 * scale);
+        if (hasBlock)
+            cursorY += gap;
+        const auto accent = senderColor(message.reply->sender.id);
+        cairo_save(cr);
+        cairo_set_source_rgba(cr, accent.red, accent.green, accent.blue, 0.14);
+        roundedRectangle(cr, contentX, cursorY, contentWidth,
+                         metrics.replyHeight, 7.0 * scale);
         cairo_fill(cr);
-        cairo_set_source_rgba(cr, 0.45, 0.78, 0.98, 1.0);
+        cairo_set_source_rgba(cr, accent.red, accent.green, accent.blue, 1.0);
+        roundedRectangle(cr, contentX, cursorY, 3.5 * scale,
+                         metrics.replyHeight, 1.75 * scale);
+        cairo_fill(cr);
+        cairo_restore(cr);
+
+        cairo_set_source_rgba(cr, accent.red, accent.green, accent.blue, 1.0);
         auto nameLayout = createLayout(
-            cr,
+            cr, fontMap,
             message.reply->sender.name.empty() ? "Reply"
                                                : message.reply->sender.name,
-            {}, contentWidth - 12.0 * scale - metrics.replyMediaSize,
-            11.0 * scale, true, 1);
-        cairo_move_to(cr, contentX + 9.0 * scale, cursorY + 2.0 * scale);
+            {}, contentWidth - 20.0 * scale - metrics.replyMediaSize,
+            kReplyNameFontSize * scale, true, 1);
+        const auto nameSize = layoutSize(nameLayout.get());
+        cairo_move_to(cr, contentX + 10.0 * scale, cursorY + 4.0 * scale);
         pango_cairo_show_layout(cr, nameLayout.get());
-        cairo_set_source_rgba(cr, 0.78, 0.82, 0.86, 1.0);
-        auto replyLayout =
-            createLayout(cr, message.reply->text, message.reply->entities,
-                         contentWidth - 12.0 * scale - metrics.replyMediaSize,
-                         12.0 * scale, false, 2);
-        cairo_move_to(cr, contentX + 9.0 * scale, cursorY + 16.0 * scale);
+        cairo_set_source_rgba(cr, 0.96, 0.97, 0.98, 1.0);
+        auto replyLayout = createLayout(
+            cr, fontMap, message.reply->text, message.reply->entities,
+            contentWidth - 20.0 * scale - metrics.replyMediaSize,
+            kReplyTextFontSize * scale, false, 2);
+        const double replyTextY =
+            cursorY + 4.0 * scale + nameSize.second + 3.0 * scale;
+        cairo_move_to(cr, contentX + 10.0 * scale, replyTextY);
         pango_cairo_show_layout(cr, replyLayout.get());
         drawCustomEmoji(cr, state, replyLayout.get(), message.reply->text,
-                        message.reply->entities, contentX + 9.0 * scale,
-                        cursorY + 16.0 * scale, 13.0 * scale);
+                        message.reply->entities, contentX + 10.0 * scale,
+                        replyTextY, (kReplyTextFontSize + 1.0) * scale);
         if (message.reply->media) {
             auto image = decodeAsset(state, message.reply->media->assetId);
             if (!image.has_value())
                 return image.error();
             const double preview = metrics.replyMediaSize;
             paintImage(cr, image.value(),
-                       contentX + contentWidth - preview - 3.0 * scale,
-                       cursorY + 2.0 * scale, preview, preview,
-                       message.reply->media->crop, 6.0 * scale);
+                       contentX + contentWidth - preview - 4.0 * scale,
+                       cursorY + (metrics.replyHeight - preview) / 2.0, preview,
+                       preview, message.reply->media->crop, 6.0 * scale);
         }
-        cursorY += metrics.replyHeight + 6.0 * scale;
+        cursorY += metrics.replyHeight;
+        hasBlock = true;
     }
     if (!message.text.empty()) {
         cairo_set_source_rgba(cr, 0.96, 0.97, 0.98, 1.0);
-        auto layout = createLayout(cr, message.text, message.entities,
-                                   contentWidth, 17.0 * scale);
+        auto layout = createLayout(cr, fontMap, message.text, message.entities,
+                                   contentWidth, kTextFontSize * scale);
         cairo_move_to(cr, contentX, cursorY);
         pango_cairo_show_layout(cr, layout.get());
         drawCustomEmoji(cr, state, layout.get(), message.text, message.entities,
-                        contentX, cursorY, 18.0 * scale);
-        cursorY += metrics.textHeight + 6.0 * scale;
+                        contentX, cursorY, (kTextFontSize + 1.0) * scale);
+        cursorY += metrics.textHeight;
+        hasBlock = true;
     }
     for (std::size_t i = 0; i < message.media.size(); ++i) {
+        if (hasBlock)
+            cursorY += gap;
         const auto& media = message.media[i];
+        const double mediaWidth = metrics.mediaWidths[i];
         const double height = metrics.mediaHeights[i];
         auto image = decodeAsset(state, media.assetId);
         if (image.has_value()) {
             paintImage(
-                cr, image.value(), contentX, cursorY, contentWidth, height,
+                cr, image.value(), contentX, cursorY, mediaWidth, height,
                 media.crop,
                 media.type == QuoteMediaType::Sticker ? 0.0 : 12.0 * scale);
         } else {
             return image.error();
         }
-        cursorY += height + 6.0 * scale;
+        cursorY += height;
+        hasBlock = true;
     }
     if (message.voice) {
-        drawVoice(cr, *message.voice, contentX, cursorY, contentWidth, scale);
+        if (hasBlock)
+            cursorY += gap;
+        drawVoice(cr, fontMap, *message.voice, contentX, cursorY,
+                  std::min(contentWidth, 260.0 * scale), scale);
     }
     return std::nullopt;
 }
@@ -1592,46 +1916,48 @@ compat::expected<QuoteRenderResult, QuoteError> QuoteRenderer::render(
 
     try {
         const auto started = std::chrono::steady_clock::now();
-        if (const auto error = registerBundledFonts(fontDirectory_)) {
-            return compat::unexpected<QuoteError>(*error);
-        }
+        auto fontMapResult = createBundledFontMap(fontDirectory_);
+        if (!fontMapResult.has_value())
+            return compat::unexpected<QuoteError>(fontMapResult.error());
+        auto fontMap = std::move(fontMapResult.value());
         RenderState state{.request = request,
                           .resolver = resolver_,
                           .started = started,
                           .expiresAt = started + request.deadline};
         const double scale = request.scale;
-        std::uint32_t width = request.width;
-        std::uint32_t height = request.height;
+        std::uint32_t logicalWidth = request.width;
+        std::uint32_t logicalHeight = request.height;
         switch (request.type) {
             case QuoteOutputType::Quote:
-                if (width == 0)
-                    width = 512;
+                if (logicalWidth == 0)
+                    logicalWidth = 512;
                 break;
             case QuoteOutputType::Image:
-                if (width == 0)
-                    width = 1200;
-                if (height == 0)
-                    height = 630;
+                if (logicalWidth == 0)
+                    logicalWidth = 1200;
+                if (logicalHeight == 0)
+                    logicalHeight = 630;
                 break;
             case QuoteOutputType::Stories:
-                if (width == 0)
-                    width = 1080;
-                if (height == 0)
-                    height = 1920;
+                if (logicalWidth == 0)
+                    logicalWidth = 1080;
+                if (logicalHeight == 0)
+                    logicalHeight = 1920;
                 break;
         }
-        if (request.telegramSticker)
-            width = 512;
-        const auto minimumWidth =
-            static_cast<std::uint32_t>(std::ceil(160.0 * scale));
-        const auto minimumHeight =
-            static_cast<std::uint32_t>(std::ceil(64.0 * scale));
-        if (width < minimumWidth || width > kMaximumDimension ||
-            height > kMaximumDimension ||
-            (height != 0 && height < minimumHeight)) {
+        const double scaledWidth = logicalWidth * scale;
+        const double scaledHeight = logicalHeight * scale;
+        if (!validFinite(scaledWidth) || !validFinite(scaledHeight) ||
+            scaledWidth < 160.0 * scale || scaledWidth > kMaximumDimension ||
+            scaledHeight > kMaximumDimension ||
+            (logicalHeight != 0 && scaledHeight < 64.0 * scale)) {
             return makeRenderError(QuoteErrorCode::LimitExceeded,
                                    "canvas dimension exceeds limit");
         }
+        const auto maximumCanvasWidth =
+            static_cast<std::uint32_t>(std::ceil(scaledWidth));
+        const auto requestedCanvasHeight =
+            static_cast<std::uint32_t>(std::ceil(scaledHeight));
 
         SurfacePtr scratchSurface(
             cairo_image_surface_create(CAIRO_FORMAT_ARGB32, 1, 1),
@@ -1642,19 +1968,43 @@ compat::expected<QuoteRenderResult, QuoteError> QuoteRenderer::render(
                 QuoteErrorCode::Internal,
                 "failed to create Pango measurement surface");
         }
-        const double showAvatarOffset = 50.0 * scale;
-        const double contentWidth = std::max(
-            64.0, static_cast<double>(width) - 64.0 * scale - showAvatarOffset);
+        const bool reserveAvatarColumn = std::any_of(
+            request.messages.begin(), request.messages.end(),
+            [](const QuoteMessage& message) { return message.avatar; });
+        const double avatarColumn =
+            reserveAvatarColumn ? (kAvatarSize + kAvatarGap) * scale : 0.0;
+        const double maximumBubbleWidth =
+            static_cast<double>(maximumCanvasWidth) - avatarColumn -
+            kShadowPad * scale;
+        if (maximumBubbleWidth < kBubbleMinimumWidth * scale) {
+            return makeRenderError(QuoteErrorCode::LimitExceeded,
+                                   "quote width leaves no room for content");
+        }
         std::vector<MessageMetrics> metrics;
         metrics.reserve(request.messages.size());
-        double contentHeight = 24.0 * scale;
+        double widestBubble = 0.0;
+        double contentHeight = kShadowPadTop * scale;
         for (const auto& message : request.messages) {
-            metrics.push_back(
-                measureMessage(scratch.get(), message, contentWidth, scale));
-            contentHeight += metrics.back().height + 8.0 * scale;
+            metrics.push_back(measureMessage(scratch.get(), fontMap.get(),
+                                             message, maximumBubbleWidth,
+                                             scale));
+            widestBubble = std::max(widestBubble, metrics.back().bubbleWidth);
+            contentHeight += metrics.back().height;
         }
-        contentHeight += 16.0 * scale;
-        if (request.type == QuoteOutputType::Quote && height == 0) {
+        for (std::size_t i = 1; i < request.messages.size(); ++i) {
+            contentHeight +=
+                (request.messages[i].groupWithPrevious ? 2.0 : 6.0) * scale;
+        }
+        contentHeight += kShadowPad * scale;
+        const double quoteGroupWidth =
+            avatarColumn + widestBubble + kShadowPad * scale;
+
+        std::uint32_t width = maximumCanvasWidth;
+        std::uint32_t height = requestedCanvasHeight;
+        if (request.type == QuoteOutputType::Quote) {
+            width = static_cast<std::uint32_t>(std::ceil(quoteGroupWidth));
+        }
+        if (request.type == QuoteOutputType::Quote && logicalHeight == 0) {
             if (!validFinite(contentHeight) ||
                 contentHeight > kMaximumDimension) {
                 return makeRenderError(QuoteErrorCode::LimitExceeded,
@@ -1670,7 +2020,7 @@ compat::expected<QuoteRenderResult, QuoteError> QuoteRenderer::render(
                                    "canvas exceeds dimension or pixel limit");
         }
         if (contentHeight > height && request.type == QuoteOutputType::Quote &&
-            request.height != 0) {
+            logicalHeight != 0) {
             return makeRenderError(QuoteErrorCode::LimitExceeded,
                                    "quote content does not fit the canvas");
         }
@@ -1688,24 +2038,42 @@ compat::expected<QuoteRenderResult, QuoteError> QuoteRenderer::render(
             return makeRenderError(QuoteErrorCode::Internal,
                                    "failed to create quote drawing context");
         }
-        paintBackground(cr.get(), static_cast<int>(width),
-                        static_cast<int>(height), request.background);
+        if (request.type == QuoteOutputType::Quote) {
+            cairo_set_operator(cr.get(), CAIRO_OPERATOR_SOURCE);
+            cairo_set_source_rgba(cr.get(), 0.0, 0.0, 0.0, 0.0);
+            cairo_paint(cr.get());
+            cairo_set_operator(cr.get(), CAIRO_OPERATOR_OVER);
+        } else {
+            paintBackground(cr.get(), static_cast<int>(width),
+                            static_cast<int>(height), request.background);
+        }
 
+        const double groupX =
+            request.type == QuoteOutputType::Quote
+                ? 0.0
+                : std::max(0.0, (static_cast<double>(width) - quoteGroupWidth) /
+                                    2.0);
+        const double bubbleX = groupX + avatarColumn;
         double y =
             request.type == QuoteOutputType::Quote
-                ? 16.0 * scale
-                : std::max(16.0 * scale,
+                ? kShadowPadTop * scale
+                : std::max(kShadowPadTop * scale,
                            (static_cast<double>(height) - contentHeight) / 2.0);
         for (std::size_t i = 0; i < request.messages.size(); ++i) {
             if (state.expired()) {
                 return makeRenderError(QuoteErrorCode::DeadlineExceeded,
                                        "quote render deadline exceeded");
             }
-            if (auto error = drawMessage(cr.get(), state, request.messages[i],
-                                         metrics[i], width, y, scale)) {
+            if (auto error = drawMessage(
+                    cr.get(), fontMap.get(), state, request.messages[i],
+                    metrics[i], bubbleX, y, scale, request.background)) {
                 return compat::unexpected<QuoteError>(*error);
             }
-            y += metrics[i].height + 8.0 * scale;
+            y += metrics[i].height;
+            if (i + 1 < request.messages.size()) {
+                y += (request.messages[i + 1].groupWithPrevious ? 2.0 : 6.0) *
+                     scale;
+            }
         }
         cairo_surface_flush(surface.get());
         if (cairo_surface_status(surface.get()) != CAIRO_STATUS_SUCCESS) {
@@ -1713,45 +2081,97 @@ compat::expected<QuoteRenderResult, QuoteError> QuoteRenderer::render(
                                    "quote drawing surface failed");
         }
 
-        SurfacePtr scaledSurface(nullptr, &cairo_surface_destroy);
+        SurfacePtr stickerCardSurface(nullptr, &cairo_surface_destroy);
+        SurfacePtr stickerOutputSurface(nullptr, &cairo_surface_destroy);
         cairo_surface_t* outputSurface = surface.get();
         std::uint32_t outputWidth = width;
         std::uint32_t outputHeight = height;
-        if (request.telegramSticker && (width > 512 || height > 512)) {
-            const double outputScale = std::min(512.0 / width, 512.0 / height);
-            outputWidth = std::max<std::uint32_t>(
-                1,
-                static_cast<std::uint32_t>(std::lround(width * outputScale)));
-            outputHeight = std::max<std::uint32_t>(
-                1,
-                static_cast<std::uint32_t>(std::lround(height * outputScale)));
-            if (width >= height)
-                outputWidth = 512;
-            if (height >= width)
-                outputHeight = 512;
-            scaledSurface.reset(cairo_image_surface_create(
-                CAIRO_FORMAT_ARGB32, static_cast<int>(outputWidth),
-                static_cast<int>(outputHeight)));
-            if (cairo_surface_status(scaledSurface.get()) !=
+        if (request.telegramSticker) {
+            // quote-api first normalizes the rendered card to the sticker's
+            // 512px boundary (including enlargement for short quotes), then
+            // adds transparent breathing room below it.  A second contain
+            // pass keeps tall cards compliant after that padding is added.
+            const double cardScale =
+                width >= height ? 512.0 / width : 512.0 / height;
+            const auto cardWidth = std::max<std::uint32_t>(
+                1, static_cast<std::uint32_t>(std::lround(width * cardScale)));
+            const auto cardHeight = std::max<std::uint32_t>(
+                1, static_cast<std::uint32_t>(std::lround(height * cardScale)));
+            const auto bottomPadding =
+                static_cast<std::uint32_t>(std::lround(kStickerBottomPadding));
+            const auto paddedHeight = cardHeight + bottomPadding;
+
+            stickerCardSurface.reset(cairo_image_surface_create(
+                CAIRO_FORMAT_ARGB32, static_cast<int>(cardWidth),
+                static_cast<int>(paddedHeight)));
+            if (cairo_surface_status(stickerCardSurface.get()) !=
                 CAIRO_STATUS_SUCCESS) {
                 return makeRenderError(
                     QuoteErrorCode::Internal,
-                    "failed to allocate sticker output canvas");
+                    "failed to allocate padded sticker canvas");
             }
-            CairoPtr scaled(cairo_create(scaledSurface.get()), &cairo_destroy);
-            cairo_set_operator(scaled.get(), CAIRO_OPERATOR_SOURCE);
-            cairo_scale(scaled.get(), outputScale, outputScale);
-            cairo_set_source_surface(scaled.get(), surface.get(), 0, 0);
-            cairo_pattern_set_filter(cairo_get_source(scaled.get()),
+            CairoPtr card(cairo_create(stickerCardSurface.get()),
+                          &cairo_destroy);
+            cairo_set_operator(card.get(), CAIRO_OPERATOR_SOURCE);
+            cairo_set_source_rgba(card.get(), 0.0, 0.0, 0.0, 0.0);
+            cairo_paint(card.get());
+            cairo_scale(card.get(), cardScale, cardScale);
+            cairo_set_source_surface(card.get(), surface.get(), 0, 0);
+            cairo_pattern_set_filter(cairo_get_source(card.get()),
                                      CAIRO_FILTER_BEST);
-            cairo_paint(scaled.get());
-            cairo_surface_flush(scaledSurface.get());
-            if (cairo_surface_status(scaledSurface.get()) !=
+            cairo_paint(card.get());
+            cairo_surface_flush(stickerCardSurface.get());
+            if (cairo_surface_status(stickerCardSurface.get()) !=
                 CAIRO_STATUS_SUCCESS) {
                 return makeRenderError(QuoteErrorCode::Internal,
-                                       "sticker scaling surface failed");
+                                       "padded sticker surface failed");
             }
-            outputSurface = scaledSurface.get();
+
+            const double finalScale = paddedHeight >= cardWidth
+                                          ? 512.0 / paddedHeight
+                                          : 512.0 / cardWidth;
+            outputWidth = std::max<std::uint32_t>(
+                1, static_cast<std::uint32_t>(
+                       std::lround(cardWidth * finalScale)));
+            outputHeight = std::max<std::uint32_t>(
+                1, static_cast<std::uint32_t>(
+                       std::lround(paddedHeight * finalScale)));
+            if (cardWidth >= paddedHeight)
+                outputWidth = 512;
+            if (paddedHeight >= cardWidth)
+                outputHeight = 512;
+
+            if (outputWidth == cardWidth && outputHeight == paddedHeight) {
+                outputSurface = stickerCardSurface.get();
+            } else {
+                stickerOutputSurface.reset(cairo_image_surface_create(
+                    CAIRO_FORMAT_ARGB32, static_cast<int>(outputWidth),
+                    static_cast<int>(outputHeight)));
+                if (cairo_surface_status(stickerOutputSurface.get()) !=
+                    CAIRO_STATUS_SUCCESS) {
+                    return makeRenderError(
+                        QuoteErrorCode::Internal,
+                        "failed to allocate sticker output canvas");
+                }
+                CairoPtr output(cairo_create(stickerOutputSurface.get()),
+                                &cairo_destroy);
+                cairo_set_operator(output.get(), CAIRO_OPERATOR_SOURCE);
+                cairo_set_source_rgba(output.get(), 0.0, 0.0, 0.0, 0.0);
+                cairo_paint(output.get());
+                cairo_scale(output.get(), finalScale, finalScale);
+                cairo_set_source_surface(output.get(), stickerCardSurface.get(),
+                                         0, 0);
+                cairo_pattern_set_filter(cairo_get_source(output.get()),
+                                         CAIRO_FILTER_BEST);
+                cairo_paint(output.get());
+                cairo_surface_flush(stickerOutputSurface.get());
+                if (cairo_surface_status(stickerOutputSurface.get()) !=
+                    CAIRO_STATUS_SUCCESS) {
+                    return makeRenderError(QuoteErrorCode::Internal,
+                                           "sticker output surface failed");
+                }
+                outputSurface = stickerOutputSurface.get();
+            }
         }
 
         const std::size_t outputLimit =

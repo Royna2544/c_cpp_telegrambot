@@ -138,6 +138,9 @@ class AnthropicBackend : public LLMBackend {
         std::optional<std::string> lastText;
         tool_safety::ToolCallBudget toolCallBudget;
         for (int iteration = 0; iteration < kMaxToolIterations; ++iteration) {
+            if (cancelled_ && cancelled_()) {
+                return lastText;
+            }
             nlohmann::json payload{{"model", model},
                                    {"max_tokens", kMaxTokens},
                                    {"system", systemPrompt},
@@ -151,6 +154,9 @@ class AnthropicBackend : public LLMBackend {
                                                       cancelled_);
             if (!raw) {
                 return std::nullopt;
+            }
+            if (cancelled_ && cancelled_()) {
+                return lastText;
             }
 
             nlohmann::json respJson;
@@ -207,7 +213,12 @@ class AnthropicBackend : public LLMBackend {
                 bool isError = false;
                 std::string result;
                 try {
-                    result = exec(toolName, toolInput, isError);
+                    if (tool_safety::executeUnlessCancelled(cancelled_, exec,
+                                                            toolName, toolInput,
+                                                            isError, result) ==
+                        tool_safety::ToolExecutionStatus::Cancelled) {
+                        return lastText;
+                    }
                 } catch (const std::exception& ex) {
                     isError = true;
                     result = std::string("Tool execution failed: ") + ex.what();

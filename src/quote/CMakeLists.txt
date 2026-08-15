@@ -1,5 +1,7 @@
 find_package(PkgConfig REQUIRED)
 pkg_check_modules(PANGOCAIRO REQUIRED IMPORTED_TARGET pangocairo)
+pkg_check_modules(PANGOFC REQUIRED IMPORTED_TARGET pangofc)
+pkg_check_modules(FONTCONFIG REQUIRED IMPORTED_TARGET fontconfig)
 find_package(PNG REQUIRED)
 find_package(libjpeg-turbo CONFIG REQUIRED)
 find_package(WebP REQUIRED)
@@ -15,6 +17,7 @@ find_package(OpenCV QUIET COMPONENTS core imgproc imgcodecs)
 tgbot_library(
   NAME QuoteRenderer
   SRCS QuoteRenderer.cpp
+  ALWAYS_SHARED
 )
 
 target_include_directories(QuoteRenderer
@@ -27,10 +30,16 @@ target_include_directories(QuoteRenderer
 target_link_libraries(QuoteRenderer
   PRIVATE
     PkgConfig::PANGOCAIRO
+    PkgConfig::PANGOFC
+    PkgConfig::FONTCONFIG
     PNG::PNG
     $<IF:$<TARGET_EXISTS:libjpeg-turbo::turbojpeg>,libjpeg-turbo::turbojpeg,libjpeg-turbo::turbojpeg-static>
     WebP::webp
 )
+
+if(CMAKE_DL_LIBS)
+  target_link_libraries(QuoteRenderer PRIVATE ${CMAKE_DL_LIBS})
+endif()
 
 if(OpenCV_FOUND)
   target_compile_definitions(QuoteRenderer PRIVATE QUOTE_HAVE_OPENCV)

@@ -208,10 +208,13 @@ bool TgBotApiImpl::ModulesManagement::invoke(const std::string& name,
     auto leaseHolder =
         std::make_shared<RefLock::SharedLease>(std::move(*lease));
 
-    // The originating command already passed the global rate limiter. Re-run
-    // target authorization but do not charge the same Telegram update twice.
-    auto prepared = _api->prepareCommand(name, accessLevel, module,
-                                         std::move(message), false);
+    // The originating command already passed the fresh-update and global
+    // rate-limit gates. Re-check the sender against the target command's
+    // current ACL, but do not expire delayed internal work based on the
+    // original Telegram timestamp.
+    auto prepared = _api->prepareCommand(
+        name, accessLevel, module, std::move(message),
+        AuthContext::MessageAgePolicy::AuthenticatedInternal);
     if (!prepared) {
         return false;
     }

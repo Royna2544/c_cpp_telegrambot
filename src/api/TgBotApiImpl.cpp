@@ -124,10 +124,12 @@ bool TgBotApiImpl::isMyCommand(const MessageExt::Ptr& message) const {
     return true;
 }
 
-bool TgBotApiImpl::authorized(const MessageExt::Ptr& message,
-                              const std::string_view commandName,
-                              AuthContext::AccessLevel flags) const {
-    const auto authRet = _auth->isAuthorized(message->message(), flags);
+bool TgBotApiImpl::authorized(
+    const MessageExt::Ptr& message, const std::string_view commandName,
+    AuthContext::AccessLevel flags,
+    const AuthContext::MessageAgePolicy agePolicy) const {
+    const auto authRet =
+        _auth->isAuthorized(message->message(), flags, agePolicy);
     if (authRet) {
         return true;
     }
@@ -160,7 +162,8 @@ bool TgBotApiImpl::authorized(const MessageExt::Ptr& message,
 
 std::shared_ptr<MessageExt> TgBotApiImpl::prepareCommand(
     const std::string& command, const AuthContext::AccessLevel authflags,
-    CommandModule* module, Message::Ptr message, bool /*applyRateLimit*/) {
+    CommandModule* module, Message::Ptr message,
+    const AuthContext::MessageAgePolicy agePolicy) {
     if (module == nullptr || !module->isLoaded()) {
         LOG(INFO) << "Command module is unavailable: " << command;
         return {};
@@ -175,7 +178,7 @@ std::shared_ptr<MessageExt> TgBotApiImpl::prepareCommand(
         return {};
     }
 
-    if (!authorized(ext.get(), command, authflags)) {
+    if (!authorized(ext.get(), command, authflags, agePolicy)) {
         return {};
     }
 

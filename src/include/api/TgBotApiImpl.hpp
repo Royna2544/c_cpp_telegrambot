@@ -478,7 +478,8 @@ class TgBotApiImpl : public TgBotApi {
     [[nodiscard]] std::shared_ptr<MessageExt> prepareCommand(
         const std::string& command, AuthContext::AccessLevel authflags,
         CommandModule* module, Message::Ptr message,
-        bool applyRateLimit = true);
+        AuthContext::MessageAgePolicy agePolicy =
+            AuthContext::MessageAgePolicy::RequireFresh);
     void commandHandler(const std::string& command, CommandModule* module,
                         const std::shared_ptr<MessageExt>& message);
     bool validateValidArgs(const CommandModule::Info* module,
@@ -517,9 +518,11 @@ class TgBotApiImpl : public TgBotApi {
     [[nodiscard]] EventBroadcaster& getEvents() { return _bot.getEvents(); }
     [[nodiscard]] const Api& getApi() const { return _bot.getApi(); }
 
-    [[nodiscard]] bool authorized(const MessageExt::Ptr& message,
-                                  const std::string_view commandName,
-                                  AuthContext::AccessLevel flags) const;
+    [[nodiscard]] bool authorized(
+        const MessageExt::Ptr& message, const std::string_view commandName,
+        AuthContext::AccessLevel flags,
+        AuthContext::MessageAgePolicy agePolicy =
+            AuthContext::MessageAgePolicy::RequireFresh) const;
 
     [[nodiscard]] bool isMyCommand(const MessageExt::Ptr& message) const;
 

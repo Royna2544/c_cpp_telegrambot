@@ -58,67 +58,83 @@ DECLARE_COMMAND_HANDLER(decide) {
     }
 
     const auto sourceMessage = message->message();
+    const auto animationStarted = std::chrono::steady_clock::now();
     const auto job = api->submitCommandWork(
         "decide", TgBotApi::WorkClass::Outbound,
         [api, sourceMessage, heading, progress = progressText.str(),
-         final = finalText.str(),
-         reaction = std::move(reaction)](std::stop_token stop) {
+         final = finalText.str(), reaction = std::move(reaction),
+         animationStarted](std::stop_token stop) {
             if (stop.stop_requested())
                 return;
-            const auto started = std::chrono::steady_clock::now();
             const auto sent = api->sendReplyMessage(sourceMessage, heading);
             if (!sent || stop.stop_requested())
                 return;
-            const auto remainingDelay = [started](const auto targetElapsed) {
-                const auto due = started + targetElapsed;
+
+            constexpr auto kProgressAt = std::chrono::milliseconds(250);
+            constexpr auto kFinalAt = std::chrono::milliseconds(750);
+            const auto remainingDelay = [](const auto due) {
                 const auto now = std::chrono::steady_clock::now();
                 return now < due ? std::chrono::duration_cast<
                                        std::chrono::milliseconds>(due - now)
                                  : std::chrono::milliseconds::zero();
             };
 
-            if (!api->submitCommandWork(
+            const auto progressDue = animationStarted + kProgressAt;
+            std::optional<TgBotApi::WorkId> progressJob;
+            if (std::chrono::steady_clock::now() < progressDue) {
+                progressJob = api->submitCommandWork(
                     "decide", TgBotApi::WorkClass::Outbound,
                     [api, sent, progress = std::move(progress)](
                         std::stop_token progressStop) {
-                        if (!progressStop.stop_requested())
-                            api->editMessage(sent, progress);
-                    },
-                    {.delay = remainingDelay(std::chrono::milliseconds(350)),
-                     .deadline = std::chrono::seconds(2)})) {
-                LOG(WARNING) << "Decision progress queue is full";
-            }
-
-            if (!api->submitCommandWork(
-                    "decide", TgBotApi::WorkClass::Outbound,
-                    [api, sourceMessage, sent, final = std::move(final),
-                     reaction =
-                         std::move(reaction)](std::stop_token finalStop) {
-                        if (finalStop.stop_requested())
-                            return;
-                        // Persist the result before a best-effort reaction; a
-                        // reaction failure must never hide the decision.
-                        api->editMessage(sent, final);
-                        if (!reaction || finalStop.stop_requested())
+                        if (progressStop.stop_requested())
                             return;
                         try {
-                            auto emoji =
-                                std::make_shared<TgBot::ReactionTypeEmoji>();
-                            emoji->emoji = *reaction;
-                            (void)api->setMessageReaction(sourceMessage,
-                                                          {emoji}, true);
+                            (void)api->editMessage(sent, progress);
                         } catch (const std::exception& error) {
-                            LOG(WARNING)
-                                << "Decision reaction failed after final edit: "
-                                << error.what();
+                            LOG(WARNING) << "Decision progress edit failed: "
+                                         << error.what();
                         }
                     },
-                    {.delay = remainingDelay(std::chrono::milliseconds(850)),
-                     .deadline = std::chrono::seconds(2)})) {
-                LOG(WARNING) << "Decision final queue is full";
+                    {.delay = remainingDelay(progressDue),
+                     .deadline = std::chrono::seconds(2)});
+                if (!progressJob)
+                    LOG(WARNING) << "Decision progress queue is full";
             }
-        },
-        {.deadline = std::chrono::seconds(2)});
+
+            TgBotApi::CancellableWork commitResult =
+                [api, sourceMessage, sent, final = std::move(final),
+                 reaction = std::move(reaction)](std::stop_token finalStop) {
+                    if (finalStop.stop_requested())
+                        return;
+                    const auto finalized = api->editMessage(sent, final);
+                    if (!finalized || !reaction || finalStop.stop_requested()) {
+                        return;
+                    }
+                    try {
+                        auto emoji =
+                            std::make_shared<TgBot::ReactionTypeEmoji>();
+                        emoji->emoji = *reaction;
+                        (void)api->setMessageReaction(sourceMessage, {emoji},
+                                                      true);
+                    } catch (const std::exception& error) {
+                        LOG(WARNING)
+                            << "Decision reaction failed after final edit: "
+                            << error.what();
+                    }
+                };
+            const auto finalJob = api->submitCommandWork(
+                "decide", TgBotApi::WorkClass::Outbound, commitResult,
+                {.delay = remainingDelay(animationStarted + kFinalAt),
+                 // A cosmetic progress request may be blocked in Telegram's
+                 // synchronous client. Keep the already-computed answer alive
+                 // long enough to run after that request returns.
+                 .deadline = std::chrono::minutes(4)});
+            if (!finalJob) {
+                if (progressJob)
+                    (void)api->cancelCommandWork("decide", *progressJob);
+                commitResult(stop);
+            }
+        });
     if (!job) {
         LOG(WARNING) << "Decision outbound queue is full";
     }

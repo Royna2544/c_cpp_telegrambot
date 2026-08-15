@@ -11,6 +11,7 @@
 #include <database/SQLiteDatabase.hpp>
 #endif
 
+#include <fstream>
 #include <future>
 #include <memory>
 #include <string>
@@ -248,6 +249,53 @@ TEST(ProtoDatabaseTest, MutationIsDurableBeforeUnload) {
 
     EXPECT_TRUE(reader.unload());
     EXPECT_TRUE(writer.unload());
+    std::filesystem::remove(path);
+}
+
+TEST(ProtoDatabaseTest, ParsedRepeatedFieldsRemainReadableAndMutable) {
+    const auto path = std::filesystem::temp_directory_path() /
+                      "glider-protobuf-parsed-repeated-field-test.db";
+    std::filesystem::remove(path);
+
+    constexpr UserId first = 3200;
+    constexpr UserId count = 32;
+    {
+        glider::proto::database::Database seed;
+        seed.set_ownerid(3199);
+        auto* const ids = seed.mutable_whitelist()->mutable_id();
+        for (UserId offset = 0; offset < count; ++offset) {
+            ids->Add(first + offset);
+        }
+
+        std::ofstream output(path, std::ios::binary | std::ios::trunc);
+        ASSERT_TRUE(output.is_open());
+        ASSERT_TRUE(seed.SerializeToOstream(&output));
+    }
+
+    ProtoDatabase reader;
+    ASSERT_TRUE(reader.load(path));
+    for (UserId offset = 0; offset < count; ++offset) {
+        EXPECT_EQ(reader.checkUserInList(DatabaseBase::ListType::WHITELIST,
+                                         first + offset),
+                  DatabaseBase::ListResult::OK);
+    }
+    ASSERT_EQ(
+        reader.removeUserFromList(DatabaseBase::ListType::WHITELIST, first + 7),
+        DatabaseBase::ListResult::OK);
+    ASSERT_EQ(
+        reader.addUserToList(DatabaseBase::ListType::WHITELIST, first + count),
+        DatabaseBase::ListResult::OK);
+    ASSERT_TRUE(reader.unload());
+
+    ProtoDatabase verifier;
+    ASSERT_TRUE(verifier.load(path));
+    EXPECT_EQ(
+        verifier.checkUserInList(DatabaseBase::ListType::WHITELIST, first + 7),
+        DatabaseBase::ListResult::NOT_IN_LIST);
+    EXPECT_EQ(verifier.checkUserInList(DatabaseBase::ListType::WHITELIST,
+                                       first + count),
+              DatabaseBase::ListResult::OK);
+    EXPECT_TRUE(verifier.unload());
     std::filesystem::remove(path);
 }
 

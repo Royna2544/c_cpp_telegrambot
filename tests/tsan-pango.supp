@@ -1,9 +1,11 @@
-# Pango 1.57 runs fontconfig work on a GLib GAsyncQueue. The vcpkg
-# GLib/Pango/fontconfig objects are not TSan-instrumented, so TSan cannot observe
-# the external queue and font-cache synchronization. Keep every suppression at
-# an exact external symbol; application frames remain fully instrumented and
-# every other TSan report still stops the test job.
-race:g_queue_pop_tail
-race:fc_thread_func
-race:pango_fc_is_supported_font_format
-race:FcDirCacheMapFd
+# Pango 1.57 runs fontconfig work on a GLib GAsyncQueue. The statically linked
+# vcpkg GLib/Pango/fontconfig objects are not TSan-instrumented, so TSan cannot
+# observe the external queue and font-cache synchronization. Match only the
+# worker boundary and the anchored Pango/Fontconfig C symbol namespaces. These
+# are intentionally namespace-wide because successive reports surface at
+# different cache helpers; application frames and unrelated libraries remain
+# fully checked.
+race:^g_queue_pop_tail$
+race:^fc_thread_func$
+race:^pango_fc_
+race:^Fc

@@ -28,6 +28,15 @@ class AuthContext {
         Owner,
     };
 
+    // Telegram updates must be fresh when first admitted. Work derived from an
+    // update may finish later (for example, after an LLM response), so an
+    // internal dispatch can re-check the sender's current ACL without treating
+    // the original update timestamp as a second admission deadline.
+    enum class MessageAgePolicy {
+        RequireFresh,
+        AuthenticatedInternal,
+    };
+
     // Holds result of isAuthorized() function
     struct Result {
         // Reason for authorization failure.
@@ -79,7 +88,8 @@ class AuthContext {
     // Overload taking a message instead of user
     [[nodiscard]] Result isAuthorized(
         const Message::Ptr& message,
-        const AccessLevel flags = AccessLevel::Unprotected) const;
+        const AccessLevel flags = AccessLevel::Unprotected,
+        MessageAgePolicy agePolicy = MessageAgePolicy::RequireFresh) const;
 
     /**
      * @brief Checks if the message is within the allowed time limit.

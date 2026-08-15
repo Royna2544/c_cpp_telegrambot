@@ -24,8 +24,16 @@ function(tgbot_common_target TARGET_NAME)
     PRIVATE fmt::fmt-header-only absl::log
   )
 
-  # Set RPATH for Unix-like systems
-  if (UNIX)
+  # Set loader-relative RPATHs for packaged executables, libraries, and
+  # command modules. macOS dyld uses @loader_path rather than ELF's $ORIGIN.
+  if (APPLE)
+    set_target_properties(${TARGET_NAME} PROPERTIES INSTALL_RPATH_USE_LINK_PATH
+                                                    TRUE)
+    set_target_properties(
+      ${TARGET_NAME}
+      PROPERTIES INSTALL_RPATH
+                 "@loader_path;@loader_path/../lib;@loader_path/..")
+  elseif(UNIX)
     # bin/main bin/cli lib/libTgBot.so
     set_target_properties(${TARGET_NAME} PROPERTIES INSTALL_RPATH_USE_LINK_PATH
                                                     TRUE)
@@ -51,12 +59,21 @@ function(tgbot_common_target TARGET_NAME)
 endfunction()
 
 function(tgbot_library)
-  cmake_parse_arguments(LIB "ALWAYS_STATIC" "NAME" "SRCS" ${ARGN})
+  cmake_parse_arguments(LIB "ALWAYS_STATIC;ALWAYS_SHARED" "NAME" "SRCS" ${ARGN})
+
+  if (LIB_ALWAYS_STATIC AND LIB_ALWAYS_SHARED)
+    message(FATAL_ERROR "${LIB_NAME} cannot be both ALWAYS_STATIC and ALWAYS_SHARED")
+  endif()
 
   if (LIB_ALWAYS_STATIC)
     add_library(${LIB_NAME} STATIC ${LIB_SRCS})
+  elseif(LIB_ALWAYS_SHARED)
+    add_library(${LIB_NAME} SHARED ${LIB_SRCS})
   else()
     add_library(${LIB_NAME} ${LIB_SRCS})
+  endif()
+
+  if (NOT LIB_ALWAYS_STATIC)
     list(APPEND LIB_PUBLIC_INC ${EXPORTCONF_DIR})
     if (WIN32)
         set_target_properties(${LIB_NAME} PROPERTIES PREFIX "${CMAKE_SHARED_LIBRARY_PREFIX}${PROJECT_NAME}.")
@@ -77,7 +94,7 @@ function(tgbot_library)
     generate_export_header(${LIB_NAME} BASE_NAME ${LIB_NAME} EXPORT_FILE_NAME
                             "${EXPORTCONF_DIR}/${LIB_NAME}Exports.h")
   endif()
-  if (BUILD_SHARED_LIBS AND NOT LIB_ALWAYS_STATIC)
+  if ((BUILD_SHARED_LIBS OR LIB_ALWAYS_SHARED) AND NOT LIB_ALWAYS_STATIC)
     install(TARGETS ${LIB_NAME} DESTINATION ${LIBRARY_INSTALL_DIR})
   endif()
 endfunction()

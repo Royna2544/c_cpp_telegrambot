@@ -25,17 +25,22 @@ bool AuthContext::isInList(DatabaseBase::ListType type,
     }
 }
 
-AuthContext::Result AuthContext::isAuthorized(const Message::Ptr& message,
-                                              const AccessLevel flags) const {
-    if (isUnderTimeLimit(message)) {
-        if (!message->from) {
-            // If the message has no sender, we can't authorize it.
-            return {false, Result::Reason::Unknown};
-        }
-        return isAuthorized(*message->from, flags);
-    } else {
+AuthContext::Result AuthContext::isAuthorized(
+    const Message::Ptr& message, const AccessLevel flags,
+    const MessageAgePolicy agePolicy) const {
+    if (!message) {
+        return {false, Result::Reason::Unknown};
+    }
+    if (agePolicy == MessageAgePolicy::RequireFresh &&
+        !isUnderTimeLimit(message)) {
         return {false, Result::Reason::MessageTooOld};
     }
+    if (!message->from || !*message->from) {
+        // If the message has no sender, we can't authorize it. Internal
+        // dispatches deliberately retain the authenticated Telegram sender.
+        return {false, Result::Reason::Unknown};
+    }
+    return isAuthorized(*message->from, flags);
 }
 
 // The group user id is a special case, as it is not a bot but should be treated

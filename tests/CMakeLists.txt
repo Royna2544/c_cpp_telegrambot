@@ -235,8 +235,9 @@ tgbot_exe(
   TEST
 )
 find_package(PNG REQUIRED)
+find_package(WebP REQUIRED)
 target_link_libraries(test_quoterenderer PRIVATE GTest::gtest PNG::PNG
-                                                    QuoteRenderer)
+                                                    WebP::webp QuoteRenderer)
 target_include_directories(test_quoterenderer PRIVATE ${CMAKE_SOURCE_DIR}/src/include)
 file(TO_CMAKE_PATH "${CMAKE_SOURCE_DIR}/resources/quote/fonts"
      QUOTE_TEST_FONT_DIR)
@@ -252,7 +253,7 @@ tgbot_exe(
   TEST
 )
 target_link_libraries(test_qcommand PRIVATE Api fruit GTest::gtest GTest::gmock
-                                            Utils)
+                                            Utils WebP::webp)
 target_include_directories(test_qcommand PRIVATE
   ${CMAKE_SOURCE_DIR}/src/command_modules
   ${CMAKE_CURRENT_SOURCE_DIR}

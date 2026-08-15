@@ -1,5 +1,6 @@
 #include <gtest/gtest.h>
 #include <png.h>
+#include <webp/decode.h>
 
 #include <algorithm>
 #include <array>
@@ -7,6 +8,7 @@
 #include <bit>
 #include <chrono>
 #include <cstdint>
+#include <functional>
 #include <future>
 #include <optional>
 #include <quote/QuoteRenderer.hpp>
@@ -94,6 +96,27 @@ std::optional<DecodedPng> decodePng(const std::vector<std::uint8_t>& bytes) {
     return decoded;
 }
 
+std::optional<DecodedPng> decodeWebP(const std::vector<std::uint8_t>& bytes) {
+    WebPBitstreamFeatures features{};
+    if (WebPGetFeatures(bytes.data(), bytes.size(), &features) !=
+            VP8_STATUS_OK ||
+        features.width <= 0 || features.height <= 0) {
+        return std::nullopt;
+    }
+    DecodedPng decoded{
+        .width = static_cast<std::uint32_t>(features.width),
+        .height = static_cast<std::uint32_t>(features.height),
+    };
+    decoded.rgba.resize(static_cast<std::size_t>(decoded.width) *
+                        decoded.height * 4U);
+    if (WebPDecodeRGBAInto(bytes.data(), bytes.size(), decoded.rgba.data(),
+                           decoded.rgba.size(),
+                           static_cast<int>(decoded.width * 4U)) == nullptr) {
+        return std::nullopt;
+    }
+    return decoded;
+}
+
 // A compact perceptual golden for the sender/body area. Each bit describes
 // whether a cell contains enough high-luminance foreground pixels. This is
 // insensitive to small platform antialiasing differences while detecting font
@@ -148,6 +171,27 @@ std::uint32_t hammingDistance(const std::array<std::uint64_t, 4>& left,
     return result;
 }
 
+std::uint64_t countPixels(
+    const DecodedPng& image, std::uint32_t left, std::uint32_t top,
+    std::uint32_t width, std::uint32_t height,
+    const std::function<bool(std::uint8_t, std::uint8_t, std::uint8_t,
+                             std::uint8_t)>& predicate) {
+    const auto right = std::min(image.width, left + width);
+    const auto bottom = std::min(image.height, top + height);
+    std::uint64_t count = 0;
+    for (auto y = top; y < bottom; ++y) {
+        for (auto x = left; x < right; ++x) {
+            const auto offset =
+                (static_cast<std::size_t>(y) * image.width + x) * 4U;
+            count += predicate(image.rgba[offset], image.rgba[offset + 1],
+                               image.rgba[offset + 2], image.rgba[offset + 3])
+                         ? 1U
+                         : 0U;
+        }
+    }
+    return count;
+}
+
 TEST(QuoteRenderer, RejectsMissingExplicitFontDirectory) {
     quote::QuoteRenderer renderer(testFontDirectory() / "missing");
     auto result = renderer.render(baseRequest());
@@ -159,7 +203,8 @@ TEST(QuoteRenderer, RejectsMissingExplicitFontDirectory) {
 TEST(QuoteRenderer, ProducesTelegramCompliantWebPSticker) {
     auto request = baseRequest();
     request.telegramSticker = true;
-    request.background = "linear-gradient(#12263a, #274060)";
+    request.scale = 2.0;
+    request.background = "//#292232";
     request.maximumEncodedBytes = 512U * 1024U;
 
     quote::QuoteRenderer renderer(testFontDirectory());
@@ -172,11 +217,128 @@ TEST(QuoteRenderer, ProducesTelegramCompliantWebPSticker) {
     EXPECT_LE(result.value().width, 512U);
     EXPECT_LE(result.value().height, 512U);
     EXPECT_TRUE(result.value().width == 512U || result.value().height == 512U);
+    EXPECT_EQ(result.value().width, 512U);
+    EXPECT_GE(result.value().height, 120U);
+    EXPECT_LE(result.value().height, 320U);
     EXPECT_TRUE(startsWith(result.value().bytes, {'R', 'I', 'F', 'F'}));
     ASSERT_GE(result.value().bytes.size(), 12U);
     EXPECT_EQ(std::string(result.value().bytes.begin() + 8,
                           result.value().bytes.begin() + 12),
               "WEBP");
+
+    const auto decoded = decodeWebP(result.value().bytes);
+    ASSERT_TRUE(decoded.has_value());
+    ASSERT_EQ(decoded->width, result.value().width);
+    ASSERT_EQ(decoded->height, result.value().height);
+    EXPECT_GE(decoded->height, 180U)
+        << "the old unreadable strip was only 128px high";
+
+    std::uint32_t opaqueTop = decoded->height;
+    std::uint32_t opaqueBottom = 0;
+    for (std::uint32_t y = 0; y < decoded->height; ++y) {
+        for (std::uint32_t x = 0; x < decoded->width; ++x) {
+            const auto offset =
+                (static_cast<std::size_t>(y) * decoded->width + x) * 4U;
+            if (decoded->rgba[offset + 3] < 180U)
+                continue;
+            opaqueTop = std::min(opaqueTop, y);
+            opaqueBottom = std::max(opaqueBottom, y);
+        }
+    }
+    ASSERT_LT(opaqueTop, decoded->height);
+    EXPECT_GE(opaqueBottom - opaqueTop + 1U, 100U)
+        << "the normalized card must remain tall enough for readable text";
+
+    const auto avatarInk =
+        countPixels(*decoded, 0, 0, 110, decoded->height,
+                    [](auto, auto, auto, auto alpha) { return alpha >= 180U; });
+    const auto readableInk =
+        countPixels(*decoded, 110, 0, decoded->width - 110, decoded->height,
+                    [](auto red, auto green, auto blue, auto alpha) {
+                        return alpha >= 180U && red >= 180U && green >= 180U &&
+                               blue >= 180U;
+                    });
+    EXPECT_GT(avatarInk, 2'500U)
+        << "the sender avatar must not collapse to a small dot";
+    EXPECT_GT(readableInk, 200U)
+        << "sender and message text must survive final sticker scaling";
+}
+
+TEST(QuoteRenderer, ShrinkWrapsRoundedQuoteWithReadableTextAndInitialsAvatar) {
+    TestResolver resolver;
+    quote::QuoteRenderer renderer(testFontDirectory(), &resolver);
+    auto request = baseRequest();
+    request.type = quote::QuoteOutputType::Quote;
+    request.format = quote::QuoteOutputFormat::Png;
+    request.width = 512;
+    request.scale = 2.0;
+    request.background = "//#292232";
+    request.messages.front().sender.avatar =
+        quote::QuoteSenderAvatar{.assetId = "missing"};
+
+    auto result = renderer.render(request);
+    ASSERT_TRUE(result.has_value()) << result.error().message;
+    EXPECT_GT(result.value().width, 300U);
+    EXPECT_LT(result.value().width, 1024U);
+    EXPECT_GT(result.value().height, 120U);
+    EXPECT_LT(result.value().height, 400U);
+    EXPECT_GT(result.value().width, result.value().height);
+
+    const auto decoded = decodePng(result.value().bytes);
+    ASSERT_TRUE(decoded.has_value());
+    ASSERT_EQ(decoded->width, result.value().width);
+    ASSERT_EQ(decoded->height, result.value().height);
+    const auto corner = decoded->rgba[3];
+    EXPECT_EQ(corner, 0U) << "quote exterior must remain transparent";
+
+    const auto avatarInk =
+        countPixels(*decoded, 0, 0, 100, decoded->height,
+                    [](auto, auto, auto, auto alpha) { return alpha >= 180U; });
+    const auto avatarWhite =
+        countPixels(*decoded, 0, 0, 100, decoded->height,
+                    [](auto red, auto green, auto blue, auto alpha) {
+                        return alpha >= 180U && red >= 220U && green >= 220U &&
+                               blue >= 220U;
+                    });
+    EXPECT_GT(avatarInk, 4'000U)
+        << "avatar fallback should be a filled, readable circle";
+    EXPECT_GT(avatarWhite, 20U)
+        << "avatar fallback should render sender initials";
+
+    const auto purpleCard =
+        countPixels(*decoded, 110, 0, decoded->width - 110, decoded->height,
+                    [](auto red, auto green, auto blue, auto alpha) {
+                        return alpha >= 180U && red > green && blue > green;
+                    });
+    const auto readableInk =
+        countPixels(*decoded, 120, 0, decoded->width - 120, decoded->height,
+                    [](auto red, auto green, auto blue, auto alpha) {
+                        return alpha >= 180U && red >= 180U && green >= 180U &&
+                               blue >= 180U;
+                    });
+    EXPECT_GT(purpleCard, 8'000U)
+        << "the bubble should use the purple gradient, not a dark strip";
+    EXPECT_GT(readableInk, 200U)
+        << "sender and message text should occupy a readable pixel area";
+}
+
+TEST(QuoteRenderer, NaturalQuoteWidthTracksTextInsteadOfFillingCanvas) {
+    quote::QuoteRenderer renderer(testFontDirectory());
+    auto shortRequest = baseRequest();
+    shortRequest.format = quote::QuoteOutputFormat::Png;
+    shortRequest.width = 512;
+    shortRequest.scale = 2.0;
+    shortRequest.messages.front().text = "Hi";
+    auto longRequest = shortRequest;
+    longRequest.messages.front().text =
+        "A substantially longer quote that should create a wider card";
+
+    auto shortResult = renderer.render(shortRequest);
+    auto longResult = renderer.render(longRequest);
+    ASSERT_TRUE(shortResult.has_value()) << shortResult.error().message;
+    ASSERT_TRUE(longResult.has_value()) << longResult.error().message;
+    EXPECT_LT(shortResult.value().width, longResult.value().width);
+    EXPECT_LT(longResult.value().width, 1024U);
 }
 
 TEST(QuoteRenderer, RendersInternationalTextEntitiesReplyMediaVoiceAndEmoji) {
@@ -400,11 +562,12 @@ TEST(QuoteRenderer, MatchesBundledFontPerceptualGoldenAndMapsEmojiBrands) {
     const auto decoded = decodePng(rendered.value().bytes);
     ASSERT_TRUE(decoded.has_value());
     const auto actual = foregroundHash(*decoded);
-    // Filled from this exact pinned-font request. Keep a small tolerance for
-    // Cairo rasterizer differences between the supported OS runners.
+    // Captured from this exact pinned-font request. The tolerance permits
+    // small rasterizer differences while still detecting broken CJK/RTL/emoji
+    // shaping or a materially different sender/body layout.
     constexpr std::array<std::uint64_t, 4> expected = {
-        0x00000000000001ffULL, 0x00003fff00001770ULL, 0x0000000000001777ULL,
-        0x0000000000000000ULL};
+        0x0001ff8000013f80ULL, 0x000000000000d800ULL, 0x0080400000000000ULL,
+        0x00ffff8000d2f780ULL};
     EXPECT_LE(hammingDistance(actual, expected), 12U)
         << std::hex << actual[0] << ' ' << actual[1] << ' ' << actual[2] << ' '
         << actual[3];

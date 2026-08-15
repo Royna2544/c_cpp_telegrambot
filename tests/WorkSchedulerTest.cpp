@@ -171,6 +171,31 @@ TEST(WorkScheduler, DelayedWorkCanBeCancelledBeforeExecution) {
     EXPECT_FALSE(ran.load());
 }
 
+TEST(WorkScheduler, DelayedOutboundWorkDoesNotOccupyTheWorker) {
+    TgBotApiImpl::WorkScheduler scheduler;
+    std::promise<void> delayed;
+    std::promise<void> immediate;
+    auto delayedFuture = delayed.get_future();
+    auto immediateFuture = immediate.get_future();
+
+    ASSERT_TRUE(
+        scheduler
+            .submit("decide", TgBotApi::WorkClass::Outbound,
+                    [&delayed](std::stop_token) { delayed.set_value(); },
+                    {.delay = 500ms})
+            .has_value());
+    ASSERT_TRUE(
+        scheduler
+            .submit("confirmation", TgBotApi::WorkClass::Outbound,
+                    [&immediate](std::stop_token) { immediate.set_value(); })
+            .has_value());
+
+    EXPECT_EQ(immediateFuture.wait_for(300ms), std::future_status::ready);
+    EXPECT_EQ(delayedFuture.wait_for(1s), std::future_status::ready);
+    scheduler.cancelAndDrain("decide");
+    scheduler.cancelAndDrain("confirmation");
+}
+
 TEST(WorkScheduler, WorkRunsInOwningModuleExecutionScope) {
     TgBotApiImpl::WorkScheduler scheduler;
     std::promise<bool> observed;

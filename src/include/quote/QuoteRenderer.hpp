@@ -143,7 +143,7 @@ struct QuoteRenderRequest {
     QuoteOutputType type{QuoteOutputType::Quote};
     QuoteOutputFormat format{QuoteOutputFormat::WebP};
     QuoteEmojiBrand emojiBrand{QuoteEmojiBrand::Open};
-    std::string background{"#1f2329"};
+    std::string background{"//#292232"};
     std::uint32_t width{};
     std::uint32_t height{};
     double scale{1.0};

@@ -19,6 +19,10 @@ namespace llm::openai {
 constexpr const char* kModelsEndpoint = "/v1/models";
 constexpr const char* kChatEndpoint = "/v1/chat/completions";
 constexpr int kMaxTokens = 1024;
+// Reasoning-capable local models may spend most of a short completion budget
+// deciding which function to call. Keep ordinary replies compact, but give
+// tool turns enough bounded headroom to emit the call after their reasoning.
+constexpr int kMaxToolTokens = 4096;
 constexpr int kMaxToolIterations = 6;
 
 // --- Request ---
@@ -189,9 +193,14 @@ class OpenAIBackend : public LLMBackend {
         std::optional<std::string> lastText;
         tool_safety::ToolCallBudget toolCallBudget;
         for (int iteration = 0; iteration < kMaxToolIterations; ++iteration) {
-            nlohmann::json payload{{"model", model},
-                                   {"messages", messages},
-                                   {"max_tokens", kMaxTokens}};
+            if (cancelled_ && cancelled_()) {
+                return lastText;
+            }
+            nlohmann::json payload{
+                {"model", model},
+                {"messages", messages},
+                {"max_tokens",
+                 toolsJson.empty() ? kMaxTokens : kMaxToolTokens}};
             if (!toolsJson.empty()) {
                 payload["tools"] = toolsJson;
             }
@@ -201,6 +210,9 @@ class OpenAIBackend : public LLMBackend {
                 std::string_view{authkey_}, cancelled_);
             if (!raw) {
                 return std::nullopt;
+            }
+            if (cancelled_ && cancelled_()) {
+                return lastText;
             }
 
             nlohmann::json respJson;
@@ -226,6 +238,18 @@ class OpenAIBackend : public LLMBackend {
                                       choiceMessage["tool_calls"].is_array() &&
                                       !choiceMessage["tool_calls"].empty();
             if (!hasToolCalls) {
+                if (!lastText) {
+                    const auto finishReason = respJson["choices"][0].value(
+                        "finish_reason", "unknown");
+                    const auto completionTokens =
+                        respJson.value("usage", nlohmann::json::object())
+                            .value("completion_tokens", 0);
+                    LOG(WARNING)
+                        << "OpenAI-compatible response contained neither "
+                           "text nor tool calls; finish_reason="
+                        << finishReason
+                        << " completion_tokens=" << completionTokens;
+                }
                 return lastText;
             }
 
@@ -262,7 +286,12 @@ class OpenAIBackend : public LLMBackend {
                 bool isError = false;
                 std::string result;
                 try {
-                    result = exec(toolName, toolInput, isError);
+                    if (tool_safety::executeUnlessCancelled(cancelled_, exec,
+                                                            toolName, toolInput,
+                                                            isError, result) ==
+                        tool_safety::ToolExecutionStatus::Cancelled) {
+                        return lastText;
+                    }
                 } catch (const std::exception& ex) {
                     isError = true;
                     result = std::string("Tool execution failed: ") + ex.what();

@@ -214,6 +214,23 @@ command_module(
   SRCS q.cpp
   LIBS QuoteRenderer Utils $<$<PLATFORM_ID:Windows>:advapi32>)
 
+# dlfcn-win32 loads command modules with LOAD_WITH_ALTERED_SEARCH_PATH, so a
+# project DLL used only by a command module must live beside that module.  The
+# vcpkg app-local step already places QuoteRenderer's runtime dependencies
+# there; copy/install the renderer itself as well.
+if(WIN32)
+  add_custom_command(
+    TARGET cmd_q
+    POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different
+            $<TARGET_FILE:QuoteRenderer> $<TARGET_FILE_DIR:cmd_q>
+    VERBATIM)
+  install(
+    FILES $<TARGET_FILE:QuoteRenderer>
+    DESTINATION lib/glider-modules
+    COMPONENT Command_q)
+endif()
+
 command_module(NAME ask SRCS ask.cpp LIBS CurlDownload Utils AuthApi)
 
 if (TGBOTCPP_LUA_MODULES)
