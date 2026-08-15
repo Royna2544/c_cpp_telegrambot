@@ -111,6 +111,31 @@ inline bool containsAny(std::string_view value, Terms... terms) {
 inline std::optional<Domain> deterministicRoute(std::string_view query,
                                                 PendingBuilds pending = {}) {
     const auto value = detail::normalized(query);
+    const bool exactResponse = value.starts_with(" say exactly ") ||
+                               value.starts_with(" please say exactly ");
+    if (exactResponse) {
+        // A literal response instruction needs no capability. Keep mixed
+        // requests on the classifier path, though: quoted-looking text can
+        // still contain a real action after the requested phrase.
+        const bool capabilityCue =
+            detail::containsAny(
+                value, "build", "compile", "rebuild", "kernel", "eureka",
+                "grasskernel", "rom", "android", "recovery", "twrp",
+                "lineageos", "derpfest", "derpfestnew", "crdroid", "yaap",
+                "evolution-x", "send", "message", "telegram", "dm",
+                "direct-message", "forward", "tell", "reply", "contact",
+                "lookup", "retrieve", "save", "register", "remember", "chat",
+                "id", "alias", "confirm", "confirmation") ||
+            value.find(" grand kernel ") != std::string::npos ||
+            value.find(" look up ") != std::string::npos ||
+            value.find(" ask me ") != std::string::npos ||
+            value.find(" ask the admin ") != std::string::npos ||
+            value.find(" and ask ") != std::string::npos;
+        if (!capabilityCue) {
+            return Domain::Chat;
+        }
+        return std::nullopt;
+    }
     const bool discussionPrefix =
         value.starts_with(" how ") || value.starts_with(" what ") ||
         value.starts_with(" why ") || value.starts_with(" when ") ||

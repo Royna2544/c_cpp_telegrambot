@@ -26,6 +26,38 @@ TEST(ToolRouterTest, RoutesExplicitRomBuildWithoutClassifier) {
               Domain::RomBuild);
 }
 
+TEST(ToolRouterTest, RoutesExactResponseWithoutClassifier) {
+    EXPECT_EQ(
+        llm::tool_router::deterministicRoute("Say exactly FINAL TEST ASK OK"),
+        Domain::Chat);
+    EXPECT_EQ(
+        llm::tool_router::deterministicRoute("Please say exactly: READY."),
+        Domain::Chat);
+}
+
+TEST(ToolRouterTest, ExactResponseOverridesPendingBuildFollowUp) {
+    EXPECT_EQ(
+        llm::tool_router::deterministicRoute("Say exactly FINAL TEST ASK OK",
+                                             PendingBuilds{.kernel = true}),
+        Domain::Chat);
+    EXPECT_EQ(llm::tool_router::deterministicRoute("Please say exactly: READY",
+                                                   PendingBuilds{.rom = true}),
+              Domain::Chat);
+}
+
+TEST(ToolRouterTest, MixedExactResponseRequestsUseClassifier) {
+    EXPECT_FALSE(llm::tool_router::deterministicRoute(
+        "Say exactly hello, then send it to Bob on Telegram"));
+    EXPECT_FALSE(llm::tool_router::deterministicRoute(
+        "Say exactly build the Eureka Kernel"));
+    EXPECT_FALSE(llm::tool_router::deterministicRoute(
+        "Please say exactly yes, then ask me whether to continue"));
+    EXPECT_FALSE(llm::tool_router::deterministicRoute(
+        "Send exactly FINAL TEST ASK OK to Bob"));
+    EXPECT_FALSE(
+        llm::tool_router::deterministicRoute("Look up Alice's Telegram ID"));
+}
+
 TEST(ToolRouterTest, LeavesDiscussionForClassifier) {
     EXPECT_FALSE(llm::tool_router::deterministicRoute(
         "How do I build an Android kernel?"));
@@ -105,6 +137,20 @@ TEST(ToolRouterTest, DeterministicRouteSkipsClassifier) {
     EXPECT_FALSE(classifierCalled);
 }
 
+TEST(ToolRouterTest, ExactResponseSkipsClassifierAndExposesNoTools) {
+    bool classifierCalled = false;
+    const auto selected = llm::tool_router::selectDomain(
+        "Say exactly FINAL TEST ASK OK", {},
+        [&](std::string_view, std::string_view) -> std::optional<std::string> {
+            classifierCalled = true;
+            return "telegram";
+        });
+
+    EXPECT_EQ(selected, Domain::Chat);
+    EXPECT_FALSE(classifierCalled);
+    EXPECT_TRUE(llm::tool_router::toolNamesForDomain(selected).empty());
+}
+
 TEST(ToolRouterTest, AmbiguousRequestUsesClassifier) {
     std::string_view receivedPrompt;
     std::string_view receivedQuery;
@@ -126,16 +172,21 @@ TEST(ToolRouterTest, ClassifierFailureFallsBackToAllTools) {
     // An unreachable or incoherent classifier must not silently answer a real
     // tool request as plain chat; both failure modes expose every tool.
     EXPECT_EQ(llm::tool_router::selectDomain(
-                  "Do something ambiguous", {},
+                  "Message the release manager", {},
                   [](std::string_view, std::string_view)
                       -> std::optional<std::string> { return std::nullopt; }),
               Domain::All);
     EXPECT_EQ(llm::tool_router::selectDomain(
-                  "Do something ambiguous", {},
+                  "Message the release manager", {},
                   [](std::string_view,
                      std::string_view) -> std::optional<std::string> {
                       return "kernel_build or telegram";
                   }),
+              Domain::All);
+    EXPECT_EQ(llm::tool_router::selectDomain(
+                  "Say exactly hello, then send it to Bob on Telegram", {},
+                  [](std::string_view, std::string_view)
+                      -> std::optional<std::string> { return std::nullopt; }),
               Domain::All);
 }
 
