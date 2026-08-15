@@ -1,6 +1,8 @@
 #pragma once
 
+#include <chrono>
 #include <cstddef>
+#include <cstdint>
 #include <filesystem>
 #include <functional>
 #include <optional>
@@ -15,6 +17,45 @@ inline constexpr long kInteractiveIdleTimeoutSeconds = 30;
 inline constexpr long kInteractiveTotalTimeoutSeconds = 180;
 inline constexpr std::size_t kMaxInMemoryResponseBytes = 4ULL * 1024 * 1024;
 inline constexpr std::size_t kMaxJsonRequestBytes = 4ULL * 1024 * 1024;
+
+namespace detail {
+
+// libcurl's low-speed timer starts before an HTTP response has produced any
+// body bytes. That makes it unsuitable for non-streaming LLM endpoints: a
+// healthy server can spend longer than the idle deadline generating the first
+// byte while still staying inside the total request deadline. Start measuring
+// response idleness only after the body transfer has actually begun.
+class InteractiveTransferWatchdog {
+   public:
+    using Clock = std::chrono::steady_clock;
+
+    explicit InteractiveTransferWatchdog(
+        std::chrono::seconds idleTimeout =
+            std::chrono::seconds{kInteractiveIdleTimeoutSeconds})
+        : idleTimeout_(idleTimeout) {}
+
+    bool observe(std::uint64_t downloadedBytes,
+                 Clock::time_point now = Clock::now()) {
+        if (downloadedBytes != downloadedBytes_) {
+            downloadedBytes_ = downloadedBytes;
+            started_ = downloadedBytes != 0;
+            lastProgress_ = now;
+            return false;
+        }
+
+        return started_ && now - lastProgress_ >= idleTimeout_;
+    }
+
+    [[nodiscard]] bool started() const { return started_; }
+
+   private:
+    std::chrono::seconds idleTimeout_;
+    Clock::time_point lastProgress_{};
+    std::uint64_t downloadedBytes_ = 0;
+    bool started_ = false;
+};
+
+}  // namespace detail
 
 // Type for cancel checker callback
 // A function that returns true if the operation should be cancelled.

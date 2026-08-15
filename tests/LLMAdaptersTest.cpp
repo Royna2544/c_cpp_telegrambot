@@ -1,6 +1,7 @@
 #include <gtest/gtest.h>
 
 #include <algorithm>
+#include <chrono>
 #include <nlohmann/json.hpp>
 #include <optional>
 #include <string>
@@ -351,4 +352,46 @@ TEST(CurlSafety, InteractiveLimitsStayFiniteAndMemoryBounded) {
     EXPECT_EQ(CurlUtils::kInteractiveTotalTimeoutSeconds, 180);
     EXPECT_EQ(CurlUtils::kMaxInMemoryResponseBytes, 4U * 1024U * 1024U);
     EXPECT_EQ(CurlUtils::kMaxJsonRequestBytes, 4U * 1024U * 1024U);
+}
+
+TEST(CurlSafety, SilentGenerationCanExceedIdleDeadlineBeforeFirstByte) {
+    using Watchdog = CurlUtils::detail::InteractiveTransferWatchdog;
+    const auto start = Watchdog::Clock::time_point{};
+    Watchdog watchdog;
+
+    EXPECT_FALSE(watchdog.observe(0, start));
+    EXPECT_FALSE(watchdog.observe(
+        0, start + std::chrono::seconds(
+                       CurlUtils::kInteractiveIdleTimeoutSeconds + 1)));
+    EXPECT_FALSE(watchdog.started());
+
+    EXPECT_FALSE(watchdog.observe(
+        128, start + std::chrono::seconds(
+                         CurlUtils::kInteractiveIdleTimeoutSeconds + 2)));
+    EXPECT_TRUE(watchdog.started());
+}
+
+TEST(CurlSafety, StartedResponseIsCancelledAfterTrueIdlePeriod) {
+    using Watchdog = CurlUtils::detail::InteractiveTransferWatchdog;
+    const auto start = Watchdog::Clock::time_point{};
+    Watchdog watchdog;
+
+    EXPECT_FALSE(watchdog.observe(128, start));
+    EXPECT_FALSE(watchdog.observe(
+        128, start + std::chrono::seconds(
+                         CurlUtils::kInteractiveIdleTimeoutSeconds - 1)));
+    EXPECT_TRUE(watchdog.observe(
+        128, start + std::chrono::seconds(
+                         CurlUtils::kInteractiveIdleTimeoutSeconds)));
+}
+
+TEST(CurlSafety, ResponseProgressRestartsIdleDeadline) {
+    using Watchdog = CurlUtils::detail::InteractiveTransferWatchdog;
+    const auto start = Watchdog::Clock::time_point{};
+    Watchdog watchdog;
+
+    EXPECT_FALSE(watchdog.observe(1, start));
+    EXPECT_FALSE(watchdog.observe(2, start + std::chrono::seconds(29)));
+    EXPECT_FALSE(watchdog.observe(2, start + std::chrono::seconds(58)));
+    EXPECT_TRUE(watchdog.observe(2, start + std::chrono::seconds(59)));
 }

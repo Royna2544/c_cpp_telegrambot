@@ -5,6 +5,7 @@
 #include <fmt/format.h>
 
 #include <StructF.hpp>
+#include <chrono>
 #include <cstdint>
 #include <libos/libsighandler.hpp>
 #include <string>
@@ -15,8 +16,16 @@
 
 namespace {
 
+struct CurlProgressContext {
+    CurlUtils::CancelChecker* cancelChecker = nullptr;
+    CurlUtils::detail::InteractiveTransferWatchdog* interactiveWatchdog =
+        nullptr;
+    bool cancelled = false;
+    bool idleTimedOut = false;
+};
+
 static CURL* CURL_setup_common(const std::string_view url,
-                               CurlUtils::CancelChecker& cancel_checker,
+                               CurlProgressContext& progress,
                                bool timeout = true) {
     CURL* curl = curl_easy_init();
     if (curl == nullptr) {
@@ -55,8 +64,7 @@ static CURL* CURL_setup_common(const std::string_view url,
         curl, CURLOPT_XFERINFOFUNCTION,
         +[](void* clientp, curl_off_t dltotal, curl_off_t dlnow,
             curl_off_t ultotal, curl_off_t ulnow) -> int {
-            auto cancel_checker =
-                static_cast<CurlUtils::CancelChecker*>(clientp);
+            auto* progress = static_cast<CurlProgressContext*>(clientp);
             LOG_EVERY_N_SEC(INFO, 5) << fmt::format(
                 "Download: {}MB/{}MB, Upload: {}MB/{}MB", dlnow / megabyte,
                 dltotal / megabyte, ulnow / megabyte, ultotal / megabyte);
@@ -64,18 +72,24 @@ static CURL* CURL_setup_common(const std::string_view url,
             constexpr int CURL_STOP = 1;
             constexpr int CURL_CONTINUE = 0;
 
-            assert(cancel_checker != nullptr);
-            if (*cancel_checker == nullptr) {
-                // No cancel checker, continue
-                return CURL_CONTINUE;
-            } else {
-                // Call the cancel checker to see if we need to cancel
-                bool rc = (*cancel_checker)();
-                // If rc is true, we need to cancel.
-                return rc ? CURL_STOP : CURL_CONTINUE;
+            assert(progress != nullptr);
+            if (progress->cancelChecker != nullptr &&
+                *progress->cancelChecker != nullptr &&
+                (*progress->cancelChecker)()) {
+                progress->cancelled = true;
+                return CURL_STOP;
             }
+
+            if (progress->interactiveWatchdog != nullptr &&
+                progress->interactiveWatchdog->observe(
+                    static_cast<std::uint64_t>(dlnow))) {
+                progress->idleTimedOut = true;
+                return CURL_STOP;
+            }
+
+            return CURL_CONTINUE;
         });
-    curl_easy_setopt(curl, CURLOPT_XFERINFODATA, &cancel_checker);
+    curl_easy_setopt(curl, CURLOPT_XFERINFODATA, &progress);
     // Enble progress callbacks
     curl_easy_setopt(curl, CURLOPT_NOPROGRESS, 0L);
 
@@ -87,12 +101,14 @@ void CURL_apply_interactive_timeouts(CURL* curl) {
                      CurlUtils::kInteractiveConnectTimeoutSeconds);
     curl_easy_setopt(curl, CURLOPT_TIMEOUT,
                      CurlUtils::kInteractiveTotalTimeoutSeconds);
-    curl_easy_setopt(curl, CURLOPT_LOW_SPEED_LIMIT, 1024L);
-    curl_easy_setopt(curl, CURLOPT_LOW_SPEED_TIME,
-                     CurlUtils::kInteractiveIdleTimeoutSeconds);
+    // The generic low-speed timer includes time spent waiting for the first
+    // response byte. Interactive requests instead enforce idleness through the
+    // progress callback once response-body transfer has started.
+    curl_easy_setopt(curl, CURLOPT_LOW_SPEED_LIMIT, 0L);
+    curl_easy_setopt(curl, CURLOPT_LOW_SPEED_TIME, 0L);
 }
 
-bool CURL_perform_common(CURL* curl) {
+bool CURL_perform_common(CURL* curl, const CurlProgressContext& progress) {
     CURLcode res = curl_easy_perform(curl);
     long http_code = 0;
     if (res == CURLE_OK) {
@@ -100,7 +116,15 @@ bool CURL_perform_common(CURL* curl) {
     }
     curl_easy_cleanup(curl);
     if (res != CURLE_OK) {
-        LOG(ERROR) << "Cannot download file: " << curl_easy_strerror(res);
+        if (progress.idleTimedOut) {
+            LOG(ERROR) << "Response body was idle for "
+                       << CurlUtils::kInteractiveIdleTimeoutSeconds
+                       << " seconds";
+        } else if (progress.cancelled) {
+            LOG(INFO) << "Transfer cancelled";
+        } else {
+            LOG(ERROR) << "Cannot download file: " << curl_easy_strerror(res);
+        }
         return false;
     }
     // A successful transport-level transfer can still carry an HTTP error
@@ -124,7 +148,8 @@ bool download_file(const std::string_view url,
     LOG(INFO) << "Downloading " << url << " to " << where;
 
     // Common CURL setup
-    CURL* curl = CURL_setup_common(url, cancel_checker);
+    CurlProgressContext progress{.cancelChecker = &cancel_checker};
+    CURL* curl = CURL_setup_common(url, progress);
     if (curl == nullptr) {
         LOG(ERROR) << "Cannot setup curl";
         return false;
@@ -146,7 +171,7 @@ bool download_file(const std::string_view url,
     curl_easy_setopt(curl, CURLOPT_WRITEDATA, file.native_handle());
 
     // Execute it
-    bool result = CURL_perform_common(curl);
+    bool result = CURL_perform_common(curl, progress);
     LOG_IF(INFO, result) << "Download succeeded, wrote to " << where;
     return result;
 }
@@ -155,6 +180,9 @@ std::optional<std::string> download_memory(
     const std::string_view url, CurlUtils::CancelChecker cancel_checker,
     const std::vector<std::string>& headers) {
     std::string result;
+    CurlUtils::detail::InteractiveTransferWatchdog watchdog;
+    CurlProgressContext progress{.cancelChecker = &cancel_checker,
+                                 .interactiveWatchdog = &watchdog};
 
     LOG(INFO) << "Downloading " << url << " to memory";
     if (!headers.empty()) {
@@ -163,7 +191,7 @@ std::optional<std::string> download_memory(
     }
 
     // Common CURL setup
-    CURL* curl = CURL_setup_common(url, cancel_checker);
+    CURL* curl = CURL_setup_common(url, progress);
     if (curl == nullptr) {
         LOG(ERROR) << "Cannot setup curl";
         return std::nullopt;
@@ -202,7 +230,7 @@ std::optional<std::string> download_memory(
     curl_easy_setopt(curl, CURLOPT_WRITEDATA, &result);
 
     // Execute it
-    bool exec_result = CURL_perform_common(curl);
+    bool exec_result = CURL_perform_common(curl, progress);
     if (hdrlist != nullptr) {
         curl_slist_free_all(hdrlist);
     }
@@ -229,6 +257,9 @@ std::optional<std::string> send_json_get_reply(
     const std::vector<std::string>& headers,
     CurlUtils::CancelChecker cancel_checker) {
     std::string result;
+    CurlUtils::detail::InteractiveTransferWatchdog watchdog;
+    CurlProgressContext progress{.cancelChecker = &cancel_checker,
+                                 .interactiveWatchdog = &watchdog};
 
     LOG(INFO) << "Sending JSON to " << url;
     if (json.size() > kMaxJsonRequestBytes) {
@@ -238,7 +269,7 @@ std::optional<std::string> send_json_get_reply(
     }
 
     // Common CURL setup
-    CURL* curl = CURL_setup_common(url, cancel_checker);
+    CURL* curl = CURL_setup_common(url, progress);
     if (curl == nullptr) {
         LOG(ERROR) << "Cannot setup curl";
         return {};
@@ -280,7 +311,7 @@ std::optional<std::string> send_json_get_reply(
     curl_easy_setopt(curl, CURLOPT_WRITEDATA, &result);
 
     // Execute it
-    bool exec_result = CURL_perform_common(curl);
+    bool exec_result = CURL_perform_common(curl, progress);
     curl_slist_free_all(hdrlist);
     LOG_IF(INFO, exec_result) << "Request succeeded";
     if (!exec_result) {
