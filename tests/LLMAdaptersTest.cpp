@@ -43,6 +43,18 @@ TEST(OpenAIAdapter, ChatRequestRoundTrip) {
     EXPECT_EQ(back.messages[1].role, "user");
 }
 
+TEST(OpenAIAdapter, ClassifierRequestIsSmallAndDeterministic) {
+    const nlohmann::json j = llm::openai::makeClassifierRequest(
+        "gpt-test", "classify this", "send a message");
+
+    EXPECT_EQ(j.at("model"), "gpt-test");
+    EXPECT_EQ(j.at("messages")[0].at("content"), "classify this");
+    EXPECT_EQ(j.at("messages")[1].at("content"), "send a message");
+    EXPECT_EQ(j.at("max_tokens"), llm::openai::kClassifierMaxTokens);
+    EXPECT_EQ(j.at("temperature"), 0);
+    EXPECT_EQ(llm::openai::kClassifierTimeout, std::chrono::seconds(60));
+}
+
 TEST(OpenAIAdapter, ChatResponseExtractsContent) {
     const auto j = nlohmann::json::parse(R"({
         "choices": [
@@ -88,6 +100,18 @@ TEST(AnthropicAdapter, DefaultMaxTokensIsSet) {
     // max_tokens is required by the API; the struct must default it.
     const llm::anthropic::MessagesRequest req;
     EXPECT_EQ(req.max_tokens, llm::anthropic::kMaxTokens);
+}
+
+TEST(AnthropicAdapter, ClassifierRequestIsSmallAndDeterministic) {
+    const nlohmann::json j = llm::anthropic::makeClassifierRequest(
+        "claude-x", "classify this", "send a message");
+
+    EXPECT_EQ(j.at("model"), "claude-x");
+    EXPECT_EQ(j.at("system"), "classify this");
+    EXPECT_EQ(j.at("messages")[0].at("content"), "send a message");
+    EXPECT_EQ(j.at("max_tokens"), llm::anthropic::kClassifierMaxTokens);
+    EXPECT_EQ(j.at("temperature"), 0);
+    EXPECT_EQ(llm::anthropic::kClassifierTimeout, std::chrono::seconds(60));
 }
 
 TEST(AnthropicAdapter, MessagesResponseExtractsTextBlock) {

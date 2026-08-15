@@ -1,5 +1,6 @@
 #pragma once
 
+#include <chrono>
 #include <nlohmann/json.hpp>
 #include <optional>
 #include <string>
@@ -18,6 +19,8 @@ constexpr const char* kModelsEndpoint = "/v1/models";
 constexpr const char* kMessagesEndpoint = "/v1/messages";
 constexpr const char* kVersionHeader = "anthropic-version: 2023-06-01";
 constexpr int kMaxTokens = 4096;
+constexpr int kClassifierMaxTokens = 32;
+constexpr auto kClassifierTimeout = std::chrono::seconds(60);
 constexpr int kMaxToolIterations = 6;
 
 // --- Request ---
@@ -35,6 +38,19 @@ struct MessagesRequest {
 };
 NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(MessagesRequest, model, max_tokens, system,
                                    messages)
+
+inline nlohmann::json makeClassifierRequest(const std::string& model,
+                                            const std::string& systemPrompt,
+                                            const std::string& userInput) {
+    MessagesRequest req;
+    req.model = model;
+    req.max_tokens = kClassifierMaxTokens;
+    req.system = systemPrompt;
+    req.messages = {{"user", userInput}};
+    nlohmann::json payload = req;
+    payload["temperature"] = 0;
+    return payload;
+}
 
 // --- Response ---
 struct ContentBlock {
@@ -98,6 +114,35 @@ class AnthropicBackend : public LLMBackend {
 
         auto raw = CurlUtils::send_json_get_reply(
             url_ + kMessagesEndpoint, payload.dump(), headers(), cancelled_);
+        if (!raw) {
+            return std::nullopt;
+        }
+        try {
+            auto resp = nlohmann::json::parse(*raw).get<MessagesResponse>();
+            for (auto& block : resp.content) {
+                if (block.type == "text") {
+                    return block.text;
+                }
+            }
+            return std::nullopt;
+        } catch (const std::exception&) {
+            return std::nullopt;
+        }
+    }
+
+    std::optional<std::string> classify(const std::string& model,
+                                        const std::string& systemPrompt,
+                                        const std::string& userInput) override {
+        const auto expiresAt =
+            std::chrono::steady_clock::now() + kClassifierTimeout;
+        const auto classifierCancelled = [cancelled = cancelled_, expiresAt] {
+            return (cancelled && cancelled()) ||
+                   std::chrono::steady_clock::now() >= expiresAt;
+        };
+        auto raw = CurlUtils::send_json_get_reply(
+            url_ + kMessagesEndpoint,
+            makeClassifierRequest(model, systemPrompt, userInput).dump(),
+            headers(), classifierCancelled);
         if (!raw) {
             return std::nullopt;
         }

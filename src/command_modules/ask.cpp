@@ -12,6 +12,7 @@
 #include <api/Providers.hpp>
 #include <api/StringResLoader.hpp>
 #include <api/TgBotApi.hpp>
+#include <chrono>
 #include <database/DatabaseBase.hpp>
 #include <memory>
 #include <mutex>
@@ -59,6 +60,8 @@ namespace {
 
 using llm::model_picker::selectedModel;
 using llm::model_picker::setSelectedModel;
+
+constexpr auto kAskWorkDeadline = std::chrono::minutes(7);
 
 bool queuePlainReply(TgBotApi::Ptr api, Message::Ptr sourceMessage,
                      std::string_view text,
@@ -467,6 +470,11 @@ void runAskWork(TgBotApi::Ptr api, Message::Ptr sourceMessage, std::string text,
 
     queuePlainReply(api, sourceMessage,
                     res->get(Strings::LLM_PROCESSING_QUERY));
+    if (stop.stop_requested()) {
+        queuePlainReply(api, sourceMessage,
+                        res->get(Strings::LLM_RESPONSE_FAILED));
+        return;
+    }
     const bool isAdmin = provider->auth->isAuthorized(
         sourceMessage, AuthContext::AccessLevel::AdminUser,
         AuthContext::MessageAgePolicy::AuthenticatedInternal);
@@ -487,6 +495,8 @@ void runAskWork(TgBotApi::Ptr api, Message::Ptr sourceMessage, std::string text,
                                          std::string(userInput));
             });
         if (stop.stop_requested()) {
+            queuePlainReply(api, sourceMessage,
+                            res->get(Strings::LLM_RESPONSE_FAILED));
             return;
         }
         tools = toolsForDomain(toolDomain);
@@ -527,6 +537,8 @@ void runAskWork(TgBotApi::Ptr api, Message::Ptr sourceMessage, std::string text,
                                                  sourceMessage, tools, stop))
             : backend->chat(model, systemPrompt, query, chatId);
     if (stop.stop_requested()) {
+        queuePlainReply(api, sourceMessage,
+                        res->get(Strings::LLM_RESPONSE_FAILED));
         return;
     }
     if (!answer || answer->empty()) {
@@ -534,9 +546,14 @@ void runAskWork(TgBotApi::Ptr api, Message::Ptr sourceMessage, std::string text,
                         res->get(Strings::LLM_RESPONSE_FAILED));
         return;
     }
-    for (const auto& chunk : llm::telegram_output::splitForMarkdown(*answer)) {
-        if (stop.stop_requested() ||
-            !queueMarkdownReply(api, sourceMessage, chunk)) {
+    const auto chunks = llm::telegram_output::splitForMarkdown(*answer);
+    for (const auto& chunk : chunks) {
+        if (stop.stop_requested()) {
+            queuePlainReply(api, sourceMessage,
+                            res->get(Strings::LLM_RESPONSE_FAILED));
+            break;
+        }
+        if (!queueMarkdownReply(api, sourceMessage, chunk)) {
             break;
         }
     }
@@ -556,18 +573,15 @@ DECLARE_COMMAND_HANDLER(ask) {
                            provider, stop);
             } catch (const std::exception& ex) {
                 LOG(ERROR) << "/ask LLM work failed: " << ex.what();
-                if (!stop.stop_requested()) {
-                    queuePlainReply(api, sourceMessage,
-                                    res->get(Strings::LLM_RESPONSE_FAILED));
-                }
+                queuePlainReply(api, sourceMessage,
+                                res->get(Strings::LLM_RESPONSE_FAILED));
             } catch (...) {
                 LOG(ERROR) << "/ask LLM work failed with an unknown exception";
-                if (!stop.stop_requested()) {
-                    queuePlainReply(api, sourceMessage,
-                                    res->get(Strings::LLM_RESPONSE_FAILED));
-                }
+                queuePlainReply(api, sourceMessage,
+                                res->get(Strings::LLM_RESPONSE_FAILED));
             }
-        });
+        },
+        {.deadline = kAskWorkDeadline});
     if (!workId) {
         LOG(WARNING) << "LLM lane rejected /ask work";
         queuePlainReply(api, sourceMessage,

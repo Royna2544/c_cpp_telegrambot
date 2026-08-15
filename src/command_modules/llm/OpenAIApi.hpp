@@ -3,6 +3,7 @@
 #include <absl/log/log.h>
 #include <fmt/format.h>
 
+#include <chrono>
 #include <nlohmann/json.hpp>
 #include <optional>
 #include <string>
@@ -19,6 +20,8 @@ namespace llm::openai {
 constexpr const char* kModelsEndpoint = "/v1/models";
 constexpr const char* kChatEndpoint = "/v1/chat/completions";
 constexpr int kMaxTokens = 1024;
+constexpr int kClassifierMaxTokens = 32;
+constexpr auto kClassifierTimeout = std::chrono::seconds(60);
 // Reasoning-capable local models may spend most of a short completion budget
 // deciding which function to call. Keep ordinary replies compact, but give
 // tool turns enough bounded headroom to emit the call after their reasoning.
@@ -38,6 +41,18 @@ struct ChatRequest {
     int max_tokens{kMaxTokens};
 };
 NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(ChatRequest, model, messages, max_tokens)
+
+inline nlohmann::json makeClassifierRequest(const std::string& model,
+                                            const std::string& systemPrompt,
+                                            const std::string& userInput) {
+    ChatRequest req;
+    req.model = model;
+    req.messages = {{"system", systemPrompt}, {"user", userInput}};
+    req.max_tokens = kClassifierMaxTokens;
+    nlohmann::json payload = req;
+    payload["temperature"] = 0;
+    return payload;
+}
 
 // --- Response (tolerant: WITH_DEFAULT ignores extra/missing fields) ---
 struct RespMessage {
@@ -141,6 +156,37 @@ class OpenAIBackend : public LLMBackend {
         auto raw = CurlUtils::send_json_get_reply(
             url_ + kChatEndpoint, payload.dump(), std::string_view{authkey_},
             cancelled_);
+        if (!raw) {
+            return std::nullopt;
+        }
+        try {
+            const auto parsed = nlohmann::json::parse(*raw);
+            if (logIfApiError(parsed, kChatEndpoint)) {
+                return std::nullopt;
+            }
+            auto resp = parsed.get<ChatResponse>();
+            if (resp.choices.empty()) {
+                return std::nullopt;
+            }
+            return resp.choices.front().message.content;
+        } catch (const std::exception&) {
+            return std::nullopt;
+        }
+    }
+
+    std::optional<std::string> classify(const std::string& model,
+                                        const std::string& systemPrompt,
+                                        const std::string& userInput) override {
+        const auto expiresAt =
+            std::chrono::steady_clock::now() + kClassifierTimeout;
+        const auto classifierCancelled = [cancelled = cancelled_, expiresAt] {
+            return (cancelled && cancelled()) ||
+                   std::chrono::steady_clock::now() >= expiresAt;
+        };
+        auto raw = CurlUtils::send_json_get_reply(
+            url_ + kChatEndpoint,
+            makeClassifierRequest(model, systemPrompt, userInput).dump(),
+            std::string_view{authkey_}, classifierCancelled);
         if (!raw) {
             return std::nullopt;
         }
