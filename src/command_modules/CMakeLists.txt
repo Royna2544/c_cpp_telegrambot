@@ -241,6 +241,14 @@ endif()
 
 command_module(NAME ask SRCS ask.cpp LIBS CurlDownload Utils AuthApi)
 
+# vcpkg's static OpenSSL is built with no-pinshared, while libcurl initializes
+# it with the default process-exit cleanup handler.  The handler would outlive
+# a normally dlclosed command image and jump into unmapped code at process
+# exit.  Keep only the OpenSSL-bearing ask image resident on ELF; command
+# unload/reload still switches execution to the loader's uniquely staged image.
+target_link_options(cmd_ask PRIVATE
+  $<$<PLATFORM_ID:Linux>:-Wl,-z,nodelete>)
+
 if (TGBOTCPP_LUA_MODULES)
   file(GLOB LUA_SCRIPTS CONFIGURE_DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/*.lua")
 
