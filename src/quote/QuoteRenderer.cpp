@@ -30,6 +30,7 @@
 #include <span>
 #include <string>
 #include <string_view>
+#include <thread>
 #include <utility>
 #include <vector>
 
@@ -89,7 +90,7 @@ using AttrListPtr =
 using FontConfigPtr = std::unique_ptr<FcConfig, decltype(&FcConfigDestroy)>;
 using FontMapPtr = std::unique_ptr<PangoFontMap, decltype(&g_object_unref)>;
 
-[[nodiscard]] std::recursive_timed_mutex& textBackendMutex() {
+[[nodiscard]] std::recursive_mutex& textBackendMutex() {
     // Pango 1.57 reuses one process-global HarfBuzz buffer under a GLib lock.
     // Keep the complete Pango object lifetime behind an application-visible
     // synchronization boundary as well. Besides making that ownership explicit,
@@ -97,7 +98,7 @@ using FontMapPtr = std::unique_ptr<PangoFontMap, decltype(&g_object_unref)>;
     // uninstrumented static dependencies. The mutex must be process-wide
     // because the cached buffer is shared by every Pango font map and
     // QuoteRenderer.
-    static std::recursive_timed_mutex mutex;
+    static std::recursive_mutex mutex;
     return mutex;
 }
 
@@ -1930,10 +1931,23 @@ compat::expected<QuoteRenderResult, QuoteError> QuoteRenderer::render(
     try {
         const auto started = std::chrono::steady_clock::now();
         const auto expiresAt = started + request.deadline;
-        std::unique_lock<std::recursive_timed_mutex> textBackendLock(
+        std::unique_lock<std::recursive_mutex> textBackendLock(
             textBackendMutex(), std::defer_lock);
-        if (!textBackendLock.try_lock_until(expiresAt) ||
-            std::chrono::steady_clock::now() >= expiresAt) {
+        // Some libstdc++/TSan combinations do not observe the timed recursive
+        // mutex acquisition and then diagnose its release as an invalid
+        // unlock. Polling the ordinary recursive try-lock keeps the hand-off
+        // visible while retaining both reentrancy and the request deadline.
+        while (!textBackendLock.try_lock()) {
+            const auto now = std::chrono::steady_clock::now();
+            if (now >= expiresAt) {
+                return makeRenderError(QuoteErrorCode::DeadlineExceeded,
+                                       "quote render deadline exceeded while "
+                                       "waiting for the text backend");
+            }
+            std::this_thread::sleep_until(
+                std::min(expiresAt, now + std::chrono::milliseconds(1)));
+        }
+        if (std::chrono::steady_clock::now() >= expiresAt) {
             return makeRenderError(QuoteErrorCode::DeadlineExceeded,
                                    "quote render deadline exceeded while "
                                    "waiting for the text backend");

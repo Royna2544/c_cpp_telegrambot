@@ -143,7 +143,10 @@ install(
 install(FILES "${TGBOTCPP_GENERATED_RESOURCE_DIR}/about.html"
         DESTINATION share/${PROJECT_NAME})
 
-file(COPY resources/ DESTINATION ${CMAKE_BINARY_DIR}/share/${PROJECT_NAME})
+file(
+  COPY resources/
+  DESTINATION ${CMAKE_BINARY_DIR}/share/${PROJECT_NAME}
+  PATTERN "about.html" EXCLUDE)
 file(COPY www/index.html www/favicon.ico
      DESTINATION ${CMAKE_BINARY_DIR}/share/${PROJECT_NAME}/www)
 
