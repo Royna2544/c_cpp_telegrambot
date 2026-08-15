@@ -7,5 +7,6 @@
 # fully checked.
 race:^g_queue_pop_tail$
 race:^fc_thread_func$
+race:^free_patterns$
 race:^pango_fc_
 race:^Fc

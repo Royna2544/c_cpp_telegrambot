@@ -11,7 +11,6 @@
 #include <database/SQLiteDatabase.hpp>
 #endif
 
-#include <fstream>
 #include <future>
 #include <memory>
 #include <string>
@@ -260,16 +259,16 @@ TEST(ProtoDatabaseTest, ParsedRepeatedFieldsRemainReadableAndMutable) {
     constexpr UserId first = 3200;
     constexpr UserId count = 32;
     {
-        glider::proto::database::Database seed;
-        seed.set_ownerid(3199);
-        auto* const ids = seed.mutable_whitelist()->mutable_id();
+        ProtoDatabase seed;
+        ASSERT_TRUE(seed.load(path));
+        ASSERT_EQ(seed.claimOwnerUserId(3199),
+                  DatabaseBase::OwnerClaimResult::OK);
         for (UserId offset = 0; offset < count; ++offset) {
-            ids->Add(first + offset);
+            ASSERT_EQ(seed.addUserToList(DatabaseBase::ListType::WHITELIST,
+                                         first + offset),
+                      DatabaseBase::ListResult::OK);
         }
-
-        std::ofstream output(path, std::ios::binary | std::ios::trunc);
-        ASSERT_TRUE(output.is_open());
-        ASSERT_TRUE(seed.SerializeToOstream(&output));
+        ASSERT_TRUE(seed.unload());
     }
 
     ProtoDatabase reader;
