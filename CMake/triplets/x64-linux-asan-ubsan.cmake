@@ -7,10 +7,12 @@ set(VCPKG_CMAKE_SYSTEM_NAME Linux)
 
 # Protobuf's RepeatedField container annotations are emitted from both inline
 # application code and the compiled runtime. Keep target libraries on the same
-# sanitizer instrumentation as the application so parser allocations have
-# valid ASan container state. Host tools use vcpkg's separate default triplet.
+# AddressSanitizer instrumentation as the application so parser allocations
+# have valid ASan container state. UBSan remains enabled for the application;
+# applying it to every dependency triggers a GCC constexpr bug in Abseil.
+# Host tools use vcpkg's separate default triplet.
 set(_GLIDER_SANITIZER_FLAGS
-    "-fsanitize=address,undefined -fno-omit-frame-pointer")
+    "-fsanitize=address -fno-omit-frame-pointer")
 set(VCPKG_C_FLAGS "${_GLIDER_SANITIZER_FLAGS}")
 set(VCPKG_CXX_FLAGS "${_GLIDER_SANITIZER_FLAGS}")
-set(VCPKG_LINKER_FLAGS "-fsanitize=address,undefined")
+set(VCPKG_LINKER_FLAGS "-fsanitize=address")
