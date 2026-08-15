@@ -35,6 +35,22 @@ TEST(ToolRouterTest, RoutesExactResponseWithoutClassifier) {
         Domain::Chat);
 }
 
+TEST(ToolRouterTest, ExtractsLiteralResponseWithoutChangingPayload) {
+    EXPECT_EQ(llm::tool_router::extractLiteralResponse(
+                  "Say exactly FINAL FAST PATH OK"),
+              std::optional<std::string>{"FINAL FAST PATH OK"});
+    EXPECT_EQ(llm::tool_router::extractLiteralResponse(
+                  "  pLeAsE SaY ExAcTlY: *Keep This.*  "),
+              std::optional<std::string>{"*Keep This.*"});
+}
+
+TEST(ToolRouterTest, EmptyLiteralResponseUsesNormalRouting) {
+    EXPECT_FALSE(llm::tool_router::extractLiteralResponse("Say exactly"));
+    EXPECT_FALSE(
+        llm::tool_router::extractLiteralResponse("Please say exactly:   \t\n"));
+    EXPECT_FALSE(llm::tool_router::deterministicRoute("Say exactly"));
+}
+
 TEST(ToolRouterTest, ExactResponseOverridesPendingBuildFollowUp) {
     EXPECT_EQ(
         llm::tool_router::deterministicRoute("Say exactly FINAL TEST ASK OK",
@@ -46,12 +62,17 @@ TEST(ToolRouterTest, ExactResponseOverridesPendingBuildFollowUp) {
 }
 
 TEST(ToolRouterTest, MixedExactResponseRequestsUseClassifier) {
-    EXPECT_FALSE(llm::tool_router::deterministicRoute(
-        "Say exactly hello, then send it to Bob on Telegram"));
-    EXPECT_FALSE(llm::tool_router::deterministicRoute(
-        "Say exactly build the Eureka Kernel"));
-    EXPECT_FALSE(llm::tool_router::deterministicRoute(
-        "Please say exactly yes, then ask me whether to continue"));
+    constexpr std::array mixedRequests{
+        "Say exactly hello, then send it to Bob on Telegram",
+        "Say exactly build the Eureka Kernel",
+        "Please say exactly yes, then ask me whether to continue",
+    };
+    for (const auto request : mixedRequests) {
+        EXPECT_FALSE(llm::tool_router::extractLiteralResponse(request));
+        EXPECT_FALSE(llm::tool_router::deterministicRoute(request));
+    }
+    EXPECT_FALSE(llm::tool_router::extractLiteralResponse(
+        "Send exactly FINAL TEST ASK OK to Bob"));
     EXPECT_FALSE(llm::tool_router::deterministicRoute(
         "Send exactly FINAL TEST ASK OK to Bob"));
     EXPECT_FALSE(

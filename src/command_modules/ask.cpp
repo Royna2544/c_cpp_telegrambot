@@ -454,6 +454,11 @@ void runAskWork(TgBotApi::Ptr api, Message::Ptr sourceMessage, std::string text,
 
     // Otherwise the whole text is the query.
     const std::string query(trimmed);
+    if (const auto literal = llm::tool_router::extractLiteralResponse(query)) {
+        queuePlainReply(api, sourceMessage, *literal);
+        return;
+    }
+
     std::string model = selectedModel(chatId);
     if (model.empty()) {
         const auto models = backend->listModels();

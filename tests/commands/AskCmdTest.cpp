@@ -158,6 +158,49 @@ TEST_F(AskCmdTest, SchedulesEntireRequestOnLlmLaneWithoutRunningInline) {
     scheduledWork = {};
 }
 
+TEST_F(AskCmdTest, LiteralResponseBypassesModelAndProcessing) {
+    struct ScopedEnv {
+        std::string key;
+        std::optional<std::string> previous;
+        ScopedEnv(std::string key, std::string_view value)
+            : key(std::move(key)), previous(Env{}[this->key].get()) {
+            Env{}[this->key] = value;
+        }
+        ~ScopedEnv() {
+            if (previous) {
+                Env{}[key] = *previous;
+            } else {
+                Env{}[key].clear();
+            }
+        }
+    } urlEnv{"LLM.Url", "file:///this-path-must-not-be-read"},
+        typeEnv{"LLM.ApiType", "OpenAI"};
+
+    EXPECT_CALL(*botApi, submitCommandWork("ask", TgBotApi::WorkClass::Llm,
+                                           testing::_, testing::_))
+        .WillOnce(testing::Invoke([](std::string_view, TgBotApi::WorkClass,
+                                     TgBotApi::CancellableWork work,
+                                     TgBotApi::WorkOptions options)
+                                      -> std::optional<TgBotApi::WorkId> {
+            EXPECT_EQ(options.deadline, std::chrono::minutes(7));
+            work(std::stop_token{});
+            return 42;
+        }));
+    EXPECT_CALL(*botApi, submitCommandWork("ask", TgBotApi::WorkClass::Outbound,
+                                           testing::_, testing::_))
+        .WillOnce(testing::Invoke(
+            [](std::string_view, TgBotApi::WorkClass,
+               TgBotApi::CancellableWork work,
+               TgBotApi::WorkOptions) -> std::optional<TgBotApi::WorkId> {
+                work(std::stop_token{});
+                return 43;
+            }));
+    willSendReplyMessage("FINAL FAST PATH OK");
+
+    setCommandExtArgs({" Say exactly FINAL FAST PATH OK"});
+    execute();
+}
+
 TEST_F(AskCmdTest, DeadlineCancellationQueuesTerminalFailureAfterProcessing) {
     runCancelledAsk(true);
 }

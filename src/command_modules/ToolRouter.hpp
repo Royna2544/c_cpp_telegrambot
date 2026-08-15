@@ -104,37 +104,124 @@ inline bool containsAny(std::string_view value, Terms... terms) {
     return (containsTerm(value, terms) || ...);
 }
 
+inline bool asciiIEquals(std::string_view value, std::string_view expected) {
+    if (value.size() != expected.size()) {
+        return false;
+    }
+    return std::ranges::equal(value, expected,
+                              [](unsigned char lhs, unsigned char rhs) {
+                                  return std::tolower(lhs) == std::tolower(rhs);
+                              });
+}
+
+inline void skipAsciiWhitespace(std::string_view value, std::size_t& pos) {
+    while (pos < value.size() &&
+           std::isspace(static_cast<unsigned char>(value[pos]))) {
+        ++pos;
+    }
+}
+
+inline bool consumeWord(std::string_view value, std::size_t& pos,
+                        std::string_view word) {
+    if (pos + word.size() > value.size() ||
+        !asciiIEquals(value.substr(pos, word.size()), word)) {
+        return false;
+    }
+    const auto end = pos + word.size();
+    if (end < value.size()) {
+        const auto next = static_cast<unsigned char>(value[end]);
+        if (std::isalnum(next) || next == '_' || next == '-') {
+            return false;
+        }
+    }
+    pos = end;
+    return true;
+}
+
+inline std::optional<std::string_view> literalResponsePayload(
+    std::string_view query) {
+    std::size_t pos = 0;
+    skipAsciiWhitespace(query, pos);
+
+    const auto prefixStart = pos;
+    if (consumeWord(query, pos, "please")) {
+        const auto beforeSpace = pos;
+        skipAsciiWhitespace(query, pos);
+        if (pos == beforeSpace) {
+            return std::nullopt;
+        }
+    } else {
+        pos = prefixStart;
+    }
+
+    if (!consumeWord(query, pos, "say")) {
+        return std::nullopt;
+    }
+    const auto afterSay = pos;
+    skipAsciiWhitespace(query, pos);
+    if (pos == afterSay || !consumeWord(query, pos, "exactly")) {
+        return std::nullopt;
+    }
+
+    skipAsciiWhitespace(query, pos);
+    if (pos < query.size() && query[pos] == ':') {
+        ++pos;
+        skipAsciiWhitespace(query, pos);
+    }
+
+    auto payload = query.substr(pos);
+    while (!payload.empty() &&
+           std::isspace(static_cast<unsigned char>(payload.back()))) {
+        payload.remove_suffix(1);
+    }
+    if (payload.empty()) {
+        return std::nullopt;
+    }
+    return payload;
+}
+
+inline bool hasCapabilityCue(std::string_view normalizedValue) {
+    return containsAny(normalizedValue, "build", "compile", "rebuild", "kernel",
+                       "eureka", "grasskernel", "rom", "android", "recovery",
+                       "twrp", "lineageos", "derpfest", "derpfestnew",
+                       "crdroid", "yaap", "evolution-x", "send", "message",
+                       "telegram", "dm", "direct-message", "forward", "tell",
+                       "reply", "contact", "lookup", "retrieve", "save",
+                       "register", "remember", "chat", "id", "alias", "confirm",
+                       "confirmation") ||
+           normalizedValue.find(" grand kernel ") != std::string_view::npos ||
+           normalizedValue.find(" look up ") != std::string_view::npos ||
+           normalizedValue.find(" ask me ") != std::string_view::npos ||
+           normalizedValue.find(" ask the admin ") != std::string_view::npos ||
+           normalizedValue.find(" and ask ") != std::string_view::npos;
+}
+
 }  // namespace detail
+
+// Returns the literal payload for a tightly bounded "say exactly" request.
+// Mixed requests that mention any exposed capability deliberately stay on the
+// classifier path, and an empty instruction is not treated as a response.
+inline std::optional<std::string> extractLiteralResponse(
+    std::string_view query) {
+    const auto payload = detail::literalResponsePayload(query);
+    if (!payload || detail::hasCapabilityCue(detail::normalized(query))) {
+        return std::nullopt;
+    }
+    return std::string(*payload);
+}
 
 // Handles high-confidence and stateful cases without spending a classifier
 // inference. std::nullopt means the compact classifier should decide.
 inline std::optional<Domain> deterministicRoute(std::string_view query,
                                                 PendingBuilds pending = {}) {
     const auto value = detail::normalized(query);
-    const bool exactResponse = value.starts_with(" say exactly ") ||
-                               value.starts_with(" please say exactly ");
-    if (exactResponse) {
-        // A literal response instruction needs no capability. Keep mixed
-        // requests on the classifier path, though: quoted-looking text can
-        // still contain a real action after the requested phrase.
-        const bool capabilityCue =
-            detail::containsAny(
-                value, "build", "compile", "rebuild", "kernel", "eureka",
-                "grasskernel", "rom", "android", "recovery", "twrp",
-                "lineageos", "derpfest", "derpfestnew", "crdroid", "yaap",
-                "evolution-x", "send", "message", "telegram", "dm",
-                "direct-message", "forward", "tell", "reply", "contact",
-                "lookup", "retrieve", "save", "register", "remember", "chat",
-                "id", "alias", "confirm", "confirmation") ||
-            value.find(" grand kernel ") != std::string::npos ||
-            value.find(" look up ") != std::string::npos ||
-            value.find(" ask me ") != std::string::npos ||
-            value.find(" ask the admin ") != std::string::npos ||
-            value.find(" and ask ") != std::string::npos;
-        if (!capabilityCue) {
-            return Domain::Chat;
+    if (detail::literalResponsePayload(query)) {
+        // Do not let a mixed literal-looking request fall through into the
+        // builder or pending-plan heuristics. It still needs the classifier.
+        if (detail::hasCapabilityCue(value)) {
+            return std::nullopt;
         }
-        return std::nullopt;
+        return Domain::Chat;
     }
     const bool discussionPrefix =
         value.starts_with(" how ") || value.starts_with(" what ") ||
