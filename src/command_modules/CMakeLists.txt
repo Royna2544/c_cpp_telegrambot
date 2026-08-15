@@ -215,16 +215,24 @@ command_module(
   LIBS QuoteRenderer Utils $<$<PLATFORM_ID:Windows>:advapi32>)
 
 # dlfcn-win32 loads command modules with LOAD_WITH_ALTERED_SEARCH_PATH, so a
-# project DLL used only by a command module must live beside that module.  The
-# vcpkg app-local step already places QuoteRenderer's runtime dependencies
-# there; copy/install the renderer itself as well.
+# project DLL used only by a command module must live beside that module. Stage
+# QuoteRenderer before cmd_q links so vcpkg's app-local post-build scan can also
+# discover and copy the renderer's runtime dependencies.
 if(WIN32)
-  add_custom_command(
-    TARGET cmd_q
-    POST_BUILD
+  set(cmd_q_runtime_dir "${CMAKE_BINARY_DIR}/lib/glider-modules")
+  if(CMAKE_CONFIGURATION_TYPES)
+    string(APPEND cmd_q_runtime_dir "/$<CONFIG>")
+  endif()
+
+  add_custom_target(
+    stage_cmd_q_runtime
+    COMMAND ${CMAKE_COMMAND} -E make_directory "${cmd_q_runtime_dir}"
     COMMAND ${CMAKE_COMMAND} -E copy_if_different
-            $<TARGET_FILE:QuoteRenderer> $<TARGET_FILE_DIR:cmd_q>
+            "$<TARGET_FILE:QuoteRenderer>" "${cmd_q_runtime_dir}"
+    DEPENDS QuoteRenderer
     VERBATIM)
+  add_dependencies(cmd_q stage_cmd_q_runtime)
+
   install(
     FILES $<TARGET_FILE:QuoteRenderer>
     DESTINATION lib/glider-modules

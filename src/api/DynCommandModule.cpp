@@ -45,6 +45,13 @@ class DLWrapper {
     [[nodiscard]] T sym(const std::string_view name) const {
         return reinterpret_cast<T>(sym(name));
     }
+    template <typename T>
+    [[nodiscard]] T optionalSym(const std::string_view name) const {
+        (void)dlerror();
+        auto* symbol = dlsym(handle.get(), name.data());
+        (void)dlerror();
+        return reinterpret_cast<T>(symbol);
+    }
     bool info(const std::string_view name, Dl_info* info) const {
         // return value of 0 or more is a valid one...
         return dladdr(sym(name), info) >= 0;
@@ -105,6 +112,8 @@ bool DynCommandModule::loadImage(const std::filesystem::path& imagePath) {
         LOG(ERROR) << "Invalid module: " << filePath;
         return false;
     }
+    cleanupCallback = dlwrapper.optionalSym<DynModule::cleanup_callback_t>(
+        DYN_COMMAND_CLEANUP_SYM_STR);
     info = Info(_module);
 
     if constexpr (buildinfo::isDebugBuild()) {
@@ -174,6 +183,10 @@ bool DynCommandModule::unload() {
     std::unique_lock<std::mutex> mLK(mLock, std::adopt_lock);
 
     if (handle) {
+        if (cleanupCallback != nullptr) {
+            cleanupCallback();
+            cleanupCallback = nullptr;
+        }
         handle = nullptr;
         removeReloadImage();
         return true;

@@ -258,4 +258,7 @@ target_include_directories(test_qcommand PRIVATE
   ${CMAKE_SOURCE_DIR}/src/command_modules
   ${CMAKE_CURRENT_SOURCE_DIR}
   $<TARGET_PROPERTY:TgBot,INTERFACE_INCLUDE_DIRECTORIES>)
-add_dependencies(test_qcommand cmd_q)
+add_dependencies(test_qcommand cmd_alive cmd_q)
+if(WIN32)
+  add_dependencies(test_qcommand stage_cmd_q_runtime)
+endif()

@@ -10,3 +10,4 @@ race:^fc_thread_func$
 race:^free_patterns$
 race:^pango_fc_
 race:^Fc
+race:^IA__Fc

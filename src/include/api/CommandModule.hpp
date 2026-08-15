@@ -21,6 +21,9 @@ class CommandModule;
 // Loading commandmodule definitions
 #define DYN_COMMAND_SYM_STR "cmd"
 #define DYN_COMMAND_SYM     cmd
+// Optional out-of-struct export so adding cleanup does not change module ABI.
+#define DYN_COMMAND_CLEANUP_SYM_STR "glider_command_cleanup_v1"
+#define DYN_COMMAND_CLEANUP_SYM     glider_command_cleanup_v1
 
 #ifdef _WIN32
 #define DYN_COMMAND_EXPORT __declspec(dllexport)
@@ -39,6 +42,7 @@ struct DynModule {
     using command_callback_t = void (*)(TgBotApi::Ptr api, MessageExt*,
                                         const StringResLoader::PerLocaleMap*,
                                         const Providers* provider);
+    using cleanup_callback_t = void (*)() noexcept;
 
     enum class Flags {
         None = 0,
@@ -239,6 +243,7 @@ class DynCommandModule : public CommandModule {
     std::unique_ptr<void, int (*)(void*)> handle;
     std::filesystem::path filePath;
     std::filesystem::path loadedImagePath;
+    DynModule::cleanup_callback_t cleanupCallback = nullptr;
 
     // Lock
     mutable std::mutex mLock;

@@ -198,6 +198,8 @@ TEST_F(IbashCommandTest, SessionsAreScopedByChatAndUser) {
         .WillByDefault(testing::Return("session started"));
     ON_CALL(strings, get(Strings::IBASH_START_FIRST))
         .WillByDefault(testing::Return("start first"));
+    ON_CALL(strings, get(Strings::IBASH_SESSION_ENDED))
+        .WillByDefault(testing::Return("session ended"));
 
     setCommandExtArgs();
     TgBotApi::CancellableWork start;
@@ -225,6 +227,54 @@ TEST_F(IbashCommandTest, SessionsAreScopedByChatAndUser) {
     execute();
     ASSERT_TRUE(static_cast<bool>(other_user));
     other_user(std::stop_token{});
+
+    defaultProvidedMessage->from = createDefaultUser();
+    setCommandExtArgs({"cancel"});
+    willSendReplyMessage("session ended");
+    execute();
+}
+
+TEST_F(IbashCommandTest, UnloadDrainsSessionsBeforeSameImageReload) {
+    ON_CALL(strings, get(Strings::IBASH_SESSION_STARTED))
+        .WillByDefault(testing::Return("session started"));
+    ON_CALL(strings, get(Strings::IBASH_SESSION_ENDED))
+        .WillByDefault(testing::Return("session ended"));
+
+    setCommandExtArgs();
+    TgBotApi::CancellableWork first_start;
+    EXPECT_CALL(*botApi,
+                submitCommandWork("ibash", TgBotApi::WorkClass::Process,
+                                  testing::_, testing::_))
+        .WillOnce(testing::DoAll(
+            testing::SaveArg<2>(&first_start),
+            testing::Return(std::optional<TgBotApi::WorkId>{49})));
+    willSendReplyMessage("session started");
+    execute();
+    ASSERT_TRUE(static_cast<bool>(first_start));
+    first_start(std::stop_token{});
+    first_start = {};
+
+    ASSERT_TRUE(module->unload());
+    module.reset();
+    module = loadModule(name);
+    ASSERT_NE(module, nullptr);
+
+    setCommandExtArgs();
+    TgBotApi::CancellableWork second_start;
+    EXPECT_CALL(*botApi,
+                submitCommandWork("ibash", TgBotApi::WorkClass::Process,
+                                  testing::_, testing::_))
+        .WillOnce(testing::DoAll(
+            testing::SaveArg<2>(&second_start),
+            testing::Return(std::optional<TgBotApi::WorkId>{50})));
+    willSendReplyMessage("session started");
+    execute();
+    ASSERT_TRUE(static_cast<bool>(second_start));
+    second_start(std::stop_token{});
+
+    setCommandExtArgs({"cancel"});
+    willSendReplyMessage("session ended");
+    execute();
 }
 
 TEST_F(IbashCommandTest, CancelInterruptsRunningCommandWithoutWorkerHang) {

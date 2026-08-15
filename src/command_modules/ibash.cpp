@@ -25,6 +25,7 @@
 #include <condition_variable>
 #include <cstdint>
 #include <cstring>
+#include <exception>
 #include <map>
 #include <memory>
 #include <mutex>
@@ -596,8 +597,15 @@ class InteractiveBashManager {
         return instance;
     }
 
+    static InteractiveBashManager* existingInstance() noexcept {
+        return existing_.load(std::memory_order_acquire);
+    }
+
     bool startSession(const SessionKey& key, std::stop_token stop,
                       Clock::time_point deadline) {
+        if (!ensureReaper()) {
+            return false;
+        }
         std::shared_ptr<BashSession> existing;
         {
             std::scoped_lock lock(mutex_);
@@ -685,35 +693,64 @@ class InteractiveBashManager {
         return true;
     }
 
-   private:
-    InteractiveBashManager()
-        : reaper_([this](std::stop_token stop) { reaperLoop(stop); }) {}
-
-    ~InteractiveBashManager() {
-        reaper_.request_stop();
-        reaper_cv_.notify_all();
+    void shutdown() {
+        std::scoped_lock lifecycle_lock(lifecycle_mutex_);
         if (reaper_.joinable()) {
+            reaper_.request_stop();
+            reaper_cv_.notify_all();
             reaper_.join();
         }
+        shutdownSessions();
+    }
 
-        std::vector<std::shared_ptr<BashSession>> remaining;
+   private:
+    bool ensureReaper() {
+        try {
+            std::scoped_lock lifecycle_lock(lifecycle_mutex_);
+            if (!reaper_.joinable()) {
+                reaper_ = std::jthread(
+                    [this](std::stop_token stop) { reaperLoop(stop); });
+            }
+            return true;
+        } catch (const std::exception& error) {
+            LOG(ERROR) << "Failed to start ibash session reaper: "
+                       << error.what();
+        } catch (...) {
+            LOG(ERROR) << "Failed to start ibash session reaper";
+        }
+        return false;
+    }
+
+    void shutdownSessions() {
+        std::scoped_lock cleanup_lock(cleanup_mutex_);
+        std::map<SessionKey, std::shared_ptr<BashSession>> sessions;
+        std::vector<std::shared_ptr<BashSession>> retired;
         {
             std::scoped_lock lock(mutex_);
-            for (auto& [key, session] : sessions_) {
-                remaining.push_back(std::move(session));
-            }
-            sessions_.clear();
-            for (auto& session : retired_) {
-                remaining.push_back(std::move(session));
-            }
-            retired_.clear();
+            sessions.swap(sessions_);
+            retired.swap(retired_);
         }
-        for (const auto& session : remaining) {
+        for (const auto& entry : sessions) {
+            entry.second->requestTermination();
+        }
+        for (const auto& session : retired) {
             session->requestTermination();
         }
-        for (const auto& session : remaining) {
+        for (const auto& entry : sessions) {
+            entry.second->cleanup();
+        }
+        for (const auto& session : retired) {
             session->cleanup();
         }
+    }
+
+    InteractiveBashManager() {
+        existing_.store(this, std::memory_order_release);
+    }
+
+    ~InteractiveBashManager() {
+        shutdown();
+        existing_.store(nullptr, std::memory_order_release);
     }
 
     void retireSession(const SessionKey& key,
@@ -752,6 +789,7 @@ class InteractiveBashManager {
     }
 
     void cleanupRetired() {
+        std::scoped_lock cleanup_lock(cleanup_mutex_);
         std::vector<std::shared_ptr<BashSession>> retired;
         {
             std::scoped_lock lock(mutex_);
@@ -785,9 +823,12 @@ class InteractiveBashManager {
     std::mutex mutex_;
     std::map<SessionKey, std::shared_ptr<BashSession>> sessions_;
     std::vector<std::shared_ptr<BashSession>> retired_;
+    std::mutex lifecycle_mutex_;
+    std::mutex cleanup_mutex_;
     std::mutex reaper_mutex_;
     std::condition_variable reaper_cv_;
     std::jthread reaper_;
+    static inline std::atomic<InteractiveBashManager*> existing_{nullptr};
 };
 
 std::optional<SessionKey> sessionKey(const MessageExt& message) {
@@ -875,6 +916,18 @@ DECLARE_COMMAND_HANDLER(ibash) {
 }
 
 }  // namespace
+
+extern "C" DYN_COMMAND_EXPORT void DYN_COMMAND_CLEANUP_SYM() noexcept {
+    try {
+        if (auto* manager = InteractiveBashManager::existingInstance()) {
+            manager->shutdown();
+        }
+    } catch (const std::exception& error) {
+        LOG(ERROR) << "Failed to clean up ibash sessions: " << error.what();
+    } catch (...) {
+        LOG(ERROR) << "Failed to clean up ibash sessions";
+    }
+}
 
 extern "C" DYN_COMMAND_EXPORT const struct DynModule DYN_COMMAND_SYM = {
     .flags = DynModule::Flags::OwnerOnly,
